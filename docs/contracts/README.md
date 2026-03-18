@@ -1,8 +1,40 @@
 # Protin — Type Contracts
 
 This directory documents the shared type contracts for the Protin platform.
-The **authoritative** source of truth is the TypeScript source in `packages/shared-types/src/`.
-These docs explain *why* types are shaped the way they are, which the TypeScript files cannot.
+
+---
+
+## Source of truth hierarchy
+
+```
+apps/api/app/schemas/      ← canonical source of truth for field names and types
+packages/shared-types/src/ ← TypeScript mirror of the API contract (camelCase)
+apps/mobile/src/           ← consumes shared-types (read-only against this contract)
+```
+
+The **API schema** (Python/Pydantic) is the authoritative source for:
+- Which fields exist in each response
+- Field names (snake_case; mobile transforms to camelCase)
+- Nullable vs required fields
+- Enum values
+
+The **shared-types package** must mirror the API schema exactly, using camelCase field names
+(because the mobile `api.ts` client transforms snake_case → camelCase on every response).
+
+The **mobile app** must not define its own local types for entities that have a shared-types
+equivalent. Local inline types in screens are acceptable only for shapes that are never
+shared across files.
+
+---
+
+## Contract ownership
+
+| Layer | Owner | Edit rule |
+|---|---|---|
+| `apps/api/app/schemas/` | Backend teammate | Source of truth — changes here drive changes below |
+| `packages/shared-types/src/` | Contracts teammate (Wave 8+) | Must stay in sync with API schemas |
+| `docs/contracts/` | Contracts teammate | Document all changes and conventions |
+| `apps/mobile/src/` | Mobile teammate | Must consume shared-types, not redefine types locally |
 
 ---
 
@@ -10,74 +42,61 @@ These docs explain *why* types are shaped the way they are, which the TypeScript
 
 ```
 User                   Identity and authentication
-  └─ UserProfile         Display data: name, bio, suburb, avatar  (sport-profile.ts)
-  └─ IdentityPreferences Who the user wants to partner with       (sport-profile.ts)
-  └─ SportProfile        Per-sport fitness data: gym or golf      (sport-profile.ts)
+  └─ User                id, email, isActive, createdAt  (user.ts)
+  └─ UserProfile         displayName, bio, suburb, avatarUrl, birthYear  (sport-profile.ts)
+  └─ IdentityPreferences openTo, ageRangeMin, ageRangeMax, maxDistanceKm  (sport-profile.ts)
+  └─ SportProfile        sport, level, preferredTimes, gymName, golfClub, goals  (sport-profile.ts)
 
 Discovery              Browsing potential workout partners (Discover tab)
-  └─ PartnerCard         Summary shown in the discovery feed
-  └─ DiscoveryFilter     Query parameters for GET /discovery
-  └─ DiscoveryAction     pass / like / save gesture by the current user
-  └─ RecordActionRequest POST /discovery/actions payload
+  └─ PartnerCard         Summary shown in the discovery feed  (discovery.ts)
+  └─ DiscoveryFilter     Query parameters for GET /discovery  (discovery.ts)
+  └─ RecordActionRequest POST /discovery/actions payload  (discovery.ts)
+  └─ RecordActionResponse matchCreated flag + optional matchId  (discovery.ts)
 
 Match                  Mutual-interest entity (real DB record)
-  └─ Match               Created when two users mutually like each other for the same sport
-  └─ MatchWithPartner    Match enriched with the other user's PartnerCard, for mobile rendering
+  └─ Match               id, sport, status, createdAt — base fields only  (match.ts)
+  └─ MatchWithPartner    Match + partner PartnerCard — what the API actually returns  (match.ts)
 
-Booking                Core transactional entity — Wave 3+ scope
-  └─ Availability        Time slot (future)
-  └─ Booking             Booked slot (future)
-  └─ BookingDetail       Enriched booking for mobile rendering (future)
+Booking                Proposed sessions between matched partners
+  └─ Booking             Base fields — API always returns enriched form  (booking.ts)
+  └─ BookingDetail       Booking + partner PartnerCard — what the API actually returns  (booking.ts)
+  └─ CreateBookingRequest POST /bookings payload  (booking.ts)
 
-Calendar               Scheduling and external sync — future scope
-  └─ AvailabilityWindow   Recurring weekly slot block
-  └─ CalendarSlot         A single slot view
-  └─ CalendarSync*        External provider (Google, Apple, Outlook) sync types
+Chat                   Messages scoped to a match
+  └─ Message             id, matchId, senderId, body, createdAt  (chat.ts)
+  └─ SendMessageRequest  body  (chat.ts)
+
+Google Calendar        Google Calendar integration (implemented)
+  └─ GoogleCalendarStatus  connected, calendarId, connectedAt  (google-calendar.ts)
+  └─ SyncBookingResponse   bookingId, googleEventId, syncStatus  (google-calendar.ts)
+
+Notifications          Push token registration
+  └─ RegisterPushTokenRequest  token, platform  (notifications.ts)
+  └─ PushTokenResponse         id, userId, token, platform, createdAt  (notifications.ts)
+  └─ PushNotificationData      type, bookingId  (notifications.ts)
+
+Safety                 Reports and blocks
+  └─ CreateReportRequest  reportedUserId, reason, context  (safety.ts)
+  └─ ReportResponse       id, reporterId, reportedId, reason  (safety.ts)
+  └─ BlockResponse        id, blockerId, blockedId, createdAt  (safety.ts)
+
+Calendar (future)      Availability scheduling — NOT YET IMPLEMENTED in the API
+  └─ AvailabilityWindow   Recurring weekly block  (calendar.ts)
+  └─ CalendarSlot         Single slot view  (calendar.ts)
+  └─ CalendarSyncRequest  External provider OAuth  (calendar.ts)
 ```
 
 ---
 
 ## Architecture notes
 
-### DiscoveryAction leads to Match when mutual
-
-A `DiscoveryAction` (`'like'` | `'pass'` | `'save'`) is recorded via `POST /discovery/actions`.
-When a like action causes a mutual like between two users for the same sport, the API
-creates a `Match` entity and returns `matchCreated: true` with a `matchId` in the
-`RecordActionResponse`.
-
-```
-User A likes User B  →  RecordActionResponse { matchCreated: false }
-User B likes User A  →  RecordActionResponse { matchCreated: true, matchId: "..." }
-                                              ↓
-                                        Match entity created in DB
-                                        (user1Id < user2Id, lexicographic)
-```
-
-The `Match` is a **real database entity** — not a view or projection. The match persists
-independently of any future booking and can be archived by either participant.
-
-### Sports are gym and golf only
-
-`Sport = 'gym' | 'golf'` is the complete set for the current scope. Do not extend this
-union speculatively — adding a sport requires product and backend changes together.
-
-### Location is suburb-based, not lat/lng
-
-Discovery filtering uses `suburb: string` (Sydney suburb name). There are no lat/lng
-coordinates in the MVP. `GeoLocation` remains in `common.ts` for future use but is not
-referenced in any Wave 2 type.
-
-### PartnerCard replaces TrainerCard
-
-The discovery feed returns `PartnerCard` objects — intentionally limited summaries of
-potential workout partners. The `bioExcerpt` is truncated at 160 chars by the API.
-Full profile detail is fetched separately.
-
 ### Wire format
 
-FastAPI emits `snake_case` JSON by default. The shared types in this package use `camelCase`
-(TypeScript convention). The mobile API client layer is responsible for field transformation:
+FastAPI emits `snake_case` JSON by default. The mobile `api.ts` client transforms all keys:
+- Outgoing requests: camelCase body keys → snake_case before sending
+- Incoming responses: snake_case JSON keys → camelCase before returning to screens
+
+Shared-types always use camelCase field names to match what screens receive after transformation.
 
 ```
 API response (snake_case)       Mobile types (camelCase)
@@ -86,10 +105,43 @@ created_at        →             createdAt
 display_name      →             displayName
 birth_year        →             birthYear
 sport_profiles    →             sportProfiles
+match_id          →             matchId
+proposer_id       →             proposerId
 ```
 
-If the API is later configured to emit camelCase (via Pydantic `alias_generator`),
-the transformation layer can be removed without touching these type definitions.
+### Match response shape
+
+The API's `MatchResponse` does NOT include `user1_id` / `user2_id`. Those are internal DB
+fields (used to maintain the canonical pair). The API always returns the enriched shape with
+`partner: PartnerCardResponse`. Mobile consumers must use `MatchWithPartner`, not `Match` directly.
+
+### Booking response shape
+
+Similarly, the API's `BookingResponse` always includes the `partner: PartnerCardResponse`.
+There is no bare-booking endpoint. The base `Booking` type exists for type composition only.
+Mobile consumers must use `BookingDetail`.
+
+### User active status
+
+The API's `UserResponse` uses `is_active: bool` (a boolean). There is no string `UserStatus`
+field in the API contract. The previously exported `UserStatus` string union has been removed
+from shared-types.
+
+### Google Calendar vs generic CalendarSync
+
+The implemented calendar feature is Google Calendar only, defined in `google-calendar.ts`.
+The `calendar.ts` file contains placeholder types for a future general availability/scheduling
+feature — those types have no corresponding API endpoints and must not be used in screens.
+
+### DiscoveryAction leads to Match when mutual
+
+```
+User A likes User B  →  RecordActionResponse { matchCreated: false }
+User B likes User A  →  RecordActionResponse { matchCreated: true, matchId: "..." }
+                                              ↓
+                                        Match entity created in DB
+                                        (user1_id < user2_id, lexicographic)
+```
 
 ### Paginated responses
 
@@ -104,45 +156,64 @@ interface Paginated<T> {
 }
 ```
 
-Query parameters are always `limit` and `offset`. Default `limit` is decided by the API
-implementation; the mobile client always passes explicit values.
-
 ### Timestamps
 
-All timestamps are ISO 8601 UTC strings (`ISODateString`). Timezone conversion for
-display is the mobile app's responsibility. Never store or transmit timestamps in
-local time across the API boundary.
+All timestamps are ISO 8601 UTC strings (`ISODateString`). Timezone conversion for display
+is the mobile app's responsibility. Never store or transmit timestamps in local time
+across the API boundary.
 
 ---
 
-## How to extend these contracts
+## How to update contracts
+
+### When the API schema changes (Backend teammate changes a schema file)
+
+1. Identify the changed field in `apps/api/app/schemas/{domain}.py`
+2. Update the matching interface in `packages/shared-types/src/{domain}.ts`
+   - Field names in shared-types use camelCase (the post-transform form)
+   - Required → optional or vice versa must match the Pydantic field definition
+3. Update `docs/contracts/naming.md` if a new field pattern is introduced
+4. Check `apps/mobile/src/` for any local type definitions that duplicate the changed field
+   — flag these as mobile-side mismatches for the Mobile teammate
 
 ### Adding a field to an existing entity
 
 Edit the interface in `packages/shared-types/src/{domain}.ts`.
-Run `npm run typecheck` from `packages/shared-types` to confirm no consumers break.
+Verify the API schema has the matching field.
 Update this README if the field changes the domain's architecture.
 
 ### Adding a new domain
 
-1. Create `packages/shared-types/src/{domain}.ts`
-2. Export from `packages/shared-types/src/index.ts`
-3. Add an entry to the domain map above
-4. Add a naming entry in `docs/contracts/naming.md`
+1. Confirm the API schema exists in `apps/api/app/schemas/{domain}.py`
+2. Create `packages/shared-types/src/{domain}.ts`
+3. Export from `packages/shared-types/src/index.ts`
+4. Add an entry to the domain map above
+5. Add naming conventions in `docs/contracts/naming.md`
+
+### Removing a field or type
+
+1. Remove from the API schema first (Backend teammate)
+2. Remove from `packages/shared-types/src/{domain}.ts`
+3. Remove the export from `index.ts`
+4. Search `apps/mobile/src/` for usages — flag to Mobile teammate
 
 ### Adding a status value
 
-Status fields are string unions (not TypeScript enums). Add the new value to the union
-and search the mobile codebase for exhaustive `switch` statements — they will need updating.
+Status fields are string unions (not TypeScript enums). Add the new value to the union and
+search the mobile codebase for exhaustive `switch` statements that will need updating.
 
 ---
 
-## Consuming this package
+## Consuming the shared-types package
 
 The package is registered in the npm workspace root (`"packages/*"` in `workspaces`).
 
 Import in mobile or other consumers:
 
 ```typescript
-import type { User, PartnerCard, Match } from '@protin/shared-types';
+import type { User, PartnerCard, Match, MatchWithPartner, BookingDetail } from '@protin/shared-types';
 ```
+
+Always import the enriched type for entities where the API always returns a partner/enriched form:
+- Use `MatchWithPartner` not `Match`
+- Use `BookingDetail` not `Booking`

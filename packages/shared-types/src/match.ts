@@ -20,10 +20,16 @@ export type MatchStatus = 'active' | 'archived';
 // Match entity
 // ---------------------------------------------------------------------------
 
+/**
+ * Match as returned by GET /matches and PATCH /matches/:id.
+ *
+ * Note: user1_id and user2_id are stored in the DB (canonical pair, user1Id < user2Id)
+ * but are NOT included in the API response. The API always returns the enriched
+ * MatchWithPartner shape (partner is always present). This base type exists only
+ * for type composition; mobile consumers should use MatchWithPartner.
+ */
 export interface Match {
   id: UUID;
-  user1Id: UUID;
-  user2Id: UUID;
   sport: Sport;
   status: MatchStatus;
   createdAt: ISODateString;

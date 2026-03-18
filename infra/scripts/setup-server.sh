@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 # setup-server.sh — First-time Docker Engine setup for Ubuntu 22.04+
 #
+# Target machine: RX6600 staging server running Ubuntu 22.04+
+# Note: nginx runs inside Docker — do NOT install nginx on the host.
+#
 # Usage:
 #   sudo bash infra/scripts/setup-server.sh
 #
 # What it does:
 #   - Installs Docker Engine and Docker Compose v2 via the official apt repo
 #   - Adds the invoking user to the docker group
+#   - Enables Docker to start on boot
 #
-# Run once on a fresh staging server. Reboot or log out/in after completion.
+# Safe to re-run — guards prevent duplicate apt source entries and GPG key writes.
 
 set -euo pipefail
 
@@ -23,15 +27,22 @@ apt-get update
 apt-get install -y ca-certificates curl gnupg
 
 install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-  | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+# Only write the GPG key if it doesn't exist (idempotent)
+if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+    | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+fi
 chmod a+r /etc/apt/keyrings/docker.gpg
 
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+# Only add the apt source if it doesn't exist (idempotent)
+if [[ ! -f /etc/apt/sources.list.d/docker.list ]]; then
+  echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
 https://download.docker.com/linux/ubuntu \
 $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
-  > /etc/apt/sources.list.d/docker.list
+    > /etc/apt/sources.list.d/docker.list
+fi
 
 apt-get update
 apt-get install -y \
@@ -40,6 +51,10 @@ apt-get install -y \
   containerd.io \
   docker-buildx-plugin \
   docker-compose-plugin
+
+# ── Enable Docker on boot ──────────────────────────────────────────────────────
+systemctl enable --now docker
+echo "Docker enabled and started."
 
 # ── Add user to docker group ───────────────────────────────────────────────────
 TARGET_USER="${SUDO_USER:-$USER}"

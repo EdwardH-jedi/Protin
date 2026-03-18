@@ -12,15 +12,17 @@
 import type { ISODateString, UUID } from './common';
 
 // ---------------------------------------------------------------------------
-// Enums (string unions)
-// ---------------------------------------------------------------------------
-
-export type UserStatus = 'active' | 'pending_verification' | 'suspended';
-
-// ---------------------------------------------------------------------------
 // Entity
 // ---------------------------------------------------------------------------
 
+/**
+ * Authentication identity as returned by GET /auth/me.
+ * Fields match the API's UserResponse schema (snake_case keys transformed to camelCase
+ * by the mobile API client layer).
+ *
+ * Note: the API uses `is_active: bool` (boolean), not a string status field.
+ * A UserStatus string union is not part of the current API contract.
+ */
 export interface User {
   id: UUID;
   email: string;

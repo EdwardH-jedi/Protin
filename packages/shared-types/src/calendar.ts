@@ -1,17 +1,12 @@
 /**
- * Calendar domain types.
+ * Calendar domain types — FUTURE SCOPE, not yet implemented in the API.
  *
- * Calendar sync is an optional layer on top of the core booking model.
- * It has two concerns:
+ * These types are placeholders for potential future availability scheduling.
+ * The only implemented calendar feature is Google Calendar sync, which is
+ * covered by google-calendar.ts.
  *
- * 1. Trainer availability management — a trainer can publish their
- *    availability as recurring windows, or sync from an external calendar.
- *
- * 2. Client calendar export — a client can export confirmed bookings
- *    to their personal calendar after a match is confirmed.
- *
- * Neither concern is implemented in the foundation. These types establish
- * the naming contract for the feature agents that build these flows.
+ * Do not use these types in mobile screens until the corresponding API
+ * endpoints exist.
  */
 
 import type { ISODateString, Timezone, UUID } from './common';
@@ -21,15 +16,14 @@ import type { ISODateString, Timezone, UUID } from './common';
 // ---------------------------------------------------------------------------
 
 /**
- * A recurring weekly availability block set by a trainer.
- * Used to generate bookable Availability slots (see booking.ts).
+ * A recurring weekly availability block — future scope.
  *
- * Times are stored in the trainer's declared timezone to correctly handle DST.
+ * Times are stored in the user's declared timezone to correctly handle DST.
  * dayOfWeek follows the JavaScript convention: 0 = Sunday, 6 = Saturday.
  */
 export interface AvailabilityWindow {
   id: UUID;
-  trainerId: UUID;
+  userId: UUID;
   dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   /** Start time in HH:MM format (24-hour). Example: "09:00" */
   startTime: string;
@@ -52,12 +46,12 @@ export interface CreateAvailabilityWindowRequest {
 }
 
 // ---------------------------------------------------------------------------
-// Calendar slots (read — what a client sees on a trainer's calendar)
+// Calendar slots (read — availability view)
 // ---------------------------------------------------------------------------
 
 /**
- * A single time slot as seen by a client browsing a trainer's availability.
- * This is a read-only view; clients interact with Availability (booking.ts) to book.
+ * A single time slot as seen when browsing availability.
+ * Future scope — no API endpoint currently exists for this.
  */
 export interface CalendarSlot {
   startsAt: ISODateString;

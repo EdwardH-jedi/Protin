@@ -5,14 +5,15 @@ Set it in your .env file for production.
 """
 
 import logging
-import os
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import jwt
 from passlib.context import CryptContext
 
-SECRET_KEY: str = os.environ.get("SECRET_KEY", "change-me-in-production")
+from app.core.config import get_settings as _get_settings
+
+SECRET_KEY: str = _get_settings().secret_key
 
 _log = logging.getLogger(__name__)
 

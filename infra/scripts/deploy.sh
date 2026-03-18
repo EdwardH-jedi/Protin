@@ -20,9 +20,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.staging.yml"
 COMPOSE="docker compose $COMPOSE_FILES"
 
-BUILD_FLAG=""
+DO_BUILD=false
 if [[ "${1:-}" == "--build" ]]; then
-    BUILD_FLAG="--build"
+    DO_BUILD=true
 fi
 
 echo "==> Protin staging deploy — $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
@@ -45,7 +45,7 @@ fi
 echo "==> Pulling base images…"
 $COMPOSE pull postgres redis nginx 2>/dev/null || true
 
-if [[ -n "$BUILD_FLAG" ]]; then
+if [[ "$DO_BUILD" == "true" ]]; then
     echo "==> Building API image…"
     $COMPOSE build api worker migrate
 fi
@@ -55,23 +55,35 @@ echo "==> Starting postgres and redis…"
 $COMPOSE up -d postgres redis
 
 echo "==> Waiting for postgres to be healthy…"
-timeout 60 bash -c "until $COMPOSE exec -T postgres pg_isready -U \"\$(grep POSTGRES_USER .env.staging | cut -d= -f2)\" >/dev/null 2>&1; do sleep 2; done"
+if ! timeout 60 bash -c "until $COMPOSE ps postgres | grep -q 'healthy'; do sleep 2; done"; then
+    echo "ERROR: postgres did not become healthy within 60 seconds."
+    $COMPOSE logs --tail=20 postgres
+    exit 1
+fi
 
 # ── Run migrations ────────────────────────────────────────────────────────────
 echo "==> Running database migrations…"
-$COMPOSE run --rm migrate
+if ! $COMPOSE run --rm migrate; then
+    echo "ERROR: database migrations failed."
+    $COMPOSE logs --tail=20 migrate
+    exit 1
+fi
 
 # ── Start API and worker ──────────────────────────────────────────────────────
 echo "==> Starting API, worker, and nginx…"
-$COMPOSE up -d $BUILD_FLAG api worker nginx
+$COMPOSE up -d api worker nginx
 
 # ── Health check ─────────────────────────────────────────────────────────────
 echo "==> Waiting for API to become healthy…"
-timeout 60 bash -c "until curl -sf http://localhost/health >/dev/null 2>&1; do sleep 3; done"
+if ! timeout 60 bash -c "until curl -sf http://localhost/health >/dev/null 2>&1; do sleep 3; done"; then
+    echo "ERROR: API health check failed within 60 seconds."
+    $COMPOSE logs --tail=30 api
+    exit 1
+fi
 
 echo ""
 echo "✓ Deployment complete."
-echo "  API health: $(curl -s http://localhost/health | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d[\"status\"])')"
+echo "  API health: $(curl -s http://localhost/health)"
 echo ""
 echo "  To tail logs:  docker compose $COMPOSE_FILES logs -f api worker"
 echo "  To stop:       docker compose $COMPOSE_FILES down"

@@ -8,7 +8,7 @@
  *
  * Domain map:
  *   common          — primitives: UUID, ISODateString, Paginated, ApiError
- *   user            — User, UserStatus, auth request/response types
+ *   user            — User, auth request/response types
  *   sport-profile   — Sport, FitnessLevel, PreferredTime, GenderPreference,
  *                     UserProfile, IdentityPreferences, SportProfile
  *   discovery       — DiscoveryAction, DiscoveryFilter, PartnerCard,
@@ -30,7 +30,6 @@ export type {
 } from './common';
 
 export type {
-  UserStatus,
   User,
   RegisterRequest,
   LoginRequest,

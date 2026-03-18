@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     _log.info("App is ready.")
     yield
     await engine.dispose()
-    await redis_pool.disconnect()
+    await redis_pool.aclose()
 
 
 app = FastAPI(
@@ -38,10 +38,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_cors_origins = settings.cors_origins_list
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # staging only — tighten for production
-    allow_credentials=True,
+    allow_origins=_cors_origins or ["*"],
+    allow_credentials=bool(_cors_origins),  # credentials require explicit origins
     allow_methods=["*"],
     allow_headers=["*"],
 )

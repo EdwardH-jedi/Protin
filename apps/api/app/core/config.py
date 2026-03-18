@@ -21,12 +21,24 @@ class Settings(BaseSettings):
     # Leave empty to disable push delivery (staging default)
     expo_push_url: str = "https://exp.host/--/api/v2/push/send"
 
+    # JWT signing key — must be set in .env for staging/production.
+    secret_key: str = "change-me-in-production"
+
+    # Comma-separated allowed CORS origins. Empty = wildcard (local dev only).
+    cors_origins: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
     )
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        if not self.cors_origins.strip():
+            return []
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     @property
     def async_postgres_url(self) -> str:

@@ -221,13 +221,12 @@ async def transition_booking(
 
     # Schedule reminder when booking is confirmed
     if new_status == "confirmed":
+        other_card = await _build_partner_card(db, other_id, b.sport)
         for recipient_id in (b.proposer_id, b.partner_id):
-            if recipient_id == current_user_id:
-                other_card = actor_card
-            else:
-                other_card = await _build_partner_card(db, other_id, b.sport)
+            # Each participant's reminder names the *other* participant
+            partner_for_recipient = other_card if recipient_id == current_user_id else actor_card
             await notif_service.schedule_booking_notification(
-                db, b, "reminder", recipient_id, other_card.display_name
+                db, b, "reminder", recipient_id, partner_for_recipient.display_name
             )
 
     await db.commit()

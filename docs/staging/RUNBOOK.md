@@ -230,6 +230,20 @@ $COMPOSE start api worker
 
 ---
 
+## Merging and deploying changes
+
+Changes reach staging only through a reviewed and merged PR on `main`.
+
+Before deploying a new merge:
+- Confirm the PR went through Claude Code Review and Codex sign-off (see `docs/workflow/PR_WORKFLOW.md`).
+- Check that `git log --oneline -5` on the server shows the expected commits after `git pull`.
+
+If you are deploying a hotfix under time pressure, the Codex review step may be skipped — note it in the PR and deploy as normal.
+
+For the deploy procedure, see the **Deploying a code update** section above.
+
+---
+
 ## First-time setup summary
 
 Quick reference for setting up a new server from scratch:

@@ -34,6 +34,22 @@ export type BookingStatus =
 // Booking entity
 // ---------------------------------------------------------------------------
 
+/**
+ * Core booking fields.
+ *
+ * The API always returns the enriched BookingDetail shape (partner is always
+ * included in BookingResponse). This base type exists for composition only;
+ * mobile consumers should use BookingDetail.
+ *
+ * Field names match the API's BookingResponse after camelCase transformation:
+ *   match_id     → matchId
+ *   proposer_id  → proposerId
+ *   partner_id   → partnerId
+ *   starts_at    → startsAt
+ *   ends_at      → endsAt
+ *   created_at   → createdAt
+ *   updated_at   → updatedAt
+ */
 export interface Booking {
   id: UUID;
   matchId: UUID;
