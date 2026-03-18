@@ -1,0 +1,350 @@
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+
+import { Screen } from '../../components/Screen';
+import { api } from '../../lib/api';
+import { useAuthStore } from '../../stores/auth';
+import { useProfileStore } from '../../stores/profile';
+import { colors, radii, spacing, typography } from '../../theme';
+
+export function ProfileScreen() {
+  const { logout } = useAuthStore();
+  const { profile, sportProfiles, fetchProfile } = useProfileStore();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [gcalConnected, setGcalConnected] = useState(false);
+  const [gcalConnecting, setGcalConnecting] = useState(false);
+
+  useEffect(() => {
+    fetchProfile()
+      .catch((err) => {
+        // 404 = profile not yet created — show prompt rather than error
+        const msg = err instanceof Error ? err.message : '';
+        if (!msg.includes('404') && !msg.includes('not found')) {
+          setError(msg || 'Failed to load profile.');
+        }
+      })
+      .finally(() => setIsLoading(false));
+  }, [fetchProfile]);
+
+  useEffect(() => {
+    api
+      .get<{ connected: boolean }>('/users/me/google-calendar/status')
+      .then((data) => setGcalConnected(data.connected))
+      .catch(() => {});
+  }, []);
+
+  const handleGoogleCalendarConnect = useCallback(async () => {
+    setGcalConnecting(true);
+    try {
+      const { url } = await api.get<{ url: string }>('/users/me/google-calendar/auth-url');
+      const result = await WebBrowser.openAuthSessionAsync(url);
+      if (result.type === 'success') {
+        // Re-check status after browser closes
+        const status = await api.get<{ connected: boolean }>('/users/me/google-calendar/status');
+        setGcalConnected(status.connected);
+      }
+    } catch {
+      // Swallow — server may not have Google configured yet
+    } finally {
+      setGcalConnecting(false);
+    }
+  }, []);
+
+  const handleGoogleCalendarDisconnect = useCallback(async () => {
+    try {
+      await api.delete('/users/me/google-calendar/disconnect');
+      setGcalConnected(false);
+    } catch {}
+  }, []);
+
+  if (isLoading) {
+    return (
+      <Screen padded>
+        <View style={styles.centred}>
+          <ActivityIndicator size="large" color={colors.accent} />
+        </View>
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen padded={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.eyebrow}>Account</Text>
+          <Text style={styles.title}>Profile</Text>
+        </View>
+
+        {error ? (
+          <View style={styles.section}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : profile ? (
+          <>
+            {/* Avatar + name */}
+            <View style={styles.avatarRow}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {profile.displayName.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.avatarInfo}>
+                <Text style={styles.displayName}>{profile.displayName}</Text>
+                {profile.suburb ? (
+                  <Text style={styles.suburb}>{profile.suburb}</Text>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Bio */}
+            {profile.bio ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>About</Text>
+                <Text style={styles.bioText}>{profile.bio}</Text>
+              </View>
+            ) : null}
+
+            {/* Sport profiles */}
+            {sportProfiles && sportProfiles.length > 0 ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Sports</Text>
+                <View style={styles.sportList}>
+                  {sportProfiles.map((sp) => (
+                    <View key={sp.sport} style={styles.sportRow}>
+                      <Text style={styles.sportName}>
+                        {sp.sport === 'gym' ? 'Gym' : 'Golf'}
+                      </Text>
+                      <Text style={styles.sportLevel}>
+                        {sp.level.charAt(0).toUpperCase() + sp.level.slice(1)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+          </>
+        ) : (
+          /* No profile created yet */
+          <View style={styles.section}>
+            <Text style={styles.emptyTitle}>Profile not set up</Text>
+            <Text style={styles.emptyBody}>
+              Complete onboarding to build your workout partner profile.
+            </Text>
+          </View>
+        )}
+
+        {/* Google Calendar */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Integrations</Text>
+          {gcalConnected ? (
+            <View style={styles.integrationRow}>
+              <Text style={styles.integrationLabel}>Google Calendar</Text>
+              <Pressable
+                style={({ pressed }) => [styles.integrationAction, pressed && styles.pressed]}
+                onPress={handleGoogleCalendarDisconnect}
+                accessibilityRole="button"
+              >
+                <Text style={styles.integrationActionText}>Disconnect</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              style={({ pressed }) => [styles.integrationButton, pressed && styles.pressed]}
+              onPress={handleGoogleCalendarConnect}
+              disabled={gcalConnecting}
+              accessibilityRole="button"
+            >
+              {gcalConnecting ? (
+                <ActivityIndicator size="small" color={colors.textSecondary} />
+              ) : (
+                <Text style={styles.integrationButtonText}>Connect Google Calendar</Text>
+              )}
+            </Pressable>
+          )}
+        </View>
+
+        {/* Logout */}
+        <View style={styles.logoutSection}>
+          <Pressable
+            style={({ pressed }) => [styles.logoutButton, pressed && styles.pressed]}
+            onPress={logout}
+            accessibilityRole="button"
+            accessibilityLabel="Log out"
+          >
+            <Text style={styles.logoutText}>Log out</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  scroll: {
+    paddingBottom: spacing.xxxl,
+  },
+  header: {
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
+  eyebrow: {
+    ...typography.label,
+    color: colors.accent,
+    marginBottom: spacing.xs,
+  },
+  title: {
+    ...typography.h2,
+  },
+  centred: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: radii.full,
+    backgroundColor: colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.textInverse,
+  },
+  avatarInfo: {
+    flex: 1,
+  },
+  displayName: {
+    ...typography.h3,
+    color: colors.textPrimary,
+  },
+  suburb: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  section: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+  },
+  sectionLabel: {
+    ...typography.label,
+    color: colors.textTertiary,
+    marginBottom: spacing.sm,
+  },
+  bioText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    lineHeight: 22,
+  },
+  sportList: {
+    gap: spacing.sm,
+  },
+  sportRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.separator,
+  },
+  sportName: {
+    ...typography.bodyLarge,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  sportLevel: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+  emptyTitle: {
+    ...typography.h3,
+    marginBottom: spacing.sm,
+  },
+  emptyBody: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+  errorText: {
+    ...typography.body,
+    color: colors.error,
+  },
+  integrationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.separator,
+  },
+  integrationLabel: {
+    ...typography.body,
+    color: colors.textPrimary,
+  },
+  integrationAction: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  integrationActionText: {
+    ...typography.label,
+    color: colors.error,
+  },
+  integrationButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  integrationButtonText: {
+    ...typography.button,
+    color: colors.textPrimary,
+  },
+  logoutSection: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  logoutButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  logoutText: {
+    ...typography.button,
+    color: colors.textSecondary,
+  },
+  pressed: {
+    opacity: 0.65,
+  },
+});

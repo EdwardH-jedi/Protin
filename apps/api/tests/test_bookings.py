@@ -1,0 +1,379 @@
+"""Booking endpoint tests using an in-memory SQLite async database."""
+
+from __future__ import annotations
+
+from typing import AsyncGenerator
+from unittest.mock import AsyncMock
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from app.db.base import Base
+from app.db.redis import get_redis
+from app.db.session import get_db
+from app.main import app
+
+from app.models import match, profile, user, chat, booking  # noqa: F401
+
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+_engine = create_async_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+_TestSession = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
+
+
+@pytest.fixture(scope="module", autouse=True)
+async def create_tables():
+    async with _engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    async with _engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+
+async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with _TestSession() as session:
+        yield session
+
+
+async def _override_get_redis() -> AsyncGenerator:
+    mock = AsyncMock()
+    mock.ping = AsyncMock(return_value=True)
+    mock.aclose = AsyncMock()
+    yield mock
+
+
+@pytest.fixture
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_redis] = _override_get_redis
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
+    app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+async def _register(client: AsyncClient, email: str) -> tuple[str, str]:
+    r = await client.post("/auth/register", json={"email": email, "password": "password123"})
+    token = r.json()["access_token"]
+    me = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    user_id = me.json()["id"]
+    return token, user_id
+
+
+def _auth(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+async def _mutual_like_and_get_match_id(
+    client: AsyncClient,
+    token_a: str,
+    uid_a: str,
+    token_b: str,
+    uid_b: str,
+    sport: str = "gym",
+) -> str:
+    await client.post(
+        "/discovery/actions",
+        json={"target_user_id": uid_b, "action": "like", "sport": sport},
+        headers=_auth(token_a),
+    )
+    r = await client.post(
+        "/discovery/actions",
+        json={"target_user_id": uid_a, "action": "like", "sport": sport},
+        headers=_auth(token_b),
+    )
+    return r.json()["match_id"]
+
+
+_BOOKING_PAYLOAD = {
+    "sport": "gym",
+    "starts_at": "2026-04-01T09:00:00Z",
+    "ends_at": "2026-04-01T10:00:00Z",
+    "location": "Bondi gym",
+}
+
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+
+async def test_bookings_requires_auth(client: AsyncClient) -> None:
+    r = await client.get("/bookings")
+    assert r.status_code == 403
+
+
+async def test_create_booking_requires_auth(client: AsyncClient) -> None:
+    r = await client.post("/bookings", json={**_BOOKING_PAYLOAD, "match_id": "00000000-0000-0000-0000-000000000001"})
+    assert r.status_code == 403
+
+
+async def test_create_booking_on_nonexistent_match_returns_404(client: AsyncClient) -> None:
+    token, _ = await _register(client, "book_noexist@example.com")
+    r = await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": "00000000-0000-0000-0000-000000000001"},
+        headers=_auth(token),
+    )
+    assert r.status_code == 404
+
+
+async def test_create_booking_returns_proposed_status(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "book_create_a@example.com")
+    token_b, uid_b = await _register(client, "book_create_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    r = await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        headers=_auth(token_a),
+    )
+    assert r.status_code == 201
+    body = r.json()
+    assert body["status"] == "proposed"
+    assert body["match_id"] == match_id
+    assert body["sport"] == "gym"
+    assert "partner" in body
+
+
+async def test_bookings_empty_for_new_user(client: AsyncClient) -> None:
+    token, _ = await _register(client, "book_empty@example.com")
+    r = await client.get("/bookings", headers=_auth(token))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["items"] == []
+    assert body["total"] == 0
+
+
+async def test_booking_visible_to_both_participants(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "book_vis_a@example.com")
+    token_b, uid_b = await _register(client, "book_vis_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        headers=_auth(token_a),
+    )
+
+    r_a = await client.get("/bookings", headers=_auth(token_a))
+    r_b = await client.get("/bookings", headers=_auth(token_b))
+    assert r_a.json()["total"] == 1
+    assert r_b.json()["total"] == 1
+    assert r_a.json()["items"][0]["id"] == r_b.json()["items"][0]["id"]
+
+
+async def test_partner_can_confirm_booking(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "book_conf_a@example.com")
+    token_b, uid_b = await _register(client, "book_conf_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    create_r = await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        headers=_auth(token_a),
+    )
+    booking_id = create_r.json()["id"]
+
+    r = await client.post(f"/bookings/{booking_id}/confirm", headers=_auth(token_b))
+    assert r.status_code == 200
+    assert r.json()["status"] == "confirmed"
+
+
+async def test_proposer_cannot_confirm_own_booking(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "book_selfconf_a@example.com")
+    token_b, uid_b = await _register(client, "book_selfconf_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    create_r = await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        headers=_auth(token_a),
+    )
+    booking_id = create_r.json()["id"]
+
+    r = await client.post(f"/bookings/{booking_id}/confirm", headers=_auth(token_a))
+    assert r.status_code == 403
+
+
+async def test_partner_can_decline_booking(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "book_decl_a@example.com")
+    token_b, uid_b = await _register(client, "book_decl_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    create_r = await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        headers=_auth(token_a),
+    )
+    booking_id = create_r.json()["id"]
+
+    r = await client.post(f"/bookings/{booking_id}/decline", headers=_auth(token_b))
+    assert r.status_code == 200
+    assert r.json()["status"] == "declined"
+
+
+async def test_proposer_can_cancel_proposed_booking(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "book_canc_a@example.com")
+    token_b, uid_b = await _register(client, "book_canc_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    create_r = await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        headers=_auth(token_a),
+    )
+    booking_id = create_r.json()["id"]
+
+    r = await client.post(f"/bookings/{booking_id}/cancel", headers=_auth(token_a))
+    assert r.status_code == 200
+    assert r.json()["status"] == "cancelled"
+
+
+async def test_invalid_transition_returns_422(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "book_inv_a@example.com")
+    token_b, uid_b = await _register(client, "book_inv_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    create_r = await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        headers=_auth(token_a),
+    )
+    booking_id = create_r.json()["id"]
+
+    # Can't complete a proposed booking
+    r = await client.post(f"/bookings/{booking_id}/complete", headers=_auth(token_a))
+    assert r.status_code == 422
+
+
+async def test_non_participant_cannot_access_booking(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "book_3p_a@example.com")
+    token_b, uid_b = await _register(client, "book_3p_b@example.com")
+    token_c, _ = await _register(client, "book_3p_c@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    create_r = await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        headers=_auth(token_a),
+    )
+    booking_id = create_r.json()["id"]
+
+    r = await client.get(f"/bookings/{booking_id}", headers=_auth(token_c))
+    assert r.status_code == 404
+
+
+async def test_ends_at_before_starts_at_returns_422(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "book_time_a@example.com")
+    token_b, uid_b = await _register(client, "book_time_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    r = await client.post(
+        "/bookings",
+        json={
+            "match_id": match_id,
+            "sport": "gym",
+            "starts_at": "2026-04-01T10:00:00Z",
+            "ends_at": "2026-04-01T09:00:00Z",
+        },
+        headers=_auth(token_a),
+    )
+    assert r.status_code == 422
+
+
+async def test_list_with_status_filter(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "book_filter_a@example.com")
+    token_b, uid_b = await _register(client, "book_filter_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    create_r = await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        headers=_auth(token_a),
+    )
+    assert create_r.status_code == 201
+    booking_id = create_r.json()["id"]
+
+    # Booking in "proposed" status should appear under ?status=proposed
+    r_proposed = await client.get("/bookings?status=proposed", headers=_auth(token_a))
+    assert r_proposed.status_code == 200
+    ids_proposed = [item["id"] for item in r_proposed.json()["items"]]
+    assert booking_id in ids_proposed
+
+    # Booking in "proposed" status should NOT appear under ?status=confirmed
+    r_confirmed = await client.get("/bookings?status=confirmed", headers=_auth(token_a))
+    assert r_confirmed.status_code == 200
+    ids_confirmed = [item["id"] for item in r_confirmed.json()["items"]]
+    assert booking_id not in ids_confirmed
+
+
+async def test_past_booking_rejected(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "book_past_a@example.com")
+    token_b, uid_b = await _register(client, "book_past_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    r = await client.post(
+        "/bookings",
+        json={
+            "match_id": match_id,
+            "sport": "gym",
+            "starts_at": "2020-01-01T00:00:00Z",
+            "ends_at": "2020-01-01T01:00:00Z",
+        },
+        headers=_auth(token_a),
+    )
+    assert r.status_code == 422
+
+
+async def test_complete_transition(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "book_complete_a@example.com")
+    token_b, uid_b = await _register(client, "book_complete_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    create_r = await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        headers=_auth(token_a),
+    )
+    assert create_r.status_code == 201
+    booking_id = create_r.json()["id"]
+
+    # Partner confirms first (proposed -> confirmed)
+    conf_r = await client.post(f"/bookings/{booking_id}/confirm", headers=_auth(token_b))
+    assert conf_r.status_code == 200
+    assert conf_r.json()["status"] == "confirmed"
+
+    # Either participant can mark complete (confirmed -> completed)
+    complete_r = await client.post(f"/bookings/{booking_id}/complete", headers=_auth(token_a))
+    assert complete_r.status_code == 200
+    assert complete_r.json()["status"] == "completed"
+
+
+async def test_no_show_transition(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "book_noshow_a@example.com")
+    token_b, uid_b = await _register(client, "book_noshow_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    create_r = await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        headers=_auth(token_a),
+    )
+    assert create_r.status_code == 201
+    booking_id = create_r.json()["id"]
+
+    # Partner confirms first (proposed -> confirmed)
+    conf_r = await client.post(f"/bookings/{booking_id}/confirm", headers=_auth(token_b))
+    assert conf_r.status_code == 200
+    assert conf_r.json()["status"] == "confirmed"
+
+    # Either participant can mark no-show (confirmed -> no_show)
+    noshow_r = await client.post(f"/bookings/{booking_id}/no-show", headers=_auth(token_b))
+    assert noshow_r.status_code == 200
+    assert noshow_r.json()["status"] == "no_show"

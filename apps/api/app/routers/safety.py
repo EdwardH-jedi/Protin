@@ -1,0 +1,55 @@
+from uuid import UUID
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.session import get_db
+from app.routers.auth import get_current_user
+from app.schemas.safety import (
+    BlockListResponse,
+    BlockResponse,
+    CreateReportRequest,
+    ReportResponse,
+)
+from app.services import safety as safety_service
+
+router = APIRouter(tags=["safety"])
+
+
+# ── Reports ──────────────────────────────────────────────────────────────────
+
+@router.post("/reports", response_model=ReportResponse, status_code=201)
+async def create_report(
+    req: CreateReportRequest,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ReportResponse:
+    return await safety_service.create_report(db, current_user.id, req)
+
+
+# ── Blocks ───────────────────────────────────────────────────────────────────
+
+@router.get("/blocks", response_model=BlockListResponse)
+async def list_blocks(
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> BlockListResponse:
+    return await safety_service.list_blocks(db, current_user.id)
+
+
+@router.post("/blocks/{blocked_user_id}", response_model=BlockResponse, status_code=201)
+async def block_user(
+    blocked_user_id: UUID,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> BlockResponse:
+    return await safety_service.block_user(db, current_user.id, blocked_user_id)
+
+
+@router.delete("/blocks/{blocked_user_id}", status_code=204)
+async def unblock_user(
+    blocked_user_id: UUID,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    await safety_service.unblock_user(db, current_user.id, blocked_user_id)

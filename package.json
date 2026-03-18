@@ -1,0 +1,19 @@
+{
+  "name": "protin",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:reset": "docker compose down -v && docker compose up -d",
+    "infra:logs": "docker compose logs -f",
+    "infra:ps": "docker compose ps",
+    "mobile:start": "npm run start --workspace @protin/mobile",
+    "mobile:android": "npm run android --workspace @protin/mobile",
+    "mobile:ios": "npm run ios --workspace @protin/mobile",
+    "mobile:web": "npm run web --workspace @protin/mobile"
+  }
+}

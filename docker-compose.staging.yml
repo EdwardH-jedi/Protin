@@ -1,0 +1,105 @@
+# =============================================================================
+# Protin — staging docker-compose override
+#
+# Extends the base docker-compose.yml with the API, worker, and nginx
+# services needed for a complete staging deployment on the RX6600 server.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+#
+# Prerequisites:
+#   1. Copy .env.staging.example to .env.staging and fill in all values.
+#   2. Build the API image: docker compose -f docker-compose.yml \
+#        -f docker-compose.staging.yml build api
+#   3. Run migrations: docker compose -f docker-compose.yml \
+#        -f docker-compose.staging.yml run --rm migrate
+# =============================================================================
+
+name: protin-staging
+
+services:
+
+  # ── Database ─────────────────────────────────────────────────────────────
+  # Inherit postgres from base; override to not expose the port publicly.
+  postgres:
+    ports: []          # remove the host-port binding from base compose
+    env_file:
+      - .env.staging
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
+  redis:
+    ports: []          # not exposed externally; accessible inside compose network
+    env_file:
+      - .env.staging
+
+  # ── DB migration (one-shot) ───────────────────────────────────────────────
+  migrate:
+    build:
+      context: apps/api
+      dockerfile: Dockerfile
+    command: alembic upgrade head
+    env_file:
+      - .env.staging
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # ── API server ────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: apps/api
+      dockerfile: Dockerfile
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --log-level ${LOG_LEVEL:-info}
+      --access-log
+    env_file:
+      - .env.staging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Background worker ─────────────────────────────────────────────────────
+  worker:
+    build:
+      context: apps/api
+      dockerfile: Dockerfile
+    command: python worker.py
+    env_file:
+      - .env.staging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Reverse proxy ─────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
