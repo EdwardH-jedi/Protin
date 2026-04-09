@@ -38,7 +38,16 @@ if [ -d "apps/mobile" ]; then
   }
 fi
 
-# ─── 4. Secret scan (staged files) ───────────────────────────────────────────
+# ─── 4. Mobile ESLint (apps/mobile) ─────────────────────────────────────────
+if [ -d "apps/mobile" ] && [ -f "apps/mobile/.eslintrc.js" ]; then
+  echo "▶ eslint…"
+  (cd apps/mobile && npm run lint --if-present) || {
+    echo '{"decision":"block","reason":"Mobile ESLint failed. Run: cd apps/mobile && npm run lint"}'
+    exit 1
+  }
+fi
+
+# ─── 5. Secret scan (staged files) ───────────────────────────────────────────
 echo "▶ secret scan…"
 STAGED=$(git diff --cached --name-only 2>/dev/null || true)
 if [ -n "$STAGED" ]; then
@@ -48,7 +57,7 @@ if [ -n "$STAGED" ]; then
   fi
 fi
 
-# ─── 5. Conventional Commits format ──────────────────────────────────────────
+# ─── 6. Conventional Commits format ──────────────────────────────────────────
 MSG_FLAG=false
 MSG=""
 for arg in "$@"; do
