@@ -47,11 +47,16 @@ function Avatar({
 
 // ─── Sport badge ──────────────────────────────────────────────────────────────
 
+const _SPORT_LABEL: Record<string, string> = {
+  gym: 'Gym',
+  golf: 'Golf',
+  tennis: 'Tennis',
+  running: 'Running',
+};
+
 function SportBadge({ sport, level }: { sport: string; level: string }) {
-  const label =
-    sport === 'gym'
-      ? `Gym · ${level.charAt(0).toUpperCase() + level.slice(1)}`
-      : `Golf · ${level.charAt(0).toUpperCase() + level.slice(1)}`;
+  const sportLabel = _SPORT_LABEL[sport] ?? sport.charAt(0).toUpperCase() + sport.slice(1);
+  const label = `${sportLabel} · ${level.charAt(0).toUpperCase() + level.slice(1)}`;
 
   return (
     <View style={styles.sportBadge}>
@@ -208,7 +213,7 @@ export function DiscoveryScreen() {
 
       {/* Sport toggle */}
       <View style={styles.sportToggle}>
-        {(['gym', 'golf'] as const).map((s) => (
+        {(['gym', 'golf', 'tennis', 'running'] as const).map((s) => (
           <Pressable
             key={s}
             style={({ pressed }) => [
@@ -218,7 +223,7 @@ export function DiscoveryScreen() {
             ]}
             onPress={() => setSport(s)}
             accessibilityRole="tab"
-            accessibilityLabel={s === 'gym' ? 'Gym' : 'Golf'}
+            accessibilityLabel={_SPORT_LABEL[s]}
             accessibilityState={{ selected: sport === s }}
           >
             <Text
@@ -227,7 +232,7 @@ export function DiscoveryScreen() {
                 sport === s && styles.sportTabTextActive,
               ]}
             >
-              {s === 'gym' ? 'Gym' : 'Golf'}
+              {_SPORT_LABEL[s]}
             </Text>
           </Pressable>
         ))}

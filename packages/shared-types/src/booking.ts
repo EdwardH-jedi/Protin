@@ -17,6 +17,7 @@
 
 import type { ISODateString, UUID } from './common';
 import type { PartnerCard } from './discovery';
+import type { Sport } from './sport-profile';
 
 // ---------------------------------------------------------------------------
 // Status
@@ -55,7 +56,7 @@ export interface Booking {
   matchId: UUID;
   proposerId: UUID;
   partnerId: UUID;
-  sport: 'gym' | 'golf';
+  sport: Sport;
   startsAt: ISODateString;
   endsAt: ISODateString;
   location?: string;
@@ -71,7 +72,7 @@ export interface Booking {
 
 export interface CreateBookingRequest {
   matchId: UUID;
-  sport: 'gym' | 'golf';
+  sport: Sport;
   startsAt: ISODateString;
   endsAt: ISODateString;
   location?: string;

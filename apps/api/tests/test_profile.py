@@ -54,6 +54,7 @@ async def auth_client() -> AsyncGenerator[tuple[AsyncClient, str], None]:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         # Use unique email per fixture invocation to avoid collisions
         import uuid
+
         email = f"user_{uuid.uuid4().hex[:8]}@example.com"
         r = await ac.post("/auth/register", json={"email": email, "password": "password123"})
         token = r.json()["access_token"]

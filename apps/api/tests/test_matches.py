@@ -201,7 +201,5 @@ async def test_archive_by_non_participant_returns_404(client: AsyncClient) -> No
 
 async def test_archive_nonexistent_match_returns_404(client: AsyncClient) -> None:
     token, _ = await _register(client, "match_noexist@example.com")
-    r = await client.patch(
-        "/matches/00000000-0000-0000-0000-000000000001", json={}, headers=_auth(token)
-    )
+    r = await client.patch("/matches/00000000-0000-0000-0000-000000000001", json={}, headers=_auth(token))
     assert r.status_code == 404

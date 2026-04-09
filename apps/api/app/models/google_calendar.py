@@ -14,8 +14,10 @@ class GoogleCalendarToken(Base):
     """
     Stores a user's Google OAuth tokens for Calendar access.
 
-    Tokens are stored in plaintext for staging convenience.
-    Production hardening: encrypt access_token + refresh_token at rest.
+    access_token and refresh_token are stored encrypted via
+    app.core.encryption (Fernet/AES-256-GCM) when FIELD_ENCRYPTION_KEY
+    is set. In local dev the values are stored with a plain: sentinel
+    prefix. Production requires the key — the app refuses to start without it.
     """
 
     __tablename__ = "google_calendar_tokens"
@@ -29,16 +31,10 @@ class GoogleCalendarToken(Base):
     )
     access_token: Mapped[str] = mapped_column(String(2048), nullable=False)
     refresh_token: Mapped[str] = mapped_column(String(512), nullable=False)
-    token_expiry: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    token_expiry: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     # Google Calendar ID to write events into (usually "primary")
-    calendar_id: Mapped[str] = mapped_column(
-        String(256), nullable=False, default="primary"
-    )
-    connected_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), nullable=False
-    )
+    calendar_id: Mapped[str] = mapped_column(String(256), nullable=False, default="primary")
+    connected_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
 
 class CalendarBookingSync(Base):
@@ -61,18 +57,8 @@ class CalendarBookingSync(Base):
     )
     google_event_id: Mapped[str] = mapped_column(String(256), nullable=False)
     # pending | synced | failed | cancelled
-    sync_status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="pending"
-    )
-    last_synced_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), nullable=False
-    )
+    sync_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
-    __table_args__ = (
-        UniqueConstraint(
-            "booking_id", "user_id", name="uq_calendar_booking_syncs_booking_user"
-        ),
-    )
+    __table_args__ = (UniqueConstraint("booking_id", "user_id", name="uq_calendar_booking_syncs_booking_user"),)

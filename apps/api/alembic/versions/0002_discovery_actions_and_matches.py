@@ -32,7 +32,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["actor_id"], ["users.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["target_id"], ["users.id"], ondelete="CASCADE"),
         sa.UniqueConstraint(
-            "actor_id", "target_id", "sport",
+            "actor_id",
+            "target_id",
+            "sport",
             name="uq_discovery_actions_actor_target_sport",
         ),
     )
@@ -61,7 +63,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user1_id"], ["users.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["user2_id"], ["users.id"], ondelete="CASCADE"),
         sa.UniqueConstraint(
-            "user1_id", "user2_id", "sport",
+            "user1_id",
+            "user2_id",
+            "sport",
             name="uq_matches_canonical_pair_sport",
         ),
     )

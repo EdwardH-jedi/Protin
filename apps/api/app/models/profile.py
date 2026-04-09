@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import ForeignKey, JSON, String, UniqueConstraint, func
+from sqlalchemy import JSON, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -57,6 +57,4 @@ class SportProfile(Base):
 
     user: Mapped["User"] = relationship(back_populates="sport_profiles")  # noqa: F821
 
-    __table_args__ = (
-        UniqueConstraint("user_id", "sport", name="uq_sport_profiles_user_sport"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "sport", name="uq_sport_profiles_user_sport"),)

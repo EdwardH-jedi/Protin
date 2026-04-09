@@ -31,6 +31,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.encryption import decrypt_token, encrypt_token
 from app.models.booking import Booking
 from app.models.google_calendar import CalendarBookingSync, GoogleCalendarToken
 from app.schemas.google_calendar import (
@@ -74,9 +75,7 @@ def _decode_state(state: str) -> UUID:
     try:
         return UUID(base64.urlsafe_b64decode(state).decode())
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid state parameter"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid state parameter")
 
 
 # ---------------------------------------------------------------------------
@@ -114,25 +113,23 @@ async def handle_oauth_callback(
     access_token = token_data["access_token"]
     refresh_token = token_data.get("refresh_token", "")
     expires_in: int = token_data.get("expires_in", 3600)
-    expiry = datetime.fromtimestamp(
-        datetime.now(tz=timezone.utc).timestamp() + expires_in, tz=timezone.utc
-    )
+    expiry = datetime.fromtimestamp(datetime.now(tz=timezone.utc).timestamp() + expires_in, tz=timezone.utc)
 
     # Upsert token record
     stmt = select(GoogleCalendarToken).where(GoogleCalendarToken.user_id == user_id)
     existing = (await db.execute(stmt)).scalar_one_or_none()
 
     if existing:
-        existing.access_token = access_token
+        existing.access_token = encrypt_token(access_token)
         if refresh_token:
-            existing.refresh_token = refresh_token
+            existing.refresh_token = encrypt_token(refresh_token)
         existing.token_expiry = expiry
     else:
         db.add(
             GoogleCalendarToken(
                 user_id=user_id,
-                access_token=access_token,
-                refresh_token=refresh_token,
+                access_token=encrypt_token(access_token),
+                refresh_token=encrypt_token(refresh_token),
                 token_expiry=expiry,
             )
         )
@@ -176,21 +173,25 @@ async def disconnect(db: AsyncSession, user_id: UUID) -> None:
 
 
 async def _ensure_fresh_token(token: GoogleCalendarToken) -> str:
-    """Return a valid access token, refreshing if it has expired."""
+    """Return a valid access token, refreshing if it has expired.
+
+    Tokens are stored encrypted; this function handles decrypt/re-encrypt
+    transparently so callers always deal with raw token strings.
+    """
     now = datetime.now(tz=timezone.utc)
     expiry = token.token_expiry
     if expiry.tzinfo is None:
         expiry = expiry.replace(tzinfo=timezone.utc)
 
     if expiry > now:
-        return token.access_token
+        return decrypt_token(token.access_token)
 
     settings = get_settings()
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             _GOOGLE_TOKEN_URL,
             data={
-                "refresh_token": token.refresh_token,
+                "refresh_token": decrypt_token(token.refresh_token),
                 "client_id": settings.google_client_id,
                 "client_secret": settings.google_client_secret,
                 "grant_type": "refresh_token",
@@ -204,12 +205,11 @@ async def _ensure_fresh_token(token: GoogleCalendarToken) -> str:
         )
 
     data = resp.json()
-    token.access_token = data["access_token"]
+    raw_access_token = data["access_token"]
+    token.access_token = encrypt_token(raw_access_token)
     expires_in: int = data.get("expires_in", 3600)
-    token.token_expiry = datetime.fromtimestamp(
-        now.timestamp() + expires_in, tz=timezone.utc
-    )
-    return token.access_token
+    token.token_expiry = datetime.fromtimestamp(now.timestamp() + expires_in, tz=timezone.utc)
+    return raw_access_token
 
 
 # ---------------------------------------------------------------------------
@@ -246,9 +246,7 @@ async def sync_booking(
     Only the requesting user's calendar is touched.
     """
     # Fetch booking
-    booking = (
-        await db.execute(select(Booking).where(Booking.id == booking_id))
-    ).scalar_one_or_none()
+    booking = (await db.execute(select(Booking).where(Booking.id == booking_id))).scalar_one_or_none()
 
     if booking is None or (booking.proposer_id != user_id and booking.partner_id != user_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
@@ -261,9 +259,7 @@ async def sync_booking(
 
     # Fetch token
     token_rec = (
-        await db.execute(
-            select(GoogleCalendarToken).where(GoogleCalendarToken.user_id == user_id)
-        )
+        await db.execute(select(GoogleCalendarToken).where(GoogleCalendarToken.user_id == user_id))
     ).scalar_one_or_none()
 
     if token_rec is None:
@@ -280,9 +276,7 @@ async def sync_booking(
 
     other_id = booking.partner_id if booking.proposer_id == user_id else booking.proposer_id
     partner_profile = (
-        await db.execute(
-            select(UserProfile).where(UserProfile.user_id == other_id)
-        )
+        await db.execute(select(UserProfile).where(UserProfile.user_id == other_id))
     ).scalar_one_or_none()
     partner_name = partner_profile.display_name if partner_profile else "your partner"
 
@@ -376,9 +370,7 @@ async def cancel_calendar_event(
         return
 
     token_rec = (
-        await db.execute(
-            select(GoogleCalendarToken).where(GoogleCalendarToken.user_id == user_id)
-        )
+        await db.execute(select(GoogleCalendarToken).where(GoogleCalendarToken.user_id == user_id))
     ).scalar_one_or_none()
     if token_rec is None:
         return

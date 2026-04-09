@@ -11,6 +11,7 @@ dependencies = [
   "asyncpg>=0.30.0,<1.0.0",
   "alembic>=1.14.0,<2.0.0",
   "redis>=5.2.0,<6.0.0",
+  "cryptography>=42.0.0,<44.0.0",
   "passlib[bcrypt]>=1.7.4,<2.0.0",
   "PyJWT>=2.8.0,<3.0.0",
   "httpx>=0.28.0,<1.0.0",
@@ -26,6 +27,19 @@ dev-dependencies = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/env.py" = ["E402", "I001"]
+"alembic/versions/*.py" = ["F401", "E501", "I001"]
+"tests/*.py" = ["F401", "E402", "E501", "I001"]
 
 [build-system]
 requires = ["hatchling"]

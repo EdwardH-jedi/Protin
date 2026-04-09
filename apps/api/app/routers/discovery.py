@@ -12,7 +12,7 @@ router = APIRouter(prefix="/discovery", tags=["discovery"])
 
 @router.get("", response_model=DiscoveryFeedResponse)
 async def get_discovery_feed(
-    sport: str = Query(..., description="Sport filter: gym or golf"),
+    sport: str = Query(..., description="Sport filter: gym, golf, tennis, or running"),
     limit: int = Query(20, ge=1, le=50),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),

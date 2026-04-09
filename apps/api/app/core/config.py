@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     # JWT signing key — must be set in .env for staging/production.
     secret_key: str = "change-me-in-production"
 
+    # Field-level encryption key for OAuth tokens stored in the database.
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # Must be set in production; optional in local/staging (tokens stored as plaintext with a sentinel prefix).
+    field_encryption_key: str = ""
+
     # Comma-separated allowed CORS origins. Empty = wildcard (local dev only).
     cors_origins: str = ""
 
@@ -55,4 +60,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

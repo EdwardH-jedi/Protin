@@ -23,9 +23,11 @@ export interface IdentityPreferences {
   maxDistanceKm: number;
 }
 
+export type SportType = 'gym' | 'golf' | 'tennis' | 'running';
+
 export interface SportProfile {
   id?: string;
-  sport: 'gym' | 'golf';
+  sport: SportType;
   level: 'beginner' | 'intermediate' | 'advanced';
   preferredTimes: string[];
   gymName?: string;

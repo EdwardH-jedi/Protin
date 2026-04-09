@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 class GoogleCalendarConnectRequest(BaseModel):
     """Exchange code returned by Google OAuth for stored tokens."""
+
     code: str
     redirect_uri: str
 

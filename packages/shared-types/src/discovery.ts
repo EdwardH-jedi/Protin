@@ -22,7 +22,7 @@ export type DiscoveryAction = 'like' | 'pass' | 'save';
 // ---------------------------------------------------------------------------
 
 export interface DiscoveryFilter {
-  sport?: Sport;                 // required filter — 'gym' or 'golf'
+  sport?: Sport;                 // required filter — gym, golf, tennis, or running
   level?: FitnessLevel;
   suburb?: string;               // Sydney suburb
   preferredTime?: PreferredTime;

@@ -1,7 +1,7 @@
 /**
  * Sport profile domain types.
  *
- * Sport domain — gym and golf only in current scope.
+ * Sport domain — gym, golf, tennis, and running.
  * This file covers both the user's own sport profile and identity preferences
  * (who they want to partner with).
  */
@@ -12,7 +12,7 @@ import type { ISODateString, UUID } from './common';
 // Shared enums
 // ---------------------------------------------------------------------------
 
-export type Sport = 'gym' | 'golf';  // replaces broad SportType
+export type Sport = 'gym' | 'golf' | 'tennis' | 'running';
 
 export type FitnessLevel = 'beginner' | 'intermediate' | 'advanced';
 

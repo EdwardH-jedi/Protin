@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.12"
+
+      - name: Lint (ruff check + format)
+        run: |
+          cd apps/api
+          uv run ruff check .
+          uv run ruff format --check .
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: cd apps/mobile && npm ci
+
+      - name: Typecheck
+        run: cd apps/mobile && npx tsc --noEmit
+
+  lint-mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: cd apps/mobile && npm ci
+
+      - name: Lint
+        run: cd apps/mobile && npm run lint
+
+  test-mobile:
+    runs-on: ubuntu-latest
+    needs: lint-mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: cd apps/mobile && npm ci
+
+      - name: Run tests
+        run: cd apps/mobile && npm run test:ci
+
+  test:
+    # API tests use SQLite in-memory — no external services required.
+    runs-on: ubuntu-latest
+    needs: lint
+    env:
+      SECRET_KEY: ci-test-secret-key-minimum-32-characters
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.12"
+
+      - name: Run tests
+        run: cd apps/api && uv run pytest
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [test, typecheck, test-mobile]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API Docker image
+        run: docker build -f apps/api/Dockerfile apps/api

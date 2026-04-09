@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 
 import { Screen } from '../../components/Screen';
-import { useProfileStore, SportProfile } from '../../stores/profile';
+import { useProfileStore, SportProfile, SportType } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/types';
@@ -32,6 +32,20 @@ const TIME_SLOTS: { value: TimeSlot; label: string }[] = [
   { value: 'flexible', label: 'Flexible' },
 ];
 
+interface SportConfig {
+  value: SportType;
+  label: string;
+  venueLabel?: string;
+  venuePlaceholder?: string;
+}
+
+const SPORT_CONFIG: SportConfig[] = [
+  { value: 'gym', label: 'Gym', venueLabel: 'Gym name (optional)', venuePlaceholder: 'e.g. Fitness First Surry Hills' },
+  { value: 'golf', label: 'Golf', venueLabel: 'Golf club (optional)', venuePlaceholder: 'e.g. Royal Sydney Golf Club' },
+  { value: 'tennis', label: 'Tennis', venueLabel: 'Tennis club (optional)', venuePlaceholder: 'e.g. White City Tennis Club' },
+  { value: 'running', label: 'Running', venueLabel: 'Regular route (optional)', venuePlaceholder: 'e.g. Centennial Park loop' },
+];
+
 interface SportFormState {
   level: Level;
   times: TimeSlot[];
@@ -44,71 +58,66 @@ const DEFAULT_SPORT_STATE: SportFormState = {
   venueName: '',
 };
 
+function makeInitialStates(): Record<SportType, SportFormState> {
+  return {
+    gym: { ...DEFAULT_SPORT_STATE },
+    golf: { ...DEFAULT_SPORT_STATE },
+    tennis: { ...DEFAULT_SPORT_STATE },
+    running: { ...DEFAULT_SPORT_STATE },
+  };
+}
+
 export function OnboardingStep3Screen({ navigation }: Props) {
-  const [gymSelected, setGymSelected] = useState(false);
-  const [golfSelected, setGolfSelected] = useState(false);
-  const [gymState, setGymState] = useState<SportFormState>({ ...DEFAULT_SPORT_STATE });
-  const [golfState, setGolfState] = useState<SportFormState>({ ...DEFAULT_SPORT_STATE });
+  const [selected, setSelected] = useState<Set<SportType>>(new Set());
+  const [sportStates, setSportStates] = useState<Record<SportType, SportFormState>>(makeInitialStates);
   const [goals, setGoals] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { upsertSportProfile } = useProfileStore();
 
-  function toggleSportTime(
-    sport: 'gym' | 'golf',
-    time: TimeSlot
-  ) {
-    const setter = sport === 'gym' ? setGymState : setGolfState;
-    setter((prev) => ({
-      ...prev,
-      times: prev.times.includes(time)
-        ? prev.times.filter((t) => t !== time)
-        : [...prev.times, time],
-    }));
+  function toggleSport(sport: SportType) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(sport)) next.delete(sport); else next.add(sport);
+      return next;
+    });
   }
 
-  function setLevel(sport: 'gym' | 'golf', level: Level) {
-    const setter = sport === 'gym' ? setGymState : setGolfState;
-    setter((prev) => ({ ...prev, level }));
+  function updateSportState(sport: SportType, patch: Partial<SportFormState>) {
+    setSportStates((prev) => ({ ...prev, [sport]: { ...prev[sport], ...patch } }));
   }
 
-  function setVenueName(sport: 'gym' | 'golf', name: string) {
-    const setter = sport === 'gym' ? setGymState : setGolfState;
-    setter((prev) => ({ ...prev, venueName: name }));
+  function toggleTime(sport: SportType, time: TimeSlot) {
+    const times = sportStates[sport].times;
+    updateSportState(sport, {
+      times: times.includes(time) ? times.filter((t) => t !== time) : [...times, time],
+    });
   }
 
   async function handleFinish() {
     setError(null);
-    if (!gymSelected && !golfSelected) {
+    if (selected.size === 0) {
       setError('Please select at least one sport.');
       return;
     }
     setIsSubmitting(true);
     try {
       const goalsValue = goals.trim() || undefined;
-      const saves: Promise<void>[] = [];
-      if (gymSelected) {
-        const gymProfile: SportProfile = {
-          sport: 'gym',
-          level: gymState.level,
-          preferredTimes: gymState.times,
-          gymName: gymState.venueName.trim() || undefined,
-          goals: goalsValue,
-        };
-        saves.push(upsertSportProfile(gymProfile));
-      }
-      if (golfSelected) {
-        const golfProfile: SportProfile = {
-          sport: 'golf',
-          level: golfState.level,
-          preferredTimes: golfState.times,
-          golfClub: golfState.venueName.trim() || undefined,
-          goals: goalsValue,
-        };
-        saves.push(upsertSportProfile(golfProfile));
-      }
-      await Promise.all(saves);
+      await Promise.all(
+        [...selected].map((sport) => {
+          const state = sportStates[sport];
+          const profile: SportProfile = {
+            sport,
+            level: state.level,
+            preferredTimes: state.times,
+            gymName: sport === 'gym' ? state.venueName.trim() || undefined : undefined,
+            golfClub: sport === 'golf' ? state.venueName.trim() || undefined : undefined,
+            goals: goalsValue,
+          };
+          return upsertSportProfile(profile);
+        })
+      );
       navigation.replace('Main');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save sport profile. Please try again.');
@@ -116,6 +125,8 @@ export function OnboardingStep3Screen({ navigation }: Props) {
       setIsSubmitting(false);
     }
   }
+
+  const anySelected = selected.size > 0;
 
   return (
     <Screen padded scroll>
@@ -137,76 +148,52 @@ export function OnboardingStep3Screen({ navigation }: Props) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Which sports are you into?</Text>
         <View style={styles.toggleRow}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.toggleButton,
-              gymSelected && styles.toggleButtonActive,
-              pressed && styles.pressed,
-            ]}
-            onPress={() => setGymSelected((v) => !v)}
-            accessibilityRole="checkbox"
-            accessibilityLabel="Gym"
-            accessibilityState={{ checked: gymSelected }}
-          >
-            <Text style={[styles.toggleButtonText, gymSelected && styles.toggleButtonTextActive]}>
-              Gym
-            </Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [
-              styles.toggleButton,
-              golfSelected && styles.toggleButtonActive,
-              pressed && styles.pressed,
-            ]}
-            onPress={() => setGolfSelected((v) => !v)}
-            accessibilityRole="checkbox"
-            accessibilityLabel="Golf"
-            accessibilityState={{ checked: golfSelected }}
-          >
-            <Text style={[styles.toggleButtonText, golfSelected && styles.toggleButtonTextActive]}>
-              Golf
-            </Text>
-          </Pressable>
+          {SPORT_CONFIG.map(({ value, label }) => {
+            const isOn = selected.has(value);
+            return (
+              <Pressable
+                key={value}
+                style={({ pressed }) => [
+                  styles.toggleButton,
+                  isOn && styles.toggleButtonActive,
+                  pressed && styles.pressed,
+                ]}
+                onPress={() => toggleSport(value)}
+                accessibilityRole="checkbox"
+                accessibilityLabel={label}
+                accessibilityState={{ checked: isOn }}
+              >
+                <Text style={[styles.toggleButtonText, isOn && styles.toggleButtonTextActive]}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 
-      {/* Gym section */}
-      {gymSelected && (
-        <View style={styles.sportBlock}>
-          <Text style={styles.sportBlockTitle}>Gym</Text>
-          <SportFields
-            sport="gym"
-            state={gymState}
-            venuePlaceholder="e.g. Fitness First Surry Hills"
-            venueLabel="Gym name (optional)"
-            onLevelChange={(l) => setLevel('gym', l)}
-            onTimeToggle={(t) => toggleSportTime('gym', t)}
-            onVenueChange={(n) => setVenueName('gym', n)}
-          />
-        </View>
-      )}
-
-      {/* Divider between sports */}
-      {gymSelected && golfSelected && <View style={styles.divider} />}
-
-      {/* Golf section */}
-      {golfSelected && (
-        <View style={styles.sportBlock}>
-          <Text style={styles.sportBlockTitle}>Golf</Text>
-          <SportFields
-            sport="golf"
-            state={golfState}
-            venuePlaceholder="e.g. Royal Sydney Golf Club"
-            venueLabel="Golf club (optional)"
-            onLevelChange={(l) => setLevel('golf', l)}
-            onTimeToggle={(t) => toggleSportTime('golf', t)}
-            onVenueChange={(n) => setVenueName('golf', n)}
-          />
-        </View>
+      {/* Per-sport detail sections */}
+      {SPORT_CONFIG.filter(({ value }) => selected.has(value)).map(
+        ({ value, label, venueLabel, venuePlaceholder }, idx, arr) => (
+          <View key={value}>
+            {idx > 0 && <View style={styles.divider} />}
+            <View style={styles.sportBlock}>
+              <Text style={styles.sportBlockTitle}>{label}</Text>
+              <SportFields
+                state={sportStates[value]}
+                venueLabel={venueLabel}
+                venuePlaceholder={venuePlaceholder}
+                onLevelChange={(l) => updateSportState(value, { level: l })}
+                onTimeToggle={(t) => toggleTime(value, t)}
+                onVenueChange={(n) => updateSportState(value, { venueName: n })}
+              />
+            </View>
+          </View>
+        )
       )}
 
       {/* Goals */}
-      {(gymSelected || golfSelected) && (
+      {anySelected && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Fitness goals (optional)</Text>
           <TextInput
@@ -248,10 +235,9 @@ export function OnboardingStep3Screen({ navigation }: Props) {
 // ─── Inline sub-component ─────────────────────────────────────────────────────
 
 interface SportFieldsProps {
-  sport: 'gym' | 'golf';
   state: SportFormState;
-  venuePlaceholder: string;
-  venueLabel: string;
+  venuePlaceholder?: string;
+  venueLabel?: string;
   onLevelChange: (l: Level) => void;
   onTimeToggle: (t: TimeSlot) => void;
   onVenueChange: (n: string) => void;
@@ -323,18 +309,20 @@ function SportFields({
         </View>
       </View>
 
-      {/* Venue */}
-      <View style={styles.subSection}>
-        <Text style={styles.subSectionTitle}>{venueLabel}</Text>
-        <TextInput
-          style={styles.input}
-          value={state.venueName}
-          onChangeText={onVenueChange}
-          placeholder={venuePlaceholder}
-          placeholderTextColor={colors.textTertiary}
-          autoCapitalize="words"
-        />
-      </View>
+      {/* Venue — only rendered when the sport has a venue concept */}
+      {venueLabel ? (
+        <View style={styles.subSection}>
+          <Text style={styles.subSectionTitle}>{venueLabel}</Text>
+          <TextInput
+            style={styles.input}
+            value={state.venueName}
+            onChangeText={onVenueChange}
+            placeholder={venuePlaceholder}
+            placeholderTextColor={colors.textTertiary}
+            autoCapitalize="words"
+          />
+        </View>
+      ) : null}
     </View>
   );
 }

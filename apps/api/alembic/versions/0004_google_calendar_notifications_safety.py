@@ -46,9 +46,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["booking_id"], ["bookings.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "booking_id", "user_id", name="uq_calendar_booking_syncs_booking_user"
-        ),
+        sa.UniqueConstraint("booking_id", "user_id", name="uq_calendar_booking_syncs_booking_user"),
     )
     op.create_index("ix_calendar_booking_syncs_booking_id", "calendar_booking_syncs", ["booking_id"])
 

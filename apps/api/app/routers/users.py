@@ -56,9 +56,7 @@ async def get_identity_preferences(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> IdentityPreferences:
-    result = await db.execute(
-        select(IdentityPreferences).where(IdentityPreferences.user_id == current_user.id)
-    )
+    result = await db.execute(select(IdentityPreferences).where(IdentityPreferences.user_id == current_user.id))
     prefs = result.scalar_one_or_none()
     if prefs is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Preferences not found")
@@ -71,9 +69,7 @@ async def upsert_identity_preferences(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> IdentityPreferences:
-    result = await db.execute(
-        select(IdentityPreferences).where(IdentityPreferences.user_id == current_user.id)
-    )
+    result = await db.execute(select(IdentityPreferences).where(IdentityPreferences.user_id == current_user.id))
     prefs = result.scalar_one_or_none()
 
     if prefs is None:
@@ -93,9 +89,7 @@ async def get_sport_profiles(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[SportProfile]:
-    result = await db.execute(
-        select(SportProfile).where(SportProfile.user_id == current_user.id)
-    )
+    result = await db.execute(select(SportProfile).where(SportProfile.user_id == current_user.id))
     return list(result.scalars().all())
 
 

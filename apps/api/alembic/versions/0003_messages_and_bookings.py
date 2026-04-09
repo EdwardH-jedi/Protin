@@ -24,9 +24,7 @@ def upgrade() -> None:
         sa.Column("match_id", sa.UUID(), nullable=False),
         sa.Column("sender_id", sa.UUID(), nullable=False),
         sa.Column("body", sa.String(1000), nullable=False),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(["match_id"], ["matches.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["sender_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -45,12 +43,8 @@ def upgrade() -> None:
         sa.Column("location", sa.String(200), nullable=True),
         sa.Column("notes", sa.String(500), nullable=True),
         sa.Column("status", sa.String(20), nullable=False, server_default="proposed"),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
-        sa.Column(
-            "updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(["match_id"], ["matches.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["proposer_id"], ["users.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["partner_id"], ["users.id"], ondelete="CASCADE"),

@@ -17,6 +17,37 @@ from app.schemas.discovery import (
 
 _CURRENT_YEAR = datetime.now().year
 
+_LEVEL_ORDER: dict[str, int] = {"beginner": 0, "intermediate": 1, "advanced": 2}
+
+# Max candidates fetched before scoring — keeps the scoring step bounded.
+_SCORE_POOL = 200
+
+
+def _score_compatibility(
+    actor_level: str,
+    actor_times: list[str],
+    target_sp: SportProfile,
+) -> float:
+    """Return a [0, 1] compatibility score between actor and target sport profiles.
+
+    Weights: 60% skill-level proximity, 40% preferred-time overlap.
+    'flexible' in either party's times counts as a full time match.
+    """
+    level_score = 1.0 - abs(
+        _LEVEL_ORDER.get(actor_level, 1) - _LEVEL_ORDER.get(target_sp.level, 1)
+    ) / 2.0
+
+    actor_set = set(actor_times or [])
+    target_set = set(target_sp.preferred_times or [])
+    if "flexible" in actor_set or "flexible" in target_set:
+        time_score = 1.0
+    elif actor_set & target_set:
+        time_score = len(actor_set & target_set) / max(len(actor_set), len(target_set), 1)
+    else:
+        time_score = 0.0
+
+    return 0.6 * level_score + 0.4 * time_score
+
 
 def _build_partner_card(
     user: User,
@@ -51,6 +82,14 @@ async def get_discovery_feed(
     limit: int = 20,
     offset: int = 0,
 ) -> DiscoveryFeedResponse:
+    # Fetch actor's sport profile for compatibility scoring.
+    actor_sp_stmt = select(SportProfile).where(
+        and_(SportProfile.user_id == current_user_id, SportProfile.sport == sport)
+    )
+    actor_sp = (await db.execute(actor_sp_stmt)).scalar_one_or_none()
+    actor_level = actor_sp.level if actor_sp else "intermediate"
+    actor_times = list(actor_sp.preferred_times or []) if actor_sp else ["flexible"]
+
     # IDs the current user has already acted on for this sport
     acted_on_subq = (
         select(DiscoveryAction.target_id)
@@ -64,16 +103,8 @@ async def get_discovery_feed(
     )
 
     # Users blocked by or blocking the current user (bidirectional hide)
-    blocked_by_me_subq = (
-        select(Block.blocked_id)
-        .where(Block.blocker_id == current_user_id)
-        .scalar_subquery()
-    )
-    blocking_me_subq = (
-        select(Block.blocker_id)
-        .where(Block.blocked_id == current_user_id)
-        .scalar_subquery()
-    )
+    blocked_by_me_subq = select(Block.blocked_id).where(Block.blocker_id == current_user_id).scalar_subquery()
+    blocking_me_subq = select(Block.blocker_id).where(Block.blocked_id == current_user_id).scalar_subquery()
 
     base_filter = and_(
         User.id != current_user_id,
@@ -83,8 +114,8 @@ async def get_discovery_feed(
         User.id.not_in(blocking_me_subq),
     )
 
-    # Fetch page
-    stmt = (
+    # Fetch a scoring pool (bounded) — sort by score in Python, then paginate.
+    pool_stmt = (
         select(User, UserProfile, SportProfile)
         .join(UserProfile, UserProfile.user_id == User.id)
         .join(
@@ -93,24 +124,21 @@ async def get_discovery_feed(
         )
         .where(base_filter)
         .order_by(User.created_at.desc())
-        .offset(offset)
-        .limit(limit)
+        .limit(_SCORE_POOL)
     )
-    rows = (await db.execute(stmt)).all()
+    pool = (await db.execute(pool_stmt)).all()
 
-    # Count total without limit
-    count_stmt = (
-        select(User.id)
-        .join(UserProfile, UserProfile.user_id == User.id)
-        .join(
-            SportProfile,
-            and_(SportProfile.user_id == User.id, SportProfile.sport == sport),
-        )
-        .where(base_filter)
+    # Score and sort descending
+    scored = sorted(
+        pool,
+        key=lambda row: _score_compatibility(actor_level, actor_times, row[2]),
+        reverse=True,
     )
-    total = len((await db.execute(count_stmt)).all())
 
-    items = [_build_partner_card(user, profile, [sp]) for user, profile, sp in rows]
+    total = len(scored)
+    page = scored[offset : offset + limit]
+
+    items = [_build_partner_card(user, profile, [sp]) for user, profile, sp in page]
     return DiscoveryFeedResponse(items=items, total=total, limit=limit, offset=offset)
 
 

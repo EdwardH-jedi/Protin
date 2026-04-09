@@ -18,6 +18,7 @@ router = APIRouter(tags=["safety"])
 
 # ── Reports ──────────────────────────────────────────────────────────────────
 
+
 @router.post("/reports", response_model=ReportResponse, status_code=201)
 async def create_report(
     req: CreateReportRequest,
@@ -28,6 +29,7 @@ async def create_report(
 
 
 # ── Blocks ───────────────────────────────────────────────────────────────────
+
 
 @router.get("/blocks", response_model=BlockListResponse)
 async def list_blocks(

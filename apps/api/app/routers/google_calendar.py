@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +11,6 @@ from app.schemas.google_calendar import (
     SyncBookingResponse,
 )
 from app.services import google_calendar as gcal_service
-from uuid import UUID
 
 router = APIRouter(prefix="/users/me/google-calendar", tags=["google-calendar"])
 

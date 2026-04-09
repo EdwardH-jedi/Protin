@@ -44,8 +44,8 @@ interface MatchListResponse {
 
 function MatchCard({ match }: { match: Match }) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const sportLabel =
-    match.sport === 'gym' ? 'Gym' : match.sport === 'golf' ? 'Golf' : match.sport;
+  const _SPORT_LABEL: Record<string, string> = { gym: 'Gym', golf: 'Golf', tennis: 'Tennis', running: 'Running' };
+  const sportLabel = _SPORT_LABEL[match.sport] ?? match.sport;
   const levelLabel = match.partner.sportProfiles.find((sp) => sp.sport === match.sport)?.level;
 
   return (

@@ -26,8 +26,8 @@ export interface UseDiscoveryReturn {
   partners: PartnerCard[];
   isLoading: boolean;
   error: string | null;
-  sport: 'gym' | 'golf';
-  setSport: (s: 'gym' | 'golf') => void;
+  sport: 'gym' | 'golf' | 'tennis' | 'running';
+  setSport: (s: 'gym' | 'golf' | 'tennis' | 'running') => void;
   recordAction: (
     targetUserId: string,
     action: 'like' | 'pass' | 'save'
@@ -41,15 +41,20 @@ export function useDiscovery(): UseDiscoveryReturn {
   const [partners, setPartners] = useState<PartnerCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sport, setSportState] = useState<'gym' | 'golf'>('gym');
+  const [sport, setSportState] = useState<'gym' | 'golf' | 'tennis' | 'running'>('gym');
 
-  async function fetchPartners(selectedSport: 'gym' | 'golf') {
+  async function fetchPartners(selectedSport: 'gym' | 'golf' | 'tennis' | 'running') {
     setIsLoading(true);
     setError(null);
     try {
       const data = await api.get<{ items: PartnerCard[] }>(
         `/discovery?sport=${selectedSport}&limit=${PAGE_LIMIT}`
       );
+      if (!data || !Array.isArray((data as { items?: unknown }).items)) {
+        throw new Error(
+          `Unexpected response shape from /discovery — got: ${JSON.stringify(data)}`
+        );
+      }
       setPartners(data.items);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load partners.');
@@ -62,7 +67,7 @@ export function useDiscovery(): UseDiscoveryReturn {
     fetchPartners(sport);
   }, [sport]);
 
-  function setSport(s: 'gym' | 'golf') {
+  function setSport(s: 'gym' | 'golf' | 'tennis' | 'running') {
     setSportState(s);
   }
 

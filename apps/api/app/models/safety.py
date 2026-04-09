@@ -32,9 +32,7 @@ class Report(Base):
     # spam | inappropriate | fake | harassment | other
     reason: Mapped[str] = mapped_column(String(50), nullable=False)
     context: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
 
 class Block(Base):
@@ -58,12 +56,6 @@ class Block(Base):
         nullable=False,
         index=True,
     )
-    created_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
-    __table_args__ = (
-        UniqueConstraint(
-            "blocker_id", "blocked_id", name="uq_blocks_blocker_blocked"
-        ),
-    )
+    __table_args__ = (UniqueConstraint("blocker_id", "blocked_id", name="uq_blocks_blocker_blocked"),)

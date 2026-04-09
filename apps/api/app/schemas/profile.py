@@ -64,7 +64,7 @@ class IdentityPreferencesResponse(BaseModel):
 
 
 class SportProfileCreate(BaseModel):
-    sport: Literal["gym", "golf"]
+    sport: Literal["gym", "golf", "tennis", "running"]
     level: Literal["beginner", "intermediate", "advanced"]
     preferred_times: list[Literal["morning", "afternoon", "evening", "flexible"]] = ["flexible"]
     gym_name: Optional[str] = Field(None, max_length=120)

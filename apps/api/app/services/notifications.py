@@ -72,9 +72,7 @@ async def unregister_push_token(
     user_id: UUID,
     token_id: UUID,
 ) -> None:
-    stmt = select(PushToken).where(
-        and_(PushToken.id == token_id, PushToken.user_id == user_id)
-    )
+    stmt = select(PushToken).where(and_(PushToken.id == token_id, PushToken.user_id == user_id))
     token = (await db.execute(stmt)).scalar_one_or_none()
     if token:
         await db.delete(token)
@@ -87,12 +85,7 @@ async def unregister_push_token(
 
 
 async def _get_latest_push_token(db: AsyncSession, user_id: UUID) -> str | None:
-    stmt = (
-        select(PushToken)
-        .where(PushToken.user_id == user_id)
-        .order_by(PushToken.created_at.desc())
-        .limit(1)
-    )
+    stmt = select(PushToken).where(PushToken.user_id == user_id).order_by(PushToken.created_at.desc()).limit(1)
     token = (await db.execute(stmt)).scalar_one_or_none()
     return token.token if token else None
 
@@ -109,9 +102,7 @@ async def schedule_booking_notification(
     partner_name: str,
 ) -> None:
     """Enqueue a notification event for immediate or future delivery."""
-    title_tpl, body_tpl = _NOTIFICATION_COPY.get(
-        notification_type, ("Protin update", "You have a new update.")
-    )
+    title_tpl, body_tpl = _NOTIFICATION_COPY.get(notification_type, ("Protin update", "You have a new update."))
     title = _render(title_tpl, partner=partner_name, sport=booking.sport)
     body = _render(body_tpl, partner=partner_name, sport=booking.sport)
     push_token = await _get_latest_push_token(db, recipient_id)

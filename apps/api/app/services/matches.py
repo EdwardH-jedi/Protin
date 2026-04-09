@@ -27,13 +27,7 @@ async def list_matches(
         Match.status == "active",
     )
 
-    stmt = (
-        select(Match)
-        .where(participant_filter)
-        .order_by(Match.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-    )
+    stmt = select(Match).where(participant_filter).order_by(Match.created_at.desc()).offset(offset).limit(limit)
     matches = list((await db.execute(stmt)).scalars().all())
 
     count_stmt = select(Match.id).where(participant_filter)
@@ -89,24 +83,14 @@ async def archive_match(
     )
 
 
-async def _build_partner_card(
-    db: AsyncSession, user_id: UUID, sport: str
-) -> PartnerCardResponse:
+async def _build_partner_card(db: AsyncSession, user_id: UUID, sport: str) -> PartnerCardResponse:
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-    profile = (
-        await db.execute(select(UserProfile).where(UserProfile.user_id == user_id))
-    ).scalar_one_or_none()
+    profile = (await db.execute(select(UserProfile).where(UserProfile.user_id == user_id))).scalar_one_or_none()
     sp = (
-        await db.execute(
-            select(SportProfile).where(
-                and_(SportProfile.user_id == user_id, SportProfile.sport == sport)
-            )
-        )
+        await db.execute(select(SportProfile).where(and_(SportProfile.user_id == user_id, SportProfile.sport == sport)))
     ).scalar_one_or_none()
 
-    display_name = (
-        profile.display_name if profile else (user.email if user else "Unknown")
-    )
+    display_name = profile.display_name if profile else (user.email if user else "Unknown")
     age = (_CURRENT_YEAR - profile.birth_year) if profile and profile.birth_year else None
     bio_excerpt = profile.bio[:160] if profile and profile.bio else None
 

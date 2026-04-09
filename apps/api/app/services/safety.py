@@ -14,7 +14,6 @@ from app.schemas.safety import (
     ReportResponse,
 )
 
-
 # ---------------------------------------------------------------------------
 # Reports
 # ---------------------------------------------------------------------------
@@ -60,9 +59,7 @@ async def block_user(
         )
 
     # Idempotent: return existing block if present
-    stmt = select(Block).where(
-        and_(Block.blocker_id == blocker_id, Block.blocked_id == blocked_id)
-    )
+    stmt = select(Block).where(and_(Block.blocker_id == blocker_id, Block.blocked_id == blocked_id))
     existing = (await db.execute(stmt)).scalar_one_or_none()
     if existing:
         return BlockResponse.model_validate(existing)
@@ -79,9 +76,7 @@ async def unblock_user(
     blocker_id: UUID,
     blocked_id: UUID,
 ) -> None:
-    stmt = select(Block).where(
-        and_(Block.blocker_id == blocker_id, Block.blocked_id == blocked_id)
-    )
+    stmt = select(Block).where(and_(Block.blocker_id == blocker_id, Block.blocked_id == blocked_id))
     block = (await db.execute(stmt)).scalar_one_or_none()
     if block is None:
         raise HTTPException(

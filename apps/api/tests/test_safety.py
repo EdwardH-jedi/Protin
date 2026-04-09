@@ -183,9 +183,7 @@ async def test_unblock_user(client: AsyncClient) -> None:
 
 async def test_unblock_nonexistent_returns_404(client: AsyncClient) -> None:
     token, _ = await _register(client, "blk_noexist@example.com")
-    r = await client.delete(
-        "/blocks/00000000-0000-0000-0000-000000000001", headers=_auth(token)
-    )
+    r = await client.delete("/blocks/00000000-0000-0000-0000-000000000001", headers=_auth(token))
     assert r.status_code == 404
 
 

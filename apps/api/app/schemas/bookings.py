@@ -11,7 +11,7 @@ from app.schemas.discovery import PartnerCardResponse
 
 class CreateBookingRequest(BaseModel):
     match_id: UUID
-    sport: Literal["gym", "golf"]
+    sport: Literal["gym", "golf", "tennis", "running"]
     starts_at: datetime
     ends_at: datetime
     location: str | None = Field(default=None, max_length=200)

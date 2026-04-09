@@ -13,19 +13,17 @@ class DiscoveryAction(Base):
     __tablename__ = "discovery_actions"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    actor_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
-    target_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
+    actor_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    target_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     sport: Mapped[str] = mapped_column(String(20), nullable=False)
     action: Mapped[str] = mapped_column(String(10), nullable=False)  # like | pass | save
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
     __table_args__ = (
         UniqueConstraint(
-            "actor_id", "target_id", "sport",
+            "actor_id",
+            "target_id",
+            "sport",
             name="uq_discovery_actions_actor_target_sport",
         ),
     )
@@ -35,19 +33,17 @@ class Match(Base):
     __tablename__ = "matches"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    user1_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
-    user2_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
+    user1_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user2_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     sport: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
     __table_args__ = (
         UniqueConstraint(
-            "user1_id", "user2_id", "sport",
+            "user1_id",
+            "user2_id",
+            "sport",
             name="uq_matches_canonical_pair_sport",
         ),
     )

@@ -195,3 +195,114 @@ async def test_both_participants_see_same_messages(client: AsyncClient) -> None:
     ids_a = {m["id"] for m in r_a.json()["items"]}
     ids_b = {m["id"] for m in r_b.json()["items"]}
     assert ids_a == ids_b
+
+
+# ---------------------------------------------------------------------------
+# _ConnectionManager unit tests  (no HTTP / no DB)
+# ---------------------------------------------------------------------------
+
+
+async def test_connection_manager_broadcast_reaches_all_connections() -> None:
+    from unittest.mock import AsyncMock
+
+    from app.routers.chat import _ConnectionManager
+
+    manager = _ConnectionManager()
+    ws1, ws2 = AsyncMock(), AsyncMock()
+
+    await manager.connect("room-x", ws1)
+    await manager.connect("room-x", ws2)
+
+    await manager.broadcast("room-x", {"body": "hello"})
+
+    ws1.send_json.assert_called_once_with({"body": "hello"})
+    ws2.send_json.assert_called_once_with({"body": "hello"})
+
+
+async def test_connection_manager_broadcast_skips_other_rooms() -> None:
+    from unittest.mock import AsyncMock
+
+    from app.routers.chat import _ConnectionManager
+
+    manager = _ConnectionManager()
+    ws_a, ws_b = AsyncMock(), AsyncMock()
+
+    await manager.connect("room-a", ws_a)
+    await manager.connect("room-b", ws_b)
+
+    await manager.broadcast("room-a", {"body": "only-a"})
+
+    ws_a.send_json.assert_called_once()
+    ws_b.send_json.assert_not_called()
+
+
+async def test_connection_manager_disconnect_stops_future_broadcasts() -> None:
+    from unittest.mock import AsyncMock
+
+    from app.routers.chat import _ConnectionManager
+
+    manager = _ConnectionManager()
+    ws = AsyncMock()
+
+    await manager.connect("room-y", ws)
+    manager.disconnect("room-y", ws)
+
+    await manager.broadcast("room-y", {"body": "ghost"})
+
+    ws.send_json.assert_not_called()
+
+
+async def test_connection_manager_tolerates_send_failure() -> None:
+    """A stale socket that raises on send_json must not crash the broadcast."""
+    from unittest.mock import AsyncMock
+
+    from app.routers.chat import _ConnectionManager
+
+    manager = _ConnectionManager()
+    bad_ws, good_ws = AsyncMock(), AsyncMock()
+    bad_ws.send_json.side_effect = RuntimeError("broken pipe")
+
+    await manager.connect("room-z", bad_ws)
+    await manager.connect("room-z", good_ws)
+
+    # Should not raise
+    await manager.broadcast("room-z", {"body": "resilient"})
+
+    good_ws.send_json.assert_called_once_with({"body": "resilient"})
+
+
+# ---------------------------------------------------------------------------
+# Broadcast integration: HTTP send_message triggers _manager.broadcast
+# ---------------------------------------------------------------------------
+
+
+async def test_send_message_triggers_ws_broadcast(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token_a, uid_a = await _register(client, "ws_bcast_a@example.com")
+    token_b, uid_b = await _register(client, "ws_bcast_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    broadcast_calls: list[tuple[str, dict]] = []
+
+    async def _capture_broadcast(room: str, data: dict) -> None:
+        broadcast_calls.append((room, data))
+
+    import app.routers.chat as chat_router
+    monkeypatch.setattr(chat_router._manager, "broadcast", _capture_broadcast)
+
+    r = await client.post(
+        f"/matches/{match_id}/messages",
+        json={"body": "ws broadcast test"},
+        headers=_auth(token_a),
+    )
+    assert r.status_code == 201
+
+    assert len(broadcast_calls) == 1
+    room, data = broadcast_calls[0]
+    assert room == match_id
+    assert data["body"] == "ws broadcast test"
+    assert data["senderId"] == uid_a
+    assert data["matchId"] == match_id
+    assert "id" in data
+    assert "createdAt" in data

@@ -1,2 +1,27 @@
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+.env
+.env.staging
+.env.production
+
+# ── Node ─────────────────────────────────────────────────────────────────────
+node_modules/
+package-lock.json
+
+# ── SSL certificates (generated locally — never commit) ──────────────────────
+infra/nginx/certs/*.crt
+infra/nginx/certs/*.key
+infra/nginx/certs/*.pem
+
+# ── Expo / React Native ───────────────────────────────────────────────────────
+.expo/
+.expo-shared/
+dist/
+web-build/
+
+# ── Misc ─────────────────────────────────────────────────────────────────────
 resume/
-resume/
+.DS_Store

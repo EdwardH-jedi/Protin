@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 
 import { Screen } from '../../components/Screen';
-import { api } from '../../lib/api';
+import { api, BASE_URL } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { ChatScreenProps } from '../../navigation/types';
@@ -40,13 +40,14 @@ interface MessageListResponse {
 
 export function ChatScreen({ route, navigation }: ChatScreenProps) {
   const { matchId, partnerName, partnerId: routePartnerId, sport } = route.params;
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [isSending, setIsSending] = useState(false);
   const listRef = useRef<FlatList>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   const partnerId = useRef<string | null>(routePartnerId);
 
@@ -126,6 +127,32 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
   useEffect(() => {
     fetchMessages();
   }, [fetchMessages]);
+
+  // ── Real-time WebSocket connection ──────────────────────────────────────────
+  useEffect(() => {
+    if (!token) return;
+    const wsBase = BASE_URL.replace(/^http/, 'ws');
+    const ws = new WebSocket(`${wsBase}/matches/${matchId}/ws?token=${token}`);
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      try {
+        const incoming = JSON.parse(event.data as string) as Message;
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === incoming.id)) return prev;
+          return [...prev, incoming];
+        });
+        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+      } catch {
+        // ignore malformed frames
+      }
+    };
+
+    return () => {
+      ws.close();
+      wsRef.current = null;
+    };
+  }, [matchId, token]);
 
   const sendMessage = useCallback(async () => {
     const body = draft.trim();

@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.booking import Booking
 from app.models.match import Match
 from app.schemas.bookings import BookingListResponse, BookingResponse, CreateBookingRequest
-from app.services.matches import _build_partner_card
 from app.services import notifications as notif_service
+from app.services.matches import _build_partner_card
 
 # ---------------------------------------------------------------------------
 # Status machine
@@ -71,11 +71,7 @@ async def _assert_booking_participant(booking: Booking, user_id: UUID) -> None:
 
 
 async def _to_response(db: AsyncSession, booking: Booking, current_user_id: UUID) -> BookingResponse:
-    other_id = (
-        booking.partner_id
-        if booking.proposer_id == current_user_id
-        else booking.proposer_id
-    )
+    other_id = booking.partner_id if booking.proposer_id == current_user_id else booking.proposer_id
     partner = await _build_partner_card(db, other_id, booking.sport)
     return BookingResponse(
         id=booking.id,
@@ -167,13 +163,7 @@ async def list_bookings(
     base_where = participant_filter
     if statuses is not None:
         base_where = and_(participant_filter, Booking.status.in_(statuses))
-    stmt = (
-        select(Booking)
-        .where(base_where)
-        .order_by(Booking.starts_at.asc())
-        .offset(offset)
-        .limit(limit)
-    )
+    stmt = select(Booking).where(base_where).order_by(Booking.starts_at.asc()).offset(offset).limit(limit)
     bookings = list((await db.execute(stmt)).scalars().all())
 
     count_stmt = select(func.count()).select_from(Booking).where(base_where)
@@ -215,9 +205,7 @@ async def transition_booking(
     }
     notif_type = notif_type_map.get(new_status)
     if notif_type:
-        await notif_service.schedule_booking_notification(
-            db, b, notif_type, other_id, actor_card.display_name
-        )
+        await notif_service.schedule_booking_notification(db, b, notif_type, other_id, actor_card.display_name)
 
     # Schedule reminder when booking is confirmed
     if new_status == "confirmed":

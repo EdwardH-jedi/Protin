@@ -265,3 +265,120 @@ async def test_acted_on_users_excluded_from_feed(client: AsyncClient) -> None:
     r = await client.get("/discovery?sport=gym", headers=_auth(token_a))
     user_ids = [item["user_id"] for item in r.json()["items"]]
     assert user_b_id not in user_ids
+
+
+# ---------------------------------------------------------------------------
+# _score_compatibility unit tests  (pure function, no DB / no HTTP)
+# ---------------------------------------------------------------------------
+
+
+def _make_sp(level: str, preferred_times: list[str]):
+    """Build a minimal SportProfile-like object for scoring tests."""
+    from app.models.profile import SportProfile
+
+    sp = SportProfile.__new__(SportProfile)
+    sp.level = level
+    sp.preferred_times = preferred_times
+    return sp
+
+
+def test_score_same_level_flexible_is_one():
+    from app.services.discovery import _score_compatibility
+
+    sp = _make_sp("intermediate", ["flexible"])
+    assert _score_compatibility("intermediate", ["morning"], sp) == 1.0
+
+
+def test_score_same_level_no_overlap():
+    from app.services.discovery import _score_compatibility
+
+    sp = _make_sp("intermediate", ["evening"])
+    score = _score_compatibility("intermediate", ["morning"], sp)
+    # 0.6 * 1.0 + 0.4 * 0.0 = 0.6
+    assert score == pytest.approx(0.6)
+
+
+def test_score_one_level_apart_flexible():
+    from app.services.discovery import _score_compatibility
+
+    sp = _make_sp("advanced", ["flexible"])
+    score = _score_compatibility("intermediate", ["morning"], sp)
+    # 0.6 * 0.5 + 0.4 * 1.0 = 0.7
+    assert score == pytest.approx(0.7)
+
+
+def test_score_two_levels_apart_flexible():
+    from app.services.discovery import _score_compatibility
+
+    sp = _make_sp("advanced", ["flexible"])
+    score = _score_compatibility("beginner", ["morning"], sp)
+    # 0.6 * 0.0 + 0.4 * 1.0 = 0.4
+    assert score == pytest.approx(0.4)
+
+
+def test_score_partial_time_overlap():
+    from app.services.discovery import _score_compatibility
+
+    sp = _make_sp("intermediate", ["morning", "evening"])
+    score = _score_compatibility("intermediate", ["morning", "afternoon"], sp)
+    # level = 1.0, overlap = 1/2 = 0.5
+    # 0.6 * 1.0 + 0.4 * 0.5 = 0.8
+    assert score == pytest.approx(0.8)
+
+
+# ---------------------------------------------------------------------------
+# Integration: feed ordering respects compatibility score
+# ---------------------------------------------------------------------------
+
+
+async def test_feed_orders_by_compatibility(client: AsyncClient) -> None:
+    """Higher-compatibility partner must appear before lower-compatibility one."""
+    token_actor, uid_actor = await _register(client, "score_actor@example.com")
+    token_hi, uid_hi = await _register(client, "score_hi@example.com")
+    token_lo, uid_lo = await _register(client, "score_lo@example.com")
+
+    # Actor: intermediate gym, morning
+    await client.put(
+        "/users/me/profile",
+        json={"display_name": "Actor"},
+        headers=_auth(token_actor),
+    )
+    await client.post(
+        "/users/me/sport-profiles",
+        json={"sport": "gym", "level": "intermediate", "preferred_times": ["morning"]},
+        headers=_auth(token_actor),
+    )
+
+    # High-match partner: same level + same time → score 1.0
+    await client.put(
+        "/users/me/profile",
+        json={"display_name": "High Match"},
+        headers=_auth(token_hi),
+    )
+    await client.post(
+        "/users/me/sport-profiles",
+        json={"sport": "gym", "level": "intermediate", "preferred_times": ["morning"]},
+        headers=_auth(token_hi),
+    )
+
+    # Low-match partner: two levels apart + different time → score 0.0
+    await client.put(
+        "/users/me/profile",
+        json={"display_name": "Low Match"},
+        headers=_auth(token_lo),
+    )
+    await client.post(
+        "/users/me/sport-profiles",
+        json={"sport": "gym", "level": "beginner", "preferred_times": ["evening"]},
+        headers=_auth(token_lo),
+    )
+
+    r = await client.get("/discovery?sport=gym&limit=50", headers=_auth(token_actor))
+    assert r.status_code == 200
+    ids = [item["user_id"] for item in r.json()["items"]]
+
+    assert uid_hi in ids, "high-match partner missing from feed"
+    assert uid_lo in ids, "low-match partner missing from feed"
+    assert ids.index(uid_hi) < ids.index(uid_lo), (
+        "high-match partner should rank before low-match partner"
+    )

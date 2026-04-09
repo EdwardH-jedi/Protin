@@ -26,6 +26,9 @@ _log = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _log.info("Protin API v%s starting — env=%s", VERSION, settings.app_env)
+    from app.core.encryption import validate_encryption_config
+
+    validate_encryption_config()
     _log.info("App is ready.")
     yield
     await engine.dispose()
@@ -72,9 +75,7 @@ async def health(
         "status": "ok" if all_ok else "degraded",
         "version": VERSION,
         "environment": settings.app_env,
-        "uptime_seconds": int(
-            (datetime.now(tz=timezone.utc) - _started_at).total_seconds()
-        ),
+        "uptime_seconds": int((datetime.now(tz=timezone.utc) - _started_at).total_seconds()),
         "checks": checks,
     }
     return JSONResponse(
@@ -83,8 +84,17 @@ async def health(
     )
 
 
-from app.routers import auth, bookings, chat, discovery, matches, users  # noqa: E402
-from app.routers import google_calendar, notifications, safety  # noqa: E402
+from app.routers import (  # noqa: E402  # noqa: E402
+    auth,
+    bookings,
+    chat,
+    discovery,
+    google_calendar,
+    matches,
+    notifications,
+    safety,
+    users,
+)
 
 app.include_router(auth.router)
 app.include_router(users.router)

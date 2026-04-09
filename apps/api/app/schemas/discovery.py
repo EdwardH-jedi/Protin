@@ -31,7 +31,7 @@ class DiscoveryFeedResponse(BaseModel):
 class RecordActionRequest(BaseModel):
     target_user_id: UUID
     action: Literal["like", "pass", "save"]
-    sport: Literal["gym", "golf"]
+    sport: Literal["gym", "golf", "tennis", "running"]
 
 
 class RecordActionResponse(BaseModel):
