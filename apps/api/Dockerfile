@@ -11,9 +11,10 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 # Install production dependencies into an isolated .venv.
-# --frozen   : refuse to update uv.lock (fails fast if stale)
-# --no-dev   : exclude test/lint dependencies
-RUN uv sync --frozen --no-dev
+# --frozen              : refuse to update uv.lock (fails fast if stale)
+# --no-dev              : exclude test/lint dependencies
+# --no-install-project  : don't build/install the local package; runtime copies source directly
+RUN uv sync --frozen --no-dev --no-install-project
 
 
 # ─── Stage 2: runtime image ──────────────────────────────────────────────────

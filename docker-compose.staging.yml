@@ -86,7 +86,9 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'python worker.py' || exit 1"]
+      # python:slim doesn't ship procps (no pgrep), so scan /proc/*/cmdline
+      # directly for the worker.py process. grep -q returns 0 on match.
+      test: ["CMD-SHELL", "grep -q worker.py /proc/[0-9]*/cmdline 2>/dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -100,8 +102,18 @@ services:
       - "443:443"
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      # certs/ must exist on the host (create with: mkdir -p infra/nginx/certs)
-      # Place fullchain.pem and privkey.pem here for HTTPS. HTTP-only: leave empty.
+      # Staging: mount the empty conf.d.staging so the nginx image's
+      # default.conf is suppressed AND the production HTTPS drop-in
+      # (infra/nginx/conf.d/https.conf) is NOT loaded — staging runs
+      # HTTP-only and does not require Let's Encrypt certificates.
+      #
+      # For production HTTPS, override this mount to:
+      #   - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
+      #   - /etc/letsencrypt:/etc/letsencrypt:ro
+      #   - ./infra/nginx/certbot-webroot:/var/www/certbot:ro
+      - ./infra/nginx/conf.d.staging:/etc/nginx/conf.d:ro
+      # Legacy self-signed cert path (kept for operators using gen-cert.sh
+      # rather than Let's Encrypt — harmless when conf.d.staging is active).
       - ./infra/nginx/certs:/etc/nginx/certs:ro
     depends_on:
       api:

@@ -36,10 +36,25 @@ if [[ ! -f .env.staging ]]; then
     exit 1
 fi
 
+set -a
+source .env.staging
+set +a
+
 if ! command -v docker &>/dev/null; then
     echo "ERROR: docker not found on PATH."
     exit 1
 fi
+
+# ── Refresh uv.lock ───────────────────────────────────────────────────────────
+# The API Dockerfile uses `uv sync --frozen`, which requires apps/api/uv.lock.
+# Always run `uv lock` (idempotent: a no-op if pyproject.toml is unchanged) so
+# dependency edits flow through without having to manually delete the lock.
+echo "==> Refreshing apps/api/uv.lock…"
+docker run --rm \
+    -v "$REPO_ROOT/apps/api:/app" \
+    -w /app \
+    ghcr.io/astral-sh/uv:python3.12-bookworm-slim \
+    uv lock
 
 # ── Pull / build images ───────────────────────────────────────────────────────
 echo "==> Pulling base images…"
