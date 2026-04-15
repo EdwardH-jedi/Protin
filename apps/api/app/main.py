@@ -7,10 +7,13 @@ import redis.asyncio as aioredis
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.rate_limit import limiter
 from app.db.redis import _pool as redis_pool
 from app.db.redis import get_redis
 from app.db.session import engine, get_db
@@ -40,6 +43,12 @@ app = FastAPI(
     version=VERSION,
     lifespan=lifespan,
 )
+
+# Rate limiting (slowapi). The limiter is attached here so routers can
+# reference it via app.state; the exception handler returns 429 with a
+# Retry-After header.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 _cors_origins = settings.cors_origins_list
 app.add_middleware(

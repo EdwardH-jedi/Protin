@@ -8,6 +8,7 @@
  */
 
 import React from 'react';
+import { Platform } from 'react-native';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 
 import { LoginScreen } from '../screens/auth/LoginScreen';
@@ -15,10 +16,29 @@ import { LoginScreen } from '../screens/auth/LoginScreen';
 // ─── Mock auth store ──────────────────────────────────────────────────────────
 
 const mockLogin = jest.fn();
+const mockLoginWithApple = jest.fn();
 
 jest.mock('../stores/auth', () => ({
   useAuthStore: jest.fn(),
 }));
+
+// ─── Mock expo-apple-authentication ───────────────────────────────────────────
+
+const mockSignInAsync = jest.fn();
+
+jest.mock('expo-apple-authentication', () => {
+  const { View } = require('react-native');
+  return {
+    __esModule: true,
+    signInAsync: (...args: unknown[]) => mockSignInAsync(...args),
+    AppleAuthenticationScope: { FULL_NAME: 0, EMAIL: 1 },
+    AppleAuthenticationButtonType: { SIGN_IN: 0 },
+    AppleAuthenticationButtonStyle: { BLACK: 0, WHITE: 1 },
+    AppleAuthenticationButton: ({ onPress }: { onPress: () => void }) => (
+      <View testID="apple-sign-in-button" accessibilityRole="button" onTouchEnd={onPress} />
+    ),
+  };
+});
 
 // ─── Mock Screen component ────────────────────────────────────────────────────
 
@@ -55,8 +75,13 @@ function setupStore(overrides: { isLoading?: boolean } = {}) {
   const { useAuthStore } = require('../stores/auth');
   (useAuthStore as jest.Mock).mockReturnValue({
     login: mockLogin,
+    loginWithApple: mockLoginWithApple,
     isLoading: overrides.isLoading ?? false,
   });
+}
+
+function setPlatform(os: 'ios' | 'android') {
+  Object.defineProperty(Platform, 'OS', { configurable: true, get: () => os });
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -171,5 +196,62 @@ describe('LoginScreen', () => {
     );
     fireEvent.press(getByText('Sign up'));
     expect(nav.replace).toHaveBeenCalledWith('RegisterScreen');
+  });
+
+  // ── Apple Sign-in ──────────────────────────────────────────────────────────
+
+  describe('Apple Sign-in', () => {
+    afterEach(() => setPlatform('ios'));
+
+    it('renders the Apple Sign-in button on iOS', () => {
+      setPlatform('ios');
+      const { queryByTestId } = render(
+        <LoginScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      expect(queryByTestId('apple-sign-in-button')).not.toBeNull();
+    });
+
+    it('does not render the Apple Sign-in button on Android', () => {
+      setPlatform('android');
+      const { queryByTestId } = render(
+        <LoginScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      expect(queryByTestId('apple-sign-in-button')).toBeNull();
+    });
+
+    it('posts identityToken + nonce to loginWithApple on success', async () => {
+      setPlatform('ios');
+      mockSignInAsync.mockResolvedValue({
+        identityToken: 'apple.jwt.token',
+        email: 'user@privaterelay.appleid.com',
+        fullName: { givenName: 'Alex', familyName: 'Kim' },
+      });
+      mockLoginWithApple.mockResolvedValue(undefined);
+      const nav = makeNavigation();
+      const { getByTestId } = render(
+        <LoginScreen navigation={nav as any} route={{} as any} />
+      );
+      fireEvent(getByTestId('apple-sign-in-button'), 'touchEnd');
+      await waitFor(() => expect(mockLoginWithApple).toHaveBeenCalled());
+      const payload = mockLoginWithApple.mock.calls[0][0];
+      expect(payload.identityToken).toBe('apple.jwt.token');
+      expect(typeof payload.nonce).toBe('string');
+      expect(payload.nonce.length).toBeGreaterThan(0);
+      expect(payload.email).toBe('user@privaterelay.appleid.com');
+      expect(payload.name).toBe('Alex Kim');
+      await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('Main'));
+    });
+
+    it('silently ignores user cancellation', async () => {
+      setPlatform('ios');
+      mockSignInAsync.mockRejectedValue({ code: 'ERR_REQUEST_CANCELED' });
+      const { getByTestId, queryByText } = render(
+        <LoginScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      fireEvent(getByTestId('apple-sign-in-button'), 'touchEnd');
+      await waitFor(() => expect(mockSignInAsync).toHaveBeenCalled());
+      expect(mockLoginWithApple).not.toHaveBeenCalled();
+      expect(queryByText(/Apple Sign-in failed/)).toBeNull();
+    });
   });
 });

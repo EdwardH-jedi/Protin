@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     # Leave empty to disable push delivery (staging default)
     expo_push_url: str = "https://exp.host/--/api/v2/push/send"
 
+    # Apple Sign-in. Must match the app's bundle identifier (iOS) or the
+    # Services ID (web) registered with Apple Developer. Required when the
+    # /auth/apple endpoint is enabled in staging/production.
+    apple_client_id: str = ""
+
     # JWT signing key — must be set in .env for staging/production.
     secret_key: str = "change-me-in-production"
 

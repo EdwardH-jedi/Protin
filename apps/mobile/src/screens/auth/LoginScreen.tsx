@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 import { Screen } from '../../components/Screen';
 import { useAuthStore } from '../../stores/auth';
@@ -16,12 +18,23 @@ import type { RootStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LoginScreen'>;
 
+function generateNonce(): string {
+  // 32 chars of url-safe entropy. The backend verifies by computing
+  // SHA256(nonce) and comparing against the identityToken's nonce claim.
+  const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let nonce = '';
+  for (let i = 0; i < 32; i++) {
+    nonce += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return nonce;
+}
+
 export function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const { login, isLoading } = useAuthStore();
+  const { login, loginWithApple, isLoading } = useAuthStore();
 
   async function handleLogin() {
     setError(null);
@@ -35,6 +48,41 @@ export function LoginScreen({ navigation }: Props) {
       navigation.replace('Main');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
+    }
+  }
+
+  async function handleAppleSignIn() {
+    setError(null);
+    try {
+      const nonce = generateNonce();
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce,
+      });
+      if (!credential.identityToken) {
+        setError('Apple Sign-in did not return an identity token.');
+        return;
+      }
+      const fullName = credential.fullName;
+      const composedName = fullName
+        ? [fullName.givenName, fullName.familyName].filter(Boolean).join(' ').trim() || null
+        : null;
+      await loginWithApple({
+        identityToken: credential.identityToken,
+        nonce,
+        email: credential.email ?? null,
+        name: composedName,
+      });
+      navigation.replace('Main');
+    } catch (err) {
+      // User canceling the sheet is not a real error — swallow silently.
+      if (err && typeof err === 'object' && (err as { code?: string }).code === 'ERR_REQUEST_CANCELED') {
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'Apple Sign-in failed. Please try again.');
     }
   }
 
@@ -94,6 +142,22 @@ export function LoginScreen({ navigation }: Props) {
             <Text style={styles.buttonPrimaryText}>Log in</Text>
           )}
         </Pressable>
+
+        {Platform.OS === 'ios' ? (
+          <View style={styles.appleSection}>
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={
+                AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+              }
+              buttonStyle={
+                AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+              }
+              cornerRadius={radii.md}
+              style={styles.appleButton}
+              onPress={handleAppleSignIn}
+            />
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.footer}>
@@ -162,6 +226,13 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.65,
+  },
+  appleSection: {
+    marginTop: spacing.md,
+  },
+  appleButton: {
+    width: '100%',
+    height: 48,
   },
   footer: {
     paddingVertical: spacing.xl,

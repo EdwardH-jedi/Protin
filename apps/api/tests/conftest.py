@@ -4,9 +4,15 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.rate_limit import limiter
 from app.db.redis import get_redis
 from app.db.session import get_db
 from app.main import app
+
+# slowapi's in-process limiter would try to reach Redis at
+# ``settings.redis_url``; in the test environment Redis is mocked, so we
+# disable rate-limiting globally for the suite.
+limiter.enabled = False
 
 
 @pytest.fixture

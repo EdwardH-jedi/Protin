@@ -10,12 +10,20 @@ interface User {
   email: string;
 }
 
+interface AppleSignInPayload {
+  identityToken: string;
+  nonce: string;
+  email?: string | null;
+  name?: string | null;
+}
+
 interface AuthState {
   token: string | null;
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
+  loginWithApple: (payload: AppleSignInPayload) => Promise<void>;
   logout: () => Promise<void>;
   initialize: () => Promise<void>;
 }
@@ -46,6 +54,23 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const data = await api.post<AuthResponse>('/auth/register', { email, password });
+      await SecureStore.setItemAsync(TOKEN_KEY, data.accessToken);
+      setToken(data.accessToken);
+      set({ token: data.accessToken, user: null });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  loginWithApple: async (payload) => {
+    set({ isLoading: true });
+    try {
+      const data = await api.post<AuthResponse>('/auth/apple', {
+        identityToken: payload.identityToken,
+        nonce: payload.nonce,
+        email: payload.email ?? undefined,
+        name: payload.name ?? undefined,
+      });
       await SecureStore.setItemAsync(TOKEN_KEY, data.accessToken);
       setToken(data.accessToken);
       set({ token: data.accessToken, user: null });

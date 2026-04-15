@@ -1,0 +1,54 @@
+# =============================================================================
+# Protin — Fly.io production deployment config
+#
+# Deploys the FastAPI API and the notification worker from a single image
+# (apps/api/Dockerfile) using Fly's process groups.
+#
+# Postgres and Redis are NOT defined here — they are managed resources
+# provisioned separately. See infra/fly/README.md for the one-liners and
+# the env vars they populate (DATABASE_URL, REDIS_URL).
+#
+# Region: syd (Sydney) — matches the Sydney-first product scope.
+# =============================================================================
+
+app = "protin-api"
+primary_region = "syd"
+
+# Build from apps/api as the Docker context so the Dockerfile's
+# `COPY pyproject.toml uv.lock ./` and `COPY . .` resolve correctly.
+[build]
+  dockerfile = "apps/api/Dockerfile"
+
+# Two process groups, one image:
+#   app    — uvicorn HTTP server (receives public traffic)
+#   worker — notification poller (no public ports)
+[processes]
+  app    = "uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info"
+  worker = "python worker.py"
+
+# Public HTTPS service — only the `app` process group serves traffic.
+[http_service]
+  internal_port     = 8000
+  force_https       = true
+  auto_stop_machines  = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes         = ["app"]
+
+  [[http_service.checks]]
+    interval     = "30s"
+    timeout      = "5s"
+    grace_period = "20s"
+    method       = "GET"
+    path         = "/health"
+
+# VM sizing — small default; tune post-launch based on observed load.
+[[vm]]
+  size      = "shared-cpu-1x"
+  memory    = "512mb"
+  processes = ["app"]
+
+[[vm]]
+  size      = "shared-cpu-1x"
+  memory    = "512mb"
+  processes = ["worker"]
