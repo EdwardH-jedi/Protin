@@ -379,6 +379,133 @@ async def test_feed_orders_by_compatibility(client: AsyncClient) -> None:
 
     assert uid_hi in ids, "high-match partner missing from feed"
     assert uid_lo in ids, "low-match partner missing from feed"
-    assert ids.index(uid_hi) < ids.index(uid_lo), (
-        "high-match partner should rank before low-match partner"
+    assert ids.index(uid_hi) < ids.index(uid_lo), "high-match partner should rank before low-match partner"
+
+
+# ---------------------------------------------------------------------------
+# Duplicate match prevention
+# ---------------------------------------------------------------------------
+
+
+async def test_repeat_mutual_like_does_not_create_duplicate_match(client: AsyncClient) -> None:
+    """Re-issuing an already-mutual like must not create a second Match row."""
+    from uuid import UUID
+
+    from sqlalchemy import and_, func, select
+
+    from app.models.match import Match
+
+    token_a = await _register(client, "disc_dup_a@example.com")
+    token_b = await _register(client, "disc_dup_b@example.com")
+
+    uid_a = (await client.get("/auth/me", headers=_auth(token_a))).json()["id"]
+    uid_b = (await client.get("/auth/me", headers=_auth(token_b))).json()["id"]
+
+    # First mutual-like sequence → match created.
+    await client.post(
+        "/discovery/actions",
+        json={"target_user_id": uid_b, "action": "like", "sport": "gym"},
+        headers=_auth(token_a),
     )
+    r_first = await client.post(
+        "/discovery/actions",
+        json={"target_user_id": uid_a, "action": "like", "sport": "gym"},
+        headers=_auth(token_b),
+    )
+    assert r_first.status_code == 200
+    assert r_first.json()["match_created"] is True
+    original_match_id = r_first.json()["match_id"]
+
+    # Either side re-posts the like for the same pair + sport.
+    r_repeat_b = await client.post(
+        "/discovery/actions",
+        json={"target_user_id": uid_a, "action": "like", "sport": "gym"},
+        headers=_auth(token_b),
+    )
+    assert r_repeat_b.status_code == 200
+    assert r_repeat_b.json()["match_created"] is False
+    assert r_repeat_b.json()["match_id"] is None
+
+    r_repeat_a = await client.post(
+        "/discovery/actions",
+        json={"target_user_id": uid_b, "action": "like", "sport": "gym"},
+        headers=_auth(token_a),
+    )
+    assert r_repeat_a.status_code == 200
+    assert r_repeat_a.json()["match_created"] is False
+
+    # Exactly one Match row should exist for this (pair, sport).
+    u1_str, u2_str = sorted([uid_a, uid_b])
+    async with _TestSession() as session:
+        count = (
+            await session.execute(
+                select(func.count())
+                .select_from(Match)
+                .where(
+                    and_(
+                        Match.user1_id == UUID(u1_str),
+                        Match.user2_id == UUID(u2_str),
+                        Match.sport == "gym",
+                    )
+                )
+            )
+        ).scalar_one()
+    assert count == 1, f"expected exactly one Match row, found {count}"
+    assert original_match_id is not None
+
+
+async def test_different_sport_creates_separate_match(client: AsyncClient) -> None:
+    """A second match for the same pair in a different sport is allowed."""
+    from uuid import UUID
+
+    from sqlalchemy import and_, func, select
+
+    from app.models.match import Match
+
+    token_a = await _register(client, "disc_dup_sport_a@example.com")
+    token_b = await _register(client, "disc_dup_sport_b@example.com")
+    uid_a = (await client.get("/auth/me", headers=_auth(token_a))).json()["id"]
+    uid_b = (await client.get("/auth/me", headers=_auth(token_b))).json()["id"]
+
+    # gym match
+    await client.post(
+        "/discovery/actions",
+        json={"target_user_id": uid_b, "action": "like", "sport": "gym"},
+        headers=_auth(token_a),
+    )
+    r_gym = await client.post(
+        "/discovery/actions",
+        json={"target_user_id": uid_a, "action": "like", "sport": "gym"},
+        headers=_auth(token_b),
+    )
+    assert r_gym.json()["match_created"] is True
+
+    # golf match — same pair, different sport → separate match row.
+    await client.post(
+        "/discovery/actions",
+        json={"target_user_id": uid_b, "action": "like", "sport": "golf"},
+        headers=_auth(token_a),
+    )
+    r_golf = await client.post(
+        "/discovery/actions",
+        json={"target_user_id": uid_a, "action": "like", "sport": "golf"},
+        headers=_auth(token_b),
+    )
+    assert r_golf.json()["match_created"] is True
+    assert r_golf.json()["match_id"] != r_gym.json()["match_id"]
+
+    u1_str, u2_str = sorted([uid_a, uid_b])
+    async with _TestSession() as session:
+        count = (
+            await session.execute(
+                select(func.count())
+                .select_from(Match)
+                .where(
+                    and_(
+                        Match.user1_id == UUID(u1_str),
+                        Match.user2_id == UUID(u2_str),
+                    )
+                )
+            )
+        ).scalar_one()
+    assert count == 2, f"expected one match per sport (2 total), found {count}"

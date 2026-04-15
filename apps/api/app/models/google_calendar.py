@@ -7,6 +7,7 @@ from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
+from app.core.encryption import EncryptedString
 from app.db.base import Base
 
 
@@ -14,10 +15,12 @@ class GoogleCalendarToken(Base):
     """
     Stores a user's Google OAuth tokens for Calendar access.
 
-    access_token and refresh_token are stored encrypted via
-    app.core.encryption (Fernet/AES-256-GCM) when FIELD_ENCRYPTION_KEY
-    is set. In local dev the values are stored with a plain: sentinel
-    prefix. Production requires the key — the app refuses to start without it.
+    access_token and refresh_token are wrapped in ``EncryptedString`` so the
+    ciphertext (Fernet/AES-256-GCM) is persisted automatically. Callers in
+    the service layer read/write raw plaintext tokens — the ORM handles
+    encrypt-on-bind and decrypt-on-load. Production requires
+    FIELD_ENCRYPTION_KEY; the app refuses to start without it. In local dev
+    a ``plain:`` sentinel is used instead of real encryption.
     """
 
     __tablename__ = "google_calendar_tokens"
@@ -29,8 +32,8 @@ class GoogleCalendarToken(Base):
         unique=True,
         index=True,
     )
-    access_token: Mapped[str] = mapped_column(String(2048), nullable=False)
-    refresh_token: Mapped[str] = mapped_column(String(512), nullable=False)
+    access_token: Mapped[str] = mapped_column(EncryptedString(2048), nullable=False)
+    refresh_token: Mapped[str] = mapped_column(EncryptedString(512), nullable=False)
     token_expiry: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     # Google Calendar ID to write events into (usually "primary")
     calendar_id: Mapped[str] = mapped_column(String(256), nullable=False, default="primary")

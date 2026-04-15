@@ -308,10 +308,10 @@ async def test_validate_encryption_config_passes_staging_without_key() -> None:
 
 
 async def test_oauth_callback_stores_encrypted_tokens(client: AsyncClient) -> None:
-    """Tokens written to the DB during OAuth callback are stored encrypted."""
-    from sqlalchemy import select
+    """Tokens written via the ORM are encrypted on disk but returned as
+    plaintext when loaded — proving the ``EncryptedString`` round-trip works."""
+    from sqlalchemy import select, text
 
-    from app.core.encryption import decrypt_token
     from app.models.google_calendar import GoogleCalendarToken
 
     _, user_id = await _register(client, "gcal_enc@example.com")
@@ -343,14 +343,24 @@ async def test_oauth_callback_stores_encrypted_tokens(client: AsyncClient) -> No
 
     assert r.status_code == 200
 
-    # Read the row directly and verify the stored value decrypts correctly.
     async with _TestSession() as session:
         from uuid import UUID
 
+        # ORM-loaded values are decrypted transparently.
         stmt = select(GoogleCalendarToken).where(GoogleCalendarToken.user_id == UUID(user_id))
         row = (await session.execute(stmt)).scalar_one()
+        assert row.access_token == raw_access
+        assert row.refresh_token == raw_refresh
 
-    # The stored value must not be the raw token (encrypted or sentinel-prefixed).
-    assert row.access_token != raw_access
-    assert decrypt_token(row.access_token) == raw_access
-    assert decrypt_token(row.refresh_token) == raw_refresh
+        # Raw on-disk values bypass the TypeDecorator and must NOT equal the plaintext.
+        # Look up by the row's primary key (avoids UUID-serialisation differences
+        # between SQLAlchemy's ``Uuid`` type and a raw string comparison on sqlite,
+        # which stores UUIDs as hex without dashes).
+        raw_row = (
+            await session.execute(
+                text("SELECT access_token, refresh_token FROM google_calendar_tokens WHERE id = :pk"),
+                {"pk": str(row.id).replace("-", "")},
+            )
+        ).one()
+        assert raw_row[0] != raw_access
+        assert raw_row[1] != raw_refresh

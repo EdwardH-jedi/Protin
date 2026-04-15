@@ -90,10 +90,13 @@ async def _mutual_like_and_get_match_id(
     return r.json()["match_id"]
 
 
+# NOTE: starts_at must stay in the future. The service rejects bookings that
+# begin more than 1 hour in the past, so a hardcoded past date would break
+# every booking-creation test as the calendar rolls over.
 _BOOKING_PAYLOAD = {
     "sport": "gym",
-    "starts_at": "2026-04-01T09:00:00Z",
-    "ends_at": "2026-04-01T10:00:00Z",
+    "starts_at": "2030-04-01T09:00:00Z",
+    "ends_at": "2030-04-01T10:00:00Z",
     "location": "Bondi gym",
 }
 
@@ -377,3 +380,116 @@ async def test_no_show_transition(client: AsyncClient) -> None:
     noshow_r = await client.post(f"/bookings/{booking_id}/no-show", headers=_auth(token_b))
     assert noshow_r.status_code == 200
     assert noshow_r.json()["status"] == "no_show"
+
+
+# ---------------------------------------------------------------------------
+# FSM edge cases — illegal transitions
+#
+# The allowed transitions are (see app/services/bookings.py::_TRANSITIONS):
+#   proposed   -> confirmed | declined | cancelled
+#   confirmed  -> cancelled | completed | no_show
+# All other transitions MUST be rejected with 422. Terminal states
+# (declined, cancelled, completed, no_show) cannot transition further.
+# ---------------------------------------------------------------------------
+
+
+async def _proposed_booking(client: AsyncClient, suffix: str) -> tuple[str, str, str, str, str]:
+    """Register two users, open a match, and create a proposed booking.
+
+    Returns (token_proposer, uid_proposer, token_partner, uid_partner, booking_id).
+    """
+    token_a, uid_a = await _register(client, f"book_fsm_{suffix}_a@example.com")
+    token_b, uid_b = await _register(client, f"book_fsm_{suffix}_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+    create_r = await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        headers=_auth(token_a),
+    )
+    assert create_r.status_code == 201
+    return token_a, uid_a, token_b, uid_b, create_r.json()["id"]
+
+
+async def test_declined_is_terminal(client: AsyncClient) -> None:
+    """Once declined, no transitions are accepted."""
+    token_a, _, token_b, _, booking_id = await _proposed_booking(client, "declined_terminal")
+
+    decline_r = await client.post(f"/bookings/{booking_id}/decline", headers=_auth(token_b))
+    assert decline_r.status_code == 200
+    assert decline_r.json()["status"] == "declined"
+
+    # Every onward transition must be rejected.
+    for ep in ("confirm", "cancel", "complete", "no-show"):
+        r = await client.post(f"/bookings/{booking_id}/{ep}", headers=_auth(token_b))
+        assert r.status_code == 422, f"declined->{ep} should be 422, got {r.status_code}"
+
+
+async def test_cancelled_is_terminal(client: AsyncClient) -> None:
+    """Once cancelled from `proposed`, no transitions are accepted."""
+    token_a, _, token_b, _, booking_id = await _proposed_booking(client, "cancelled_terminal")
+
+    cancel_r = await client.post(f"/bookings/{booking_id}/cancel", headers=_auth(token_a))
+    assert cancel_r.status_code == 200
+    assert cancel_r.json()["status"] == "cancelled"
+
+    for ep in ("confirm", "decline", "complete", "no-show"):
+        r = await client.post(f"/bookings/{booking_id}/{ep}", headers=_auth(token_a))
+        assert r.status_code == 422, f"cancelled->{ep} should be 422, got {r.status_code}"
+
+
+async def test_completed_is_terminal(client: AsyncClient) -> None:
+    """Once completed, no transitions are accepted."""
+    token_a, _, token_b, _, booking_id = await _proposed_booking(client, "completed_terminal")
+
+    # proposed -> confirmed -> completed
+    await client.post(f"/bookings/{booking_id}/confirm", headers=_auth(token_b))
+    complete_r = await client.post(f"/bookings/{booking_id}/complete", headers=_auth(token_a))
+    assert complete_r.status_code == 200
+    assert complete_r.json()["status"] == "completed"
+
+    for ep in ("confirm", "decline", "cancel", "no-show"):
+        r = await client.post(f"/bookings/{booking_id}/{ep}", headers=_auth(token_a))
+        assert r.status_code == 422, f"completed->{ep} should be 422, got {r.status_code}"
+
+
+async def test_no_show_is_terminal(client: AsyncClient) -> None:
+    """Once marked no_show, no transitions are accepted."""
+    token_a, _, token_b, _, booking_id = await _proposed_booking(client, "noshow_terminal")
+
+    await client.post(f"/bookings/{booking_id}/confirm", headers=_auth(token_b))
+    noshow_r = await client.post(f"/bookings/{booking_id}/no-show", headers=_auth(token_a))
+    assert noshow_r.status_code == 200
+    assert noshow_r.json()["status"] == "no_show"
+
+    for ep in ("confirm", "decline", "cancel", "complete"):
+        r = await client.post(f"/bookings/{booking_id}/{ep}", headers=_auth(token_a))
+        assert r.status_code == 422, f"no_show->{ep} should be 422, got {r.status_code}"
+
+
+async def test_confirmed_cannot_go_backwards(client: AsyncClient) -> None:
+    """confirmed -> decline is not a legal transition."""
+    token_a, _, token_b, _, booking_id = await _proposed_booking(client, "confirmed_backward")
+
+    conf_r = await client.post(f"/bookings/{booking_id}/confirm", headers=_auth(token_b))
+    assert conf_r.status_code == 200
+
+    # Cannot un-confirm via decline.
+    r = await client.post(f"/bookings/{booking_id}/decline", headers=_auth(token_b))
+    assert r.status_code == 422
+
+
+async def test_partner_cannot_cancel_proposed_booking(client: AsyncClient) -> None:
+    """From `proposed`, only the proposer can cancel — the partner must decline."""
+    token_a, _, token_b, _, booking_id = await _proposed_booking(client, "partner_cancel")
+
+    # Partner attempts to cancel a still-proposed booking: only proposer may.
+    r = await client.post(f"/bookings/{booking_id}/cancel", headers=_auth(token_b))
+    assert r.status_code == 403
+
+
+async def test_proposer_cannot_decline_own_booking(client: AsyncClient) -> None:
+    """Only the partner may decline — the proposer must cancel."""
+    token_a, _, token_b, _, booking_id = await _proposed_booking(client, "proposer_decline")
+
+    r = await client.post(f"/bookings/{booking_id}/decline", headers=_auth(token_a))
+    assert r.status_code == 403

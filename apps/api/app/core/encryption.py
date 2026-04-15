@@ -29,6 +29,9 @@ from __future__ import annotations
 
 import logging
 
+from sqlalchemy import String
+from sqlalchemy.types import TypeDecorator
+
 from app.core.config import get_settings
 
 _log = logging.getLogger(__name__)
@@ -90,6 +93,35 @@ def decrypt_token(ciphertext: str) -> str:
             "This row was likely written before encryption was enabled."
         )
         return ciphertext
+
+
+class EncryptedString(TypeDecorator):
+    """SQLAlchemy column type that transparently encrypts strings at rest.
+
+    Stored on disk as a ``String`` of the configured length (ciphertext
+    produced by :func:`encrypt_token`). The ORM hands the caller the plaintext
+    value, so service-layer code reads and writes raw strings without ever
+    touching :func:`encrypt_token` / :func:`decrypt_token` directly.
+
+    The ``length`` argument should be generous enough to hold the Fernet
+    ciphertext, which is ~30% larger than the plaintext plus overhead.
+    """
+
+    impl = String
+    cache_ok = True
+
+    def __init__(self, length: int | None = None, *args, **kwargs) -> None:
+        super().__init__(length, *args, **kwargs)
+
+    def process_bind_param(self, value: str | None, dialect) -> str | None:
+        if value is None:
+            return None
+        return encrypt_token(value)
+
+    def process_result_value(self, value: str | None, dialect) -> str | None:
+        if value is None:
+            return None
+        return decrypt_token(value)
 
 
 def validate_encryption_config() -> None:

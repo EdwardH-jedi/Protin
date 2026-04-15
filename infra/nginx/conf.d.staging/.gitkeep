@@ -1,0 +1,5 @@
+# Intentionally empty.
+#
+# docker-compose.staging.yml mounts this directory at /etc/nginx/conf.d to
+# override the nginx image's default.conf AND prevent conf.d/https.conf
+# from loading — staging runs HTTP-only so nginx does not require TLS certs.

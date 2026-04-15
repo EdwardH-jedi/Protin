@@ -1,0 +1,22 @@
+[Unit]
+Description=Protin staging health check (oneshot)
+# Only run once docker is available; healthcheck.sh shells into compose.
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# WorkingDirectory must be the repo root so docker compose picks up
+# docker-compose.yml + docker-compose.staging.yml. Override ProtinRoot via
+# a drop-in (systemctl edit protin-healthcheck.service) if the repo lives
+# somewhere other than /opt/protin.
+WorkingDirectory=/opt/protin
+ExecStart=/usr/bin/env bash /opt/protin/infra/scripts/cron-health-check.sh
+# Never mark the unit failed on a transient check miss — the wrapper
+# script already writes failures to /var/log/protin/health-failures.log
+# and always exits 0.
+SuccessExitStatus=0
+
+[Install]
+WantedBy=multi-user.target

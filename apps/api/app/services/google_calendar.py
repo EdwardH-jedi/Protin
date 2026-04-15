@@ -31,7 +31,6 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.encryption import decrypt_token, encrypt_token
 from app.models.booking import Booking
 from app.models.google_calendar import CalendarBookingSync, GoogleCalendarToken
 from app.schemas.google_calendar import (
@@ -120,16 +119,16 @@ async def handle_oauth_callback(
     existing = (await db.execute(stmt)).scalar_one_or_none()
 
     if existing:
-        existing.access_token = encrypt_token(access_token)
+        existing.access_token = access_token
         if refresh_token:
-            existing.refresh_token = encrypt_token(refresh_token)
+            existing.refresh_token = refresh_token
         existing.token_expiry = expiry
     else:
         db.add(
             GoogleCalendarToken(
                 user_id=user_id,
-                access_token=encrypt_token(access_token),
-                refresh_token=encrypt_token(refresh_token),
+                access_token=access_token,
+                refresh_token=refresh_token,
                 token_expiry=expiry,
             )
         )
@@ -175,8 +174,8 @@ async def disconnect(db: AsyncSession, user_id: UUID) -> None:
 async def _ensure_fresh_token(token: GoogleCalendarToken) -> str:
     """Return a valid access token, refreshing if it has expired.
 
-    Tokens are stored encrypted; this function handles decrypt/re-encrypt
-    transparently so callers always deal with raw token strings.
+    Tokens are stored encrypted by the ``EncryptedString`` column type,
+    so attribute access here yields plaintext directly.
     """
     now = datetime.now(tz=timezone.utc)
     expiry = token.token_expiry
@@ -184,14 +183,14 @@ async def _ensure_fresh_token(token: GoogleCalendarToken) -> str:
         expiry = expiry.replace(tzinfo=timezone.utc)
 
     if expiry > now:
-        return decrypt_token(token.access_token)
+        return token.access_token
 
     settings = get_settings()
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             _GOOGLE_TOKEN_URL,
             data={
-                "refresh_token": decrypt_token(token.refresh_token),
+                "refresh_token": token.refresh_token,
                 "client_id": settings.google_client_id,
                 "client_secret": settings.google_client_secret,
                 "grant_type": "refresh_token",
@@ -206,7 +205,7 @@ async def _ensure_fresh_token(token: GoogleCalendarToken) -> str:
 
     data = resp.json()
     raw_access_token = data["access_token"]
-    token.access_token = encrypt_token(raw_access_token)
+    token.access_token = raw_access_token
     expires_in: int = data.get("expires_in", 3600)
     token.token_expiry = datetime.fromtimestamp(now.timestamp() + expires_in, tz=timezone.utc)
     return raw_access_token

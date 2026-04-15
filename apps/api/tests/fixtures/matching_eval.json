@@ -1,0 +1,125 @@
+{
+  "description": "Offline eval fixtures for app.services.discovery._score_compatibility. Score = 0.6 * level_proximity + 0.4 * time_overlap. level_proximity = 1 - |actor - target| / 2 over {beginner:0, intermediate:1, advanced:2}. time_overlap = 1.0 if 'flexible' on either side, else |intersection| / max(|actor|, |target|, 1).",
+  "cases": [
+    {
+      "id": "exact_level_exact_time",
+      "actor_level": "intermediate",
+      "actor_times": ["morning"],
+      "target_level": "intermediate",
+      "target_times": ["morning"],
+      "expected_score": 1.0
+    },
+    {
+      "id": "exact_level_no_time_overlap",
+      "actor_level": "advanced",
+      "actor_times": ["morning"],
+      "target_level": "advanced",
+      "target_times": ["evening"],
+      "expected_score": 0.6
+    },
+    {
+      "id": "one_level_apart_matching_time",
+      "actor_level": "beginner",
+      "actor_times": ["morning"],
+      "target_level": "intermediate",
+      "target_times": ["morning"],
+      "expected_score": 0.7
+    },
+    {
+      "id": "two_levels_apart_matching_time",
+      "actor_level": "beginner",
+      "actor_times": ["morning"],
+      "target_level": "advanced",
+      "target_times": ["morning"],
+      "expected_score": 0.4
+    },
+    {
+      "id": "two_levels_apart_no_time_overlap",
+      "actor_level": "beginner",
+      "actor_times": ["morning"],
+      "target_level": "advanced",
+      "target_times": ["evening"],
+      "expected_score": 0.0
+    },
+    {
+      "id": "actor_flexible_counts_as_full_overlap",
+      "actor_level": "intermediate",
+      "actor_times": ["flexible"],
+      "target_level": "intermediate",
+      "target_times": ["evening"],
+      "expected_score": 1.0
+    },
+    {
+      "id": "target_flexible_counts_as_full_overlap",
+      "actor_level": "intermediate",
+      "actor_times": ["morning"],
+      "target_level": "intermediate",
+      "target_times": ["flexible"],
+      "expected_score": 1.0
+    },
+    {
+      "id": "partial_time_overlap_actor_wider",
+      "actor_level": "intermediate",
+      "actor_times": ["morning", "evening"],
+      "target_level": "intermediate",
+      "target_times": ["morning"],
+      "expected_score": 0.8
+    },
+    {
+      "id": "partial_time_overlap_target_wider",
+      "actor_level": "intermediate",
+      "actor_times": ["morning"],
+      "target_level": "intermediate",
+      "target_times": ["morning", "afternoon", "evening"],
+      "expected_score": 0.7333333333
+    },
+    {
+      "id": "empty_actor_times_no_overlap",
+      "actor_level": "intermediate",
+      "actor_times": [],
+      "target_level": "intermediate",
+      "target_times": ["morning"],
+      "expected_score": 0.6
+    },
+    {
+      "id": "empty_target_times_no_overlap",
+      "actor_level": "intermediate",
+      "actor_times": ["morning"],
+      "target_level": "intermediate",
+      "target_times": [],
+      "expected_score": 0.6
+    },
+    {
+      "id": "one_level_apart_partial_time",
+      "actor_level": "intermediate",
+      "actor_times": ["morning", "afternoon"],
+      "target_level": "advanced",
+      "target_times": ["afternoon", "evening"],
+      "expected_score": 0.5
+    },
+    {
+      "id": "two_levels_apart_full_time_overlap",
+      "actor_level": "beginner",
+      "actor_times": ["morning", "evening"],
+      "target_level": "advanced",
+      "target_times": ["morning", "evening"],
+      "expected_score": 0.4
+    },
+    {
+      "id": "unknown_actor_level_defaults_to_intermediate",
+      "actor_level": "pro",
+      "actor_times": ["morning"],
+      "target_level": "intermediate",
+      "target_times": ["morning"],
+      "expected_score": 1.0
+    },
+    {
+      "id": "unknown_target_level_defaults_to_intermediate",
+      "actor_level": "beginner",
+      "actor_times": ["morning"],
+      "target_level": "pro",
+      "target_times": ["morning"],
+      "expected_score": 0.7
+    }
+  ]
+}
