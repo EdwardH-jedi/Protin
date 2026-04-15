@@ -1,0 +1,176 @@
+/**
+ * RegisterScreen tests
+ *
+ * Mocks:
+ *  - stores/auth (useAuthStore)
+ *  - Screen component
+ *  - theme
+ */
+
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+
+import { RegisterScreen } from '../screens/auth/RegisterScreen';
+
+// ─── Mock auth store ──────────────────────────────────────────────────────────
+
+const mockRegister = jest.fn();
+
+jest.mock('../stores/auth', () => ({
+  useAuthStore: jest.fn(),
+}));
+
+// ─── Mock Screen component ────────────────────────────────────────────────────
+
+jest.mock('../components/Screen', () => {
+  const { View } = require('react-native');
+  return {
+    Screen: ({ children }: { children: React.ReactNode }) => <View>{children}</View>,
+  };
+});
+
+// ─── Mock theme ───────────────────────────────────────────────────────────────
+
+jest.mock('../theme', () => ({
+  colors: {
+    accent: '#000', brand: '#000', border: '#ccc', surface: '#fff',
+    surfaceElevated: '#f5f5f5', background: '#fafafa', separator: '#e0e0e0',
+    textPrimary: '#000', textSecondary: '#555', textTertiary: '#888',
+    textInverse: '#fff', success: '#0f0', error: '#f00',
+  },
+  radii: { sm: 4, md: 8, lg: 12, full: 9999 },
+  spacing: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 40, xxxl: 48 },
+  typography: {
+    h1: {}, h2: {}, h3: {}, body: {}, bodySmall: {}, bodyLarge: {}, label: {}, button: {},
+  },
+}));
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function makeNavigation() {
+  return { replace: jest.fn(), navigate: jest.fn() };
+}
+
+function setupStore(overrides: { isLoading?: boolean } = {}) {
+  const { useAuthStore } = require('../stores/auth');
+  (useAuthStore as jest.Mock).mockReturnValue({
+    register: mockRegister,
+    isLoading: overrides.isLoading ?? false,
+  });
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────────────
+
+describe('RegisterScreen', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupStore();
+  });
+
+  // ── Rendering ──────────────────────────────────────────────────────────────
+
+  it('renders the title and form labels', () => {
+    const { getByText } = render(
+      <RegisterScreen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    getByText('Create your');
+    getByText('Email');
+    getByText('Password');
+  });
+
+  it('renders the Create account button', () => {
+    const { getByText } = render(
+      <RegisterScreen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    getByText('Create account');
+  });
+
+  // ── Validation ─────────────────────────────────────────────────────────────
+
+  it('shows an error when email is empty', async () => {
+    const { getByText } = render(
+      <RegisterScreen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    fireEvent.press(getByText('Create account'));
+    await waitFor(() => getByText('Please enter your email address.'));
+    expect(mockRegister).not.toHaveBeenCalled();
+  });
+
+  it('shows an error when password is shorter than 8 characters', async () => {
+    const { getByText, getByPlaceholderText } = render(
+      <RegisterScreen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    fireEvent.changeText(getByPlaceholderText('you@example.com'), 'user@test.com');
+    fireEvent.changeText(getByPlaceholderText('Min. 8 characters'), 'short');
+    fireEvent.press(getByText('Create account'));
+    await waitFor(() => getByText('Password must be at least 8 characters.'));
+    expect(mockRegister).not.toHaveBeenCalled();
+  });
+
+  // ── Loading state ──────────────────────────────────────────────────────────
+
+  it('shows a loading indicator when isLoading is true', () => {
+    setupStore({ isLoading: true });
+    const { UNSAFE_queryAllByType } = render(
+      <RegisterScreen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    const { ActivityIndicator } = require('react-native');
+    expect(UNSAFE_queryAllByType(ActivityIndicator).length).toBeGreaterThan(0);
+  });
+
+  // ── Successful registration ────────────────────────────────────────────────
+
+  it('calls register with trimmed email and password', async () => {
+    mockRegister.mockResolvedValue(undefined);
+    const nav = makeNavigation();
+    const { getByText, getByPlaceholderText } = render(
+      <RegisterScreen navigation={nav as any} route={{} as any} />
+    );
+    fireEvent.changeText(getByPlaceholderText('you@example.com'), '  new@test.com  ');
+    fireEvent.changeText(getByPlaceholderText('Min. 8 characters'), 'password123');
+    fireEvent.press(getByText('Create account'));
+    await waitFor(() => {
+      expect(mockRegister).toHaveBeenCalledWith('new@test.com', 'password123');
+    });
+  });
+
+  it('navigates to OnboardingStep1 after successful registration', async () => {
+    mockRegister.mockResolvedValue(undefined);
+    const nav = makeNavigation();
+    const { getByText, getByPlaceholderText } = render(
+      <RegisterScreen navigation={nav as any} route={{} as any} />
+    );
+    fireEvent.changeText(getByPlaceholderText('you@example.com'), 'new@test.com');
+    fireEvent.changeText(getByPlaceholderText('Min. 8 characters'), 'password123');
+    fireEvent.press(getByText('Create account'));
+    await waitFor(() => {
+      expect(nav.replace).toHaveBeenCalledWith('OnboardingStep1');
+    });
+  });
+
+  // ── Failed registration ────────────────────────────────────────────────────
+
+  it('shows the error message returned by register', async () => {
+    mockRegister.mockRejectedValue(new Error('Email already in use'));
+    const nav = makeNavigation();
+    const { getByText, getByPlaceholderText } = render(
+      <RegisterScreen navigation={nav as any} route={{} as any} />
+    );
+    fireEvent.changeText(getByPlaceholderText('you@example.com'), 'taken@test.com');
+    fireEvent.changeText(getByPlaceholderText('Min. 8 characters'), 'password123');
+    fireEvent.press(getByText('Create account'));
+    await waitFor(() => getByText('Email already in use'));
+    expect(nav.replace).not.toHaveBeenCalled();
+  });
+
+  // ── Footer navigation ──────────────────────────────────────────────────────
+
+  it('navigates to LoginScreen when Log in footer link is pressed', () => {
+    const nav = makeNavigation();
+    const { getByText } = render(
+      <RegisterScreen navigation={nav as any} route={{} as any} />
+    );
+    fireEvent.press(getByText('Log in'));
+    expect(nav.replace).toHaveBeenCalledWith('LoginScreen');
+  });
+});
