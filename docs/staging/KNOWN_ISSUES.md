@@ -28,10 +28,8 @@ None confirmed at time of writing. Update as issues are found.
 **Workaround**: Create at least 2 test accounts. Set up profiles for both. Like each other to create a match.
 **Owner**: N/A (expected behaviour)
 
-### NB-004 — Chat does not auto-refresh
-**Symptom**: New messages from the partner require a manual screen reload to appear.
-**Workaround**: Pull-to-refresh or navigate away and back. Real-time messaging (WebSocket/polling) is out of scope for current waves.
-**Owner**: Mobile — future wave
+### NB-004 — ~~Chat does not auto-refresh~~ — RESOLVED (Wave 10)
+**Resolved**: WebSocket-based real-time messaging shipped. Server: `apps/api/app/routers/chat.py` (`_ConnectionManager` + `/matches/{id}/ws`). Client: `apps/mobile/src/screens/ChatScreen.tsx` opens an authenticated `ws://` connection on mount. Manual refresh no longer required.
 
 ### NB-005 — Booking time input is manual text
 **Symptom**: BookingComposer requires manual YYYY-MM-DD and HH:MM input. No date picker.

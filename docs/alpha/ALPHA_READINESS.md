@@ -3,6 +3,12 @@
 Date: 2026-03-18
 Wave: 7 (post-hardening)
 
+> **SUPERSEDED (2026-04-15)** — This document is frozen at Wave 7 and does
+> not reflect Waves 8–17 (harness, sport expansion, WebSocket chat, matching
+> algorithm, push-notification tests, CI pipeline, ESLint, nginx HTTP-only
+> default). See `docs/alpha/ALPHA_READINESS_UPDATED.md` for the current audit.
+> Kept for historical context only.
+
 ---
 
 ## What is working
