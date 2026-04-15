@@ -13,6 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { Screen } from '../../components/Screen';
 import { api } from '../../lib/api';
+import { sportLabel } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { RootStackParamList } from '../../navigation/types';
 
@@ -44,8 +45,7 @@ interface MatchListResponse {
 
 function MatchCard({ match }: { match: Match }) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const _SPORT_LABEL: Record<string, string> = { gym: 'Gym', golf: 'Golf', tennis: 'Tennis', running: 'Running' };
-  const sportLabel = _SPORT_LABEL[match.sport] ?? match.sport;
+  const sportLabelText = sportLabel(match.sport);
   const levelLabel = match.partner.sportProfiles.find((sp) => sp.sport === match.sport)?.level;
 
   return (
@@ -74,7 +74,7 @@ function MatchCard({ match }: { match: Match }) {
         ) : null}
         <View style={styles.sportBadge}>
           <Text style={styles.sportBadgeText}>
-            {sportLabel}
+            {sportLabelText}
             {levelLabel ? ` · ${levelLabel.charAt(0).toUpperCase()}${levelLabel.slice(1)}` : ''}
           </Text>
         </View>

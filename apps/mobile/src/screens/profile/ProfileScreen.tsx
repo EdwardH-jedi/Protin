@@ -12,7 +12,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { Screen } from '../../components/Screen';
 import { api } from '../../lib/api';
 import { useAuthStore } from '../../stores/auth';
-import { useProfileStore } from '../../stores/profile';
+import { sportLabel, useProfileStore } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
 
 export function ProfileScreen() {
@@ -125,7 +125,7 @@ export function ProfileScreen() {
                   {sportProfiles.map((sp) => (
                     <View key={sp.sport} style={styles.sportRow}>
                       <Text style={styles.sportName}>
-                        {sp.sport === 'gym' ? 'Gym' : 'Golf'}
+                        {sportLabel(sp.sport)}
                       </Text>
                       <Text style={styles.sportLevel}>
                         {sp.level.charAt(0).toUpperCase() + sp.level.slice(1)}

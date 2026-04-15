@@ -47,6 +47,11 @@ jest.mock('../stores/profile', () => ({
     sportProfiles: mockSportProfiles,
     fetchProfile: mockFetchProfile,
   }),
+  SPORT_LABELS: { gym: 'Gym', golf: 'Golf', tennis: 'Tennis', running: 'Running' },
+  sportLabel: (sport: string) => {
+    const labels: Record<string, string> = { gym: 'Gym', golf: 'Golf', tennis: 'Tennis', running: 'Running' };
+    return labels[sport] ?? sport.charAt(0).toUpperCase() + sport.slice(1);
+  },
 }));
 
 // ─── Mock expo-web-browser ────────────────────────────────────────────────────

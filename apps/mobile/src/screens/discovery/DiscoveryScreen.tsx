@@ -10,6 +10,7 @@ import {
 
 import { Screen } from '../../components/Screen';
 import { useDiscovery, PartnerCard } from '../../hooks/useDiscovery';
+import { SPORT_LABELS, sportLabel } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
 
 // ─── Match banner ─────────────────────────────────────────────────────────────
@@ -47,16 +48,8 @@ function Avatar({
 
 // ─── Sport badge ──────────────────────────────────────────────────────────────
 
-const _SPORT_LABEL: Record<string, string> = {
-  gym: 'Gym',
-  golf: 'Golf',
-  tennis: 'Tennis',
-  running: 'Running',
-};
-
 function SportBadge({ sport, level }: { sport: string; level: string }) {
-  const sportLabel = _SPORT_LABEL[sport] ?? sport.charAt(0).toUpperCase() + sport.slice(1);
-  const label = `${sportLabel} · ${level.charAt(0).toUpperCase() + level.slice(1)}`;
+  const label = `${sportLabel(sport)} · ${level.charAt(0).toUpperCase() + level.slice(1)}`;
 
   return (
     <View style={styles.sportBadge}>
@@ -223,7 +216,7 @@ export function DiscoveryScreen() {
             ]}
             onPress={() => setSport(s)}
             accessibilityRole="tab"
-            accessibilityLabel={_SPORT_LABEL[s]}
+            accessibilityLabel={SPORT_LABELS[s]}
             accessibilityState={{ selected: sport === s }}
           >
             <Text
@@ -232,7 +225,7 @@ export function DiscoveryScreen() {
                 sport === s && styles.sportTabTextActive,
               ]}
             >
-              {_SPORT_LABEL[s]}
+              {SPORT_LABELS[s]}
             </Text>
           </Pressable>
         ))}

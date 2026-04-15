@@ -3,7 +3,7 @@
 ## Product direction
 - Booking-first workout partner app
 - Sydney-first
-- Gym and golf only for current scope
+- Supported sports: gym, golf, tennis, running (expanded from gym+golf in Wave 11)
 - Premium but minimal UX
 - Avoid generic dating-app feel
 

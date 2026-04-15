@@ -25,6 +25,19 @@ export interface IdentityPreferences {
 
 export type SportType = 'gym' | 'golf' | 'tennis' | 'running';
 
+export const SPORT_LABELS: Record<SportType, string> = {
+  gym: 'Gym',
+  golf: 'Golf',
+  tennis: 'Tennis',
+  running: 'Running',
+};
+
+export function sportLabel(sport: string): string {
+  return (
+    SPORT_LABELS[sport as SportType] ?? sport.charAt(0).toUpperCase() + sport.slice(1)
+  );
+}
+
 export interface SportProfile {
   id?: string;
   sport: SportType;
