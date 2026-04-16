@@ -33,6 +33,7 @@ export type {
   User,
   RegisterRequest,
   LoginRequest,
+  AppleSignInRequest,
   TokenResponse,
   MeResponse,
 } from './user';

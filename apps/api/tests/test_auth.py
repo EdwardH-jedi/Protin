@@ -333,6 +333,200 @@ async def test_apple_sign_in_503_when_not_configured(
     assert r.status_code == 503
 
 
+async def test_apple_sign_in_links_existing_user_by_verified_email(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An existing email/password user gets apple_sub attached when the
+    verified email in the identity token matches their registered email.
+    """
+    from sqlalchemy import select
+
+    from app.core import config as config_module
+    from app.models.user import User
+    from app.routers import auth as auth_router
+
+    settings = config_module.get_settings()
+    monkeypatch.setattr(settings, "apple_client_id", "com.protin.app")
+
+    # Seed an email/password user directly (no /register dependency on bcrypt).
+    async with _TestSession() as session:
+        existing = User(email="link-me@example.com", hashed_password="x" * 60)
+        session.add(existing)
+        await session.commit()
+        existing_id = existing.id
+
+    async def fake_verify(identity_token, *, audience, nonce=None, http_client=None):
+        return {
+            "sub": "002468.apple-link-user",
+            "email": "link-me@example.com",
+            "aud": audience,
+            "iss": "https://appleid.apple.com",
+        }
+
+    monkeypatch.setattr(auth_router, "verify_identity_token", fake_verify)
+
+    r = await client.post("/auth/apple", json={"identity_token": "stub.jwt.value"})
+    assert r.status_code == 200, r.text
+
+    async with _TestSession() as session:
+        row = (
+            await session.execute(select(User).where(User.id == existing_id))
+        ).scalar_one()
+        assert row.apple_sub == "002468.apple-link-user"
+        # Original hashed_password is preserved — linking does not wipe credentials.
+        assert row.hashed_password == "x" * 60
+
+
+async def test_apple_sign_in_does_not_link_via_client_supplied_email(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hardening: an attacker forging body.email must NOT be able to attach
+    their apple_sub to a victim's existing email/password account when the
+    identity token does not carry a verified email claim. The request fails
+    with 400 (no verified email for new account creation) and the victim's
+    row remains untouched.
+    """
+    from sqlalchemy import select
+
+    from app.core import config as config_module
+    from app.models.user import User
+    from app.routers import auth as auth_router
+
+    settings = config_module.get_settings()
+    monkeypatch.setattr(settings, "apple_client_id", "com.protin.app")
+
+    async with _TestSession() as session:
+        victim = User(email="victim@example.com", hashed_password="x" * 60)
+        session.add(victim)
+        await session.commit()
+        victim_id = victim.id
+
+    async def fake_verify(identity_token, *, audience, nonce=None, http_client=None):
+        # Apple omits the email claim (returning user / re-auth case).
+        return {
+            "sub": "009999.attacker-apple-sub",
+            "aud": audience,
+            "iss": "https://appleid.apple.com",
+        }
+
+    monkeypatch.setattr(auth_router, "verify_identity_token", fake_verify)
+
+    r = await client.post(
+        "/auth/apple",
+        json={
+            "identity_token": "stub.jwt.value",
+            "email": "victim@example.com",  # forged
+        },
+    )
+    # Either 409 (email collides on the new-user insert path) or 400 — both
+    # are safe outcomes. The behaviour we are asserting is the negative one:
+    # the victim's row must NOT have been touched.
+    assert r.status_code in (400, 409), r.text
+
+    async with _TestSession() as session:
+        row = (
+            await session.execute(select(User).where(User.id == victim_id))
+        ).scalar_one()
+        assert row.apple_sub is None, "victim row was linked via forged body.email"
+
+
+async def test_apple_sign_in_propagates_nonce_mismatch_as_401(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A nonce mismatch raised by the verifier must surface as 401, not 500."""
+    from app.core import config as config_module
+    from app.routers import auth as auth_router
+    from app.services.apple_auth import AppleIdentityTokenError
+
+    settings = config_module.get_settings()
+    monkeypatch.setattr(settings, "apple_client_id", "com.protin.app")
+
+    async def fake_verify(identity_token, *, audience, nonce=None, http_client=None):
+        raise AppleIdentityTokenError("Nonce mismatch")
+
+    monkeypatch.setattr(auth_router, "verify_identity_token", fake_verify)
+
+    r = await client.post(
+        "/auth/apple",
+        json={"identity_token": "stub.jwt.value", "nonce": "client-nonce"},
+    )
+    assert r.status_code == 401
+    assert "nonce" in r.json()["detail"].lower()
+
+
+async def test_apple_sign_in_first_time_without_verified_email_is_rejected(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A first-ever Apple sign-in whose token does NOT carry an `email` claim
+    must be rejected with 400 — even if the client supplies a body.email.
+    No new user row may be created in this case.
+    """
+    from sqlalchemy import select
+
+    from app.core import config as config_module
+    from app.models.user import User
+    from app.routers import auth as auth_router
+
+    settings = config_module.get_settings()
+    monkeypatch.setattr(settings, "apple_client_id", "com.protin.app")
+
+    apple_sub = "001111.no-verified-email-user"
+
+    async def fake_verify(identity_token, *, audience, nonce=None, http_client=None):
+        # No "email" claim — Apple omits it for returning users whose
+        # server-side row was previously deleted.
+        return {
+            "sub": apple_sub,
+            "aud": audience,
+            "iss": "https://appleid.apple.com",
+        }
+
+    monkeypatch.setattr(auth_router, "verify_identity_token", fake_verify)
+
+    # Even with a client-supplied email in the body, the server must refuse.
+    r = await client.post(
+        "/auth/apple",
+        json={"identity_token": "stub.jwt.value", "email": "anything@example.com"},
+    )
+    assert r.status_code == 400, r.text
+    assert "email" in r.json()["detail"].lower()
+
+    # Confirm no row was created under either the body email or the apple_sub.
+    async with _TestSession() as session:
+        rows_by_sub = (
+            await session.execute(select(User).where(User.apple_sub == apple_sub))
+        ).scalars().all()
+        assert rows_by_sub == []
+        rows_by_email = (
+            await session.execute(select(User).where(User.email == "anything@example.com"))
+        ).scalars().all()
+        assert rows_by_email == []
+
+
+async def test_password_login_rejects_apple_only_account(client: AsyncClient) -> None:
+    """An Apple-only user has hashed_password IS NULL. The /auth/login endpoint
+    must refuse password authentication for such accounts (no fallback path
+    that treats NULL as a wildcard or silently authenticates)."""
+    from app.models.user import User
+
+    async with _TestSession() as session:
+        apple_only = User(
+            email="apple-only@example.com",
+            hashed_password=None,
+            apple_sub="003333.apple-only-user",
+        )
+        session.add(apple_only)
+        await session.commit()
+
+    # Attempt password login with an arbitrary password — must be rejected
+    # exactly the same way a wrong password would be.
+    r = await client.post(
+        "/auth/login",
+        json={"email": "apple-only@example.com", "password": "anything-here"},
+    )
+    assert r.status_code == 401
+
+
 # ---------------------------------------------------------------------------
 # SECRET_KEY fail-closed (M3)
 # ---------------------------------------------------------------------------

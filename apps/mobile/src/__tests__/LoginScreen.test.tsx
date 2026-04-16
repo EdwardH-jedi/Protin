@@ -13,6 +13,8 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 
 import { LoginScreen } from '../screens/auth/LoginScreen';
 
+// "Log in" appears as both header title and submit button text — press by accessibilityLabel.
+
 // ─── Mock auth store ──────────────────────────────────────────────────────────
 
 const mockLogin = jest.fn();
@@ -95,10 +97,10 @@ describe('LoginScreen', () => {
   // ── Rendering ──────────────────────────────────────────────────────────────
 
   it('renders the title and form labels', () => {
-    const { getByText } = render(
+    const { getByText, getAllByText } = render(
       <LoginScreen navigation={makeNavigation() as any} route={{} as any} />
     );
-    getByText('Log in');
+    expect(getAllByText('Log in').length).toBeGreaterThanOrEqual(1);
     getByText('Email');
     getByText('Password');
   });
@@ -113,20 +115,20 @@ describe('LoginScreen', () => {
   // ── Validation ─────────────────────────────────────────────────────────────
 
   it('shows an error when submitting with empty fields', async () => {
-    const { getByText } = render(
+    const { getByText, getByLabelText } = render(
       <LoginScreen navigation={makeNavigation() as any} route={{} as any} />
     );
-    fireEvent.press(getByText('Log in'));
+    fireEvent.press(getByLabelText('Log in'));
     await waitFor(() => getByText('Please enter your email and password.'));
     expect(mockLogin).not.toHaveBeenCalled();
   });
 
   it('shows an error when only email is provided', async () => {
-    const { getByText, getByPlaceholderText } = render(
+    const { getByText, getByLabelText, getByPlaceholderText } = render(
       <LoginScreen navigation={makeNavigation() as any} route={{} as any} />
     );
     fireEvent.changeText(getByPlaceholderText('you@example.com'), 'test@test.com');
-    fireEvent.press(getByText('Log in'));
+    fireEvent.press(getByLabelText('Log in'));
     await waitFor(() => getByText('Please enter your email and password.'));
     expect(mockLogin).not.toHaveBeenCalled();
   });
@@ -147,12 +149,12 @@ describe('LoginScreen', () => {
   it('calls login with trimmed email and password', async () => {
     mockLogin.mockResolvedValue(undefined);
     const nav = makeNavigation();
-    const { getByText, getByPlaceholderText } = render(
+    const { getByLabelText, getByPlaceholderText } = render(
       <LoginScreen navigation={nav as any} route={{} as any} />
     );
     fireEvent.changeText(getByPlaceholderText('you@example.com'), '  user@test.com  ');
     fireEvent.changeText(getByPlaceholderText('Your password'), 'secret123');
-    fireEvent.press(getByText('Log in'));
+    fireEvent.press(getByLabelText('Log in'));
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('user@test.com', 'secret123');
     });
@@ -161,12 +163,12 @@ describe('LoginScreen', () => {
   it('navigates to Main after successful login', async () => {
     mockLogin.mockResolvedValue(undefined);
     const nav = makeNavigation();
-    const { getByText, getByPlaceholderText } = render(
+    const { getByLabelText, getByPlaceholderText } = render(
       <LoginScreen navigation={nav as any} route={{} as any} />
     );
     fireEvent.changeText(getByPlaceholderText('you@example.com'), 'user@test.com');
     fireEvent.changeText(getByPlaceholderText('Your password'), 'secret123');
-    fireEvent.press(getByText('Log in'));
+    fireEvent.press(getByLabelText('Log in'));
     await waitFor(() => {
       expect(nav.replace).toHaveBeenCalledWith('Main');
     });
@@ -177,12 +179,12 @@ describe('LoginScreen', () => {
   it('shows the error message returned by login', async () => {
     mockLogin.mockRejectedValue(new Error('Invalid credentials'));
     const nav = makeNavigation();
-    const { getByText, getByPlaceholderText } = render(
+    const { getByText, getByLabelText, getByPlaceholderText } = render(
       <LoginScreen navigation={nav as any} route={{} as any} />
     );
     fireEvent.changeText(getByPlaceholderText('you@example.com'), 'user@test.com');
     fireEvent.changeText(getByPlaceholderText('Your password'), 'wrongpass');
-    fireEvent.press(getByText('Log in'));
+    fireEvent.press(getByLabelText('Log in'));
     await waitFor(() => getByText('Invalid credentials'));
     expect(nav.replace).not.toHaveBeenCalled();
   });

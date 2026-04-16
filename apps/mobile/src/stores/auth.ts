@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
+import type { AppleSignInRequest } from '@protin/shared-types';
 
 import { api, setToken } from '../lib/api';
 
@@ -10,20 +11,13 @@ interface User {
   email: string;
 }
 
-interface AppleSignInPayload {
-  identityToken: string;
-  nonce: string;
-  email?: string | null;
-  name?: string | null;
-}
-
 interface AuthState {
   token: string | null;
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
-  loginWithApple: (payload: AppleSignInPayload) => Promise<void>;
+  loginWithApple: (payload: AppleSignInRequest) => Promise<void>;
   logout: () => Promise<void>;
   initialize: () => Promise<void>;
 }

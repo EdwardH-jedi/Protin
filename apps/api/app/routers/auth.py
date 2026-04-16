@@ -118,32 +118,48 @@ async def apple_sign_in(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e)) from e
 
     apple_sub: str = claims["sub"]
-    # Apple provides the email on first sign-in only. Prefer the token claim
-    # (it is verified) over the client-provided one when both exist.
-    email: str | None = claims.get("email") or body.email
+    # Apple's identity token carries an `email` claim only on the user's
+    # FIRST authorization for this app; subsequent sign-ins omit it. We use
+    # this verified value for both account linking and account creation.
+    # `body.email` is forwarded by the client for completeness but is
+    # attacker-controlled and is never persisted or used for lookups.
+    verified_email: str | None = claims.get("email")
 
     # 1) Look up by apple_sub — this is the durable identifier.
     result = await db.execute(select(User).where(User.apple_sub == apple_sub))
     user = result.scalar_one_or_none()
 
-    # 2) Fallback: match by email and attach apple_sub (e.g. a user who
-    #    previously registered with email/password then used Apple).
-    if user is None and email:
-        result = await db.execute(select(User).where(User.email == email))
+    # 2) Email-linking fallback: a user who previously registered with
+    #    email/password and is now signing in with Apple gets their
+    #    apple_sub attached so future Apple logins resolve to the same row.
+    #    SECURITY: this lookup must use the *verified* token email only.
+    #    Falling back to body.email here would let an attacker hijack any
+    #    email/password account by submitting a forged email field on a
+    #    first-ever Apple sign-in.
+    if user is None and verified_email:
+        result = await db.execute(select(User).where(User.email == verified_email))
         user = result.scalar_one_or_none()
         if user is not None:
             user.apple_sub = apple_sub
 
     # 3) New user — create a row. hashed_password is NULL for Apple-only users.
+    #    SECURITY: new account creation requires the *verified* token email.
+    #    body.email is attacker-controlled, so accepting it here would let a
+    #    first-ever Apple sign-in mint accounts under arbitrary emails. Apple
+    #    only omits the email claim for users who previously authorised the
+    #    app and whose server row has since been removed; in that case the
+    #    user can revoke at Settings → Apple ID → Apps Using Apple ID and
+    #    re-sign-in so Apple re-issues a token containing the email claim.
     if user is None:
-        if not email:
-            # First-time Apple sign-in must include an email. The client is
-            # responsible for forwarding the email Apple returns.
+        if not verified_email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="email required for first-time Apple sign-in",
+                detail=(
+                    "Apple did not return a verified email. Revoke this app "
+                    "in Settings → Apple ID → Apps Using Apple ID and try again."
+                ),
             )
-        user = User(email=email, apple_sub=apple_sub, hashed_password=None)
+        user = User(email=verified_email, apple_sub=apple_sub, hashed_password=None)
         db.add(user)
 
     try:

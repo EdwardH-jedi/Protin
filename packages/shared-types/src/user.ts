@@ -44,6 +44,19 @@ export interface LoginRequest {
   password: string;
 }
 
+/**
+ * Request body for POST /auth/apple.
+ * `identityToken` is the JWT issued by Apple on the client; the API verifies
+ * it against Apple's public keys. `email` and `name` are only provided by
+ * Apple on the very first sign-in and should be forwarded when present.
+ */
+export interface AppleSignInRequest {
+  identityToken: string;
+  nonce?: string;
+  email?: string | null;
+  name?: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Response bodies
 // ---------------------------------------------------------------------------
