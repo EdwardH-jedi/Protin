@@ -11,6 +11,7 @@ import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 import { DiscoveryScreen } from '../screens/discovery/DiscoveryScreen';
+import type { UseDiscoveryReturn } from '../hooks/useDiscovery';
 
 // ─── Mock useDiscovery ────────────────────────────────────────────────────────
 
@@ -18,11 +19,11 @@ const mockRecordAction = jest.fn();
 const mockFetchMore = jest.fn();
 const mockSetSport = jest.fn();
 
-const defaultDiscovery = {
+const defaultDiscovery: UseDiscoveryReturn = {
   partners: [],
   isLoading: false,
   error: null,
-  sport: 'gym' as const,
+  sport: 'gym',
   setSport: mockSetSport,
   recordAction: mockRecordAction,
   fetchMore: mockFetchMore,
@@ -73,7 +74,7 @@ jest.mock('../theme', () => ({
 
 const { useDiscovery } = require('../hooks/useDiscovery');
 
-function setupDiscovery(overrides: Partial<typeof defaultDiscovery> = {}) {
+function setupDiscovery(overrides: Partial<UseDiscoveryReturn> = {}) {
   useDiscovery.mockReturnValue({ ...defaultDiscovery, ...overrides });
 }
 

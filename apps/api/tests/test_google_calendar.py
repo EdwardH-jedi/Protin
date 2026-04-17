@@ -298,13 +298,29 @@ async def test_validate_encryption_config_blocks_production_without_key() -> Non
             assert "FIELD_ENCRYPTION_KEY" in str(exc)
 
 
-async def test_validate_encryption_config_passes_staging_without_key() -> None:
-    """validate_encryption_config does not raise in non-production environments."""
+async def test_validate_encryption_config_blocks_staging_without_key() -> None:
+    """Staging also refuses to start without a key (backups would leak tokens)."""
     from app.core.encryption import validate_encryption_config
 
     with patch("app.core.encryption.get_settings") as mock_settings:
         mock_settings.return_value = MagicMock(app_env="staging", field_encryption_key="")
+        try:
+            validate_encryption_config()
+            assert False, "Expected RuntimeError"
+        except RuntimeError as exc:
+            assert "FIELD_ENCRYPTION_KEY" in str(exc)
+            assert "staging" in str(exc)
+
+
+async def test_validate_encryption_config_passes_local_without_key() -> None:
+    """validate_encryption_config does not raise in local dev (plaintext fallback allowed)."""
+    from app.core.encryption import encrypt_token, validate_encryption_config
+
+    with patch("app.core.encryption.get_settings") as mock_settings:
+        mock_settings.return_value = MagicMock(app_env="local", field_encryption_key="")
         validate_encryption_config()  # must not raise
+        # Fallback still produces the sentinel-prefixed value.
+        assert encrypt_token("x").startswith("plain:")
 
 
 async def test_oauth_callback_stores_encrypted_tokens(client: AsyncClient) -> None:

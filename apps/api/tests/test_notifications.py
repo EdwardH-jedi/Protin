@@ -14,7 +14,10 @@ from app.db.redis import get_redis
 from app.db.session import get_db
 from app.main import app
 
-from app.models import match, profile, user, chat, booking  # noqa: F401
+# Import model modules for SQLAlchemy registration. `booking` is aliased so
+# it doesn't shadow local `booking` test-instance variables (ruff F811).
+from app.models import match, profile, user, chat  # noqa: F401
+from app.models import booking as _booking_model  # noqa: F401
 from app.models import google_calendar, notification, safety  # noqa: F401
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

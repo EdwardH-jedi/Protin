@@ -73,7 +73,8 @@ describe('RegisterScreen', () => {
     const { getByText } = render(
       <RegisterScreen navigation={makeNavigation() as any} route={{} as any} />
     );
-    getByText('Create your');
+    // Title is rendered as "Create your\naccount" in one Text node, so match via regex.
+    getByText(/Create your/);
     getByText('Email');
     getByText('Password');
   });

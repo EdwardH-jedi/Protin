@@ -12,7 +12,9 @@ e.g. produced by:
 
 If the key is absent (local dev only), tokens are stored as plaintext and a
 warning is emitted at import time. This fallback is explicitly disabled in
-production (app_env == "production") — the application will refuse to start.
+any protected environment (app_env in {"staging", "production"}) — the
+application will refuse to start. Staging is included because staging database
+dumps are retained as backups and would otherwise leak OAuth tokens.
 
 Usage
 -----
@@ -37,6 +39,7 @@ from app.core.config import get_settings
 _log = logging.getLogger(__name__)
 
 _PLAINTEXT_PREFIX = "plain:"
+_PROTECTED_ENVS = {"staging", "production"}
 
 
 def _get_fernet():
@@ -125,13 +128,15 @@ class EncryptedString(TypeDecorator):
 
 
 def validate_encryption_config() -> None:
-    """Raise RuntimeError if the app is running in production without a key.
+    """Raise RuntimeError if a protected environment is missing the key.
 
-    Called from app startup so the process aborts before accepting requests.
+    Applies to both ``staging`` and ``production``: staging database backups
+    would otherwise contain plaintext OAuth tokens. Called from app startup so
+    the process aborts before accepting requests.
     """
     settings = get_settings()
-    if settings.app_env == "production" and not settings.field_encryption_key.strip():
+    if settings.app_env in _PROTECTED_ENVS and not settings.field_encryption_key.strip():
         raise RuntimeError(
-            "FIELD_ENCRYPTION_KEY must be set in production. "
+            f"FIELD_ENCRYPTION_KEY must be set in {settings.app_env}. "
             'Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
         )

@@ -79,7 +79,8 @@ function makeRoute(overrides: Record<string, unknown> = {}) {
 }
 
 /** Fill all required fields with valid values. */
-function fillRequiredFields(getByPlaceholderText: (s: string) => ReturnType<typeof getByPlaceholderText>) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fillRequiredFields(getByPlaceholderText: (s: string) => any) {
   fireEvent.changeText(getByPlaceholderText('2026-04-15'), '2026-06-01');
   fireEvent.changeText(getByPlaceholderText('09:00'), '09:00');
   fireEvent.changeText(getByPlaceholderText('10:00'), '10:00');

@@ -47,9 +47,8 @@ function MainTabs() {
           letterSpacing: 0.3,
           marginBottom: 2,
         },
-        // Icon slot left intentionally empty at foundation stage.
-        // Icon agent will add tab icons once the icon system is decided.
-        tabBarShowIcon: false,
+        // No tabBarIcon is provided — icons are added once the icon system
+        // is decided. React Navigation v6 has no `tabBarShowIcon` option.
       }}
     >
       <Tab.Screen
