@@ -11,6 +11,7 @@
  */
 
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
@@ -223,5 +224,96 @@ describe('ProfileScreen', () => {
     await waitFor(() => getByLabelText('Log out'));
     fireEvent.press(getByLabelText('Log out'));
     expect(mockLogout).toHaveBeenCalledTimes(1);
+  });
+
+  // ── Delete account ─────────────────────────────────────────────────────────
+
+  describe('Delete my account', () => {
+    let alertSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      alertSpy.mockRestore();
+    });
+
+    it('opens a confirmation alert when Delete my account is pressed', async () => {
+      const { getByLabelText } = render(<ProfileScreen />);
+      await waitFor(() => getByLabelText('Delete my account'));
+      fireEvent.press(getByLabelText('Delete my account'));
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(alertSpy.mock.calls[0][0]).toBe('Delete your account?');
+      expect(mockApiDelete).not.toHaveBeenCalledWith('/auth/me');
+      expect(mockLogout).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when the user cancels the confirmation', async () => {
+      const { getByLabelText } = render(<ProfileScreen />);
+      await waitFor(() => getByLabelText('Delete my account'));
+      fireEvent.press(getByLabelText('Delete my account'));
+
+      // Invoke the Cancel button's onPress (if any). Cancel has no handler,
+      // so just verify nothing was called after the alert opened.
+      const buttons = alertSpy.mock.calls[0][2] as {
+        text: string;
+        style?: string;
+        onPress?: () => void;
+      }[];
+      const cancel = buttons.find((b) => b.text === 'Cancel');
+      expect(cancel).toBeDefined();
+      expect(cancel?.style).toBe('cancel');
+      cancel?.onPress?.();
+
+      expect(mockApiDelete).not.toHaveBeenCalledWith('/auth/me');
+      expect(mockLogout).not.toHaveBeenCalled();
+    });
+
+    it('calls DELETE /auth/me and logout when the user confirms', async () => {
+      mockApiDelete.mockResolvedValue(undefined);
+      const { getByLabelText } = render(<ProfileScreen />);
+      await waitFor(() => getByLabelText('Delete my account'));
+      fireEvent.press(getByLabelText('Delete my account'));
+
+      const buttons = alertSpy.mock.calls[0][2] as {
+        text: string;
+        style?: string;
+        onPress?: () => void | Promise<void>;
+      }[];
+      const destructive = buttons.find((b) => b.style === 'destructive');
+      expect(destructive).toBeDefined();
+
+      await act(async () => {
+        await destructive?.onPress?.();
+      });
+
+      expect(mockApiDelete).toHaveBeenCalledWith('/auth/me');
+      expect(mockLogout).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows a failure alert when the delete request rejects', async () => {
+      mockApiDelete.mockRejectedValue(new Error('500 server error'));
+      const { getByLabelText } = render(<ProfileScreen />);
+      await waitFor(() => getByLabelText('Delete my account'));
+      fireEvent.press(getByLabelText('Delete my account'));
+
+      const buttons = alertSpy.mock.calls[0][2] as {
+        text: string;
+        style?: string;
+        onPress?: () => void | Promise<void>;
+      }[];
+      const destructive = buttons.find((b) => b.style === 'destructive');
+
+      await act(async () => {
+        await destructive?.onPress?.();
+      });
+
+      expect(mockApiDelete).toHaveBeenCalledWith('/auth/me');
+      expect(mockLogout).not.toHaveBeenCalled();
+      // Second alert call is the failure message
+      expect(alertSpy).toHaveBeenCalledTimes(2);
+      expect(alertSpy.mock.calls[1][0]).toBe('Delete failed');
+    });
   });
 });

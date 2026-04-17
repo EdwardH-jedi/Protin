@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -9,6 +10,7 @@ import {
 } from 'react-native';
 
 import { Screen } from '../../components/Screen';
+import { PRIVACY_URL, TERMS_URL } from '../../lib/legal';
 import { useAuthStore } from '../../stores/auth';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -98,6 +100,26 @@ export function RegisterScreen({ navigation }: Props) {
             <Text style={styles.buttonPrimaryText}>Create account</Text>
           )}
         </Pressable>
+
+        <Text style={styles.legalText}>
+          By creating an account you agree to our{' '}
+          <Text
+            style={styles.legalLink}
+            accessibilityRole="link"
+            onPress={() => Linking.openURL(TERMS_URL)}
+          >
+            Terms of Service
+          </Text>
+          {' '}and{' '}
+          <Text
+            style={styles.legalLink}
+            accessibilityRole="link"
+            onPress={() => Linking.openURL(PRIVACY_URL)}
+          >
+            Privacy Policy
+          </Text>
+          .
+        </Text>
       </View>
 
       <View style={styles.footer}>
@@ -166,6 +188,16 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.65,
+  },
+  legalText: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    marginTop: spacing.md,
+  },
+  legalLink: {
+    color: colors.accent,
+    fontWeight: '600',
   },
   footer: {
     paddingVertical: spacing.xl,

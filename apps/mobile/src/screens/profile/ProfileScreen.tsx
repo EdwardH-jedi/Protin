@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +13,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { Screen } from '../../components/Screen';
 import { api } from '../../lib/api';
+import { PRIVACY_URL, TERMS_URL } from '../../lib/legal';
 import { useAuthStore } from '../../stores/auth';
 import { sportLabel, useProfileStore } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -65,6 +68,33 @@ export function ProfileScreen() {
       setGcalConnected(false);
     } catch {}
   }, []);
+
+  const handleDeleteAccount = useCallback(() => {
+    Alert.alert(
+      'Delete your account?',
+      'This permanently deletes your profile, matches, chat history, and bookings. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete('/auth/me');
+              // RootNavigator is token-gated, so clearing the store routes
+              // the user back to the auth entry automatically.
+              await logout();
+            } catch {
+              Alert.alert(
+                'Delete failed',
+                "Couldn't delete your account. Please try again or contact support."
+              );
+            }
+          },
+        },
+      ]
+    );
+  }, [logout]);
 
   if (isLoading) {
     return (
@@ -176,6 +206,29 @@ export function ProfileScreen() {
           )}
         </View>
 
+        {/* Legal */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Legal</Text>
+          <View style={styles.legalList}>
+            <Pressable
+              style={({ pressed }) => [styles.legalRow, pressed && styles.pressed]}
+              onPress={() => Linking.openURL(PRIVACY_URL)}
+              accessibilityRole="link"
+              accessibilityLabel="Privacy Policy"
+            >
+              <Text style={styles.legalRowText}>Privacy Policy</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.legalRow, pressed && styles.pressed]}
+              onPress={() => Linking.openURL(TERMS_URL)}
+              accessibilityRole="link"
+              accessibilityLabel="Terms of Service"
+            >
+              <Text style={styles.legalRowText}>Terms of Service</Text>
+            </Pressable>
+          </View>
+        </View>
+
         {/* Logout */}
         <View style={styles.logoutSection}>
           <Pressable
@@ -185,6 +238,18 @@ export function ProfileScreen() {
             accessibilityLabel="Log out"
           >
             <Text style={styles.logoutText}>Log out</Text>
+          </Pressable>
+        </View>
+
+        {/* Delete account */}
+        <View style={styles.deleteSection}>
+          <Pressable
+            style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
+            onPress={handleDeleteAccount}
+            accessibilityRole="button"
+            accessibilityLabel="Delete my account"
+          >
+            <Text style={styles.deleteText}>Delete my account</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -343,6 +408,33 @@ const styles = StyleSheet.create({
   logoutText: {
     ...typography.button,
     color: colors.textSecondary,
+  },
+  legalList: {
+    gap: spacing.xs,
+  },
+  legalRow: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.separator,
+  },
+  legalRowText: {
+    ...typography.body,
+    color: colors.textPrimary,
+  },
+  deleteSection: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  deleteButton: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  deleteText: {
+    ...typography.button,
+    color: colors.error,
   },
   pressed: {
     opacity: 0.65,
