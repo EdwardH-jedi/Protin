@@ -28,3 +28,13 @@ resume/
 # Claude Code — per-developer local state (do not commit)
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+# Codex Stop-hook review reports (generated)
+reviews/
+
+# Claude Code — run archive (per-developer local; README only is tracked)
+runs/*
+!runs/README.md
+
+# Claude Code — hook state (session → run-file mapping)
+.claude/tmp/

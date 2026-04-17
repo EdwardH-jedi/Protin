@@ -1,4 +1,15 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(git diff*)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(ruff check*)",
+      "Bash(ruff format*)",
+      "Bash(npx tsc*)",
+      "Bash(codex exec*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -21,16 +32,41 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/log-run-prompt.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/log-run-stop.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/stop-quality-gate.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/codex-review.sh"
+          }
+        ]
+      }
     ]
   },
-  "permissions": {
-    "allow": [
-      "Bash(git diff*)",
-      "Bash(git status*)",
-      "Bash(git log*)",
-      "Bash(ruff check*)",
-      "Bash(ruff format*)",
-      "Bash(npx tsc*)"
-    ]
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true
   }
 }
