@@ -1,6 +1,10 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@protin/shared-types": ["../../packages/shared-types/src/index.ts"]
+    }
   }
 }

@@ -1,29 +1,16 @@
 import { create } from 'zustand';
+import type {
+  IdentityPreferences,
+  SetIdentityPreferencesRequest,
+  Sport,
+  SportProfile,
+  UpsertSportProfileRequest,
+  UserProfile,
+} from '@protin/shared-types';
 
 import { api } from '../lib/api';
 
-// ─── Domain types ─────────────────────────────────────────────────────────────
-// These will be imported from @protin/shared-types once that package is ready.
-
-export interface UserProfile {
-  id: string;
-  userId: string;
-  displayName: string;
-  bio?: string;
-  birthYear?: number;
-  suburb?: string;
-  avatarUrl?: string;
-}
-
-export interface IdentityPreferences {
-  id?: string;
-  openTo: string[];
-  ageRangeMin: number;
-  ageRangeMax: number;
-  maxDistanceKm: number;
-}
-
-export type SportType = 'gym' | 'golf' | 'tennis' | 'running';
+export type SportType = Sport;
 
 export const SPORT_LABELS: Record<SportType, string> = {
   gym: 'Gym',
@@ -33,22 +20,8 @@ export const SPORT_LABELS: Record<SportType, string> = {
 };
 
 export function sportLabel(sport: string): string {
-  return (
-    SPORT_LABELS[sport as SportType] ?? sport.charAt(0).toUpperCase() + sport.slice(1)
-  );
+  return SPORT_LABELS[sport as SportType] ?? sport.charAt(0).toUpperCase() + sport.slice(1);
 }
-
-export interface SportProfile {
-  id?: string;
-  sport: SportType;
-  level: 'beginner' | 'intermediate' | 'advanced';
-  preferredTimes: string[];
-  gymName?: string;
-  golfClub?: string;
-  goals?: string;
-}
-
-// ─── Store ────────────────────────────────────────────────────────────────────
 
 interface ProfileState {
   profile: UserProfile | null;
@@ -56,8 +29,8 @@ interface ProfileState {
   sportProfiles: SportProfile[] | null;
   fetchProfile: () => Promise<void>;
   upsertProfile: (data: Partial<UserProfile>) => Promise<void>;
-  upsertIdentityPreferences: (data: IdentityPreferences) => Promise<void>;
-  upsertSportProfile: (data: SportProfile) => Promise<void>;
+  upsertIdentityPreferences: (data: SetIdentityPreferencesRequest) => Promise<void>;
+  upsertSportProfile: (data: UpsertSportProfileRequest) => Promise<void>;
 }
 
 export const useProfileStore = create<ProfileState>((set, get) => ({
@@ -86,10 +59,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     const updated = await api.post<SportProfile>('/users/me/sport-profiles', data);
     const current = get().sportProfiles ?? [];
     const idx = current.findIndex((sp) => sp.sport === data.sport);
-    const next =
-      idx >= 0
-        ? current.map((sp, i) => (i === idx ? updated : sp))
-        : [...current, updated];
+    const next = idx >= 0 ? current.map((sp, i) => (i === idx ? updated : sp)) : [...current, updated];
     set({ sportProfiles: next });
   },
 }));

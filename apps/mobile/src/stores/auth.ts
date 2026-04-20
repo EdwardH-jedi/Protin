@@ -1,30 +1,20 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
-import type { AppleSignInRequest } from '@protin/shared-types';
+import type { AppleSignInRequest, MeResponse, TokenResponse } from '@protin/shared-types';
 
 import { api, setToken } from '../lib/api';
 
 const TOKEN_KEY = 'protin.auth.token';
 
-interface User {
-  id: string;
-  email: string;
-}
-
 interface AuthState {
   token: string | null;
-  user: User | null;
+  user: MeResponse | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   loginWithApple: (payload: AppleSignInRequest) => Promise<void>;
   logout: () => Promise<void>;
   initialize: () => Promise<void>;
-}
-
-interface AuthResponse {
-  accessToken: string;
-  tokenType: string;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -35,7 +25,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   login: async (email, password) => {
     set({ isLoading: true });
     try {
-      const data = await api.post<AuthResponse>('/auth/login', { email, password });
+      const data = await api.post<TokenResponse>('/auth/login', { email, password });
       await SecureStore.setItemAsync(TOKEN_KEY, data.accessToken);
       setToken(data.accessToken);
       set({ token: data.accessToken, user: null });
@@ -47,7 +37,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   register: async (email, password) => {
     set({ isLoading: true });
     try {
-      const data = await api.post<AuthResponse>('/auth/register', { email, password });
+      const data = await api.post<TokenResponse>('/auth/register', { email, password });
       await SecureStore.setItemAsync(TOKEN_KEY, data.accessToken);
       setToken(data.accessToken);
       set({ token: data.accessToken, user: null });
@@ -59,7 +49,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   loginWithApple: async (payload) => {
     set({ isLoading: true });
     try {
-      const data = await api.post<AuthResponse>('/auth/apple', {
+      const data = await api.post<TokenResponse>('/auth/apple', {
         identityToken: payload.identityToken,
         nonce: payload.nonce,
         email: payload.email ?? undefined,
@@ -84,7 +74,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const stored = await SecureStore.getItemAsync(TOKEN_KEY);
       if (!stored) return;
       setToken(stored);
-      const user = await api.get<User>('/auth/me');
+      const user = await api.get<MeResponse>('/auth/me');
       set({ token: stored, user });
     } catch {
       // Token may be invalid — clear it silently

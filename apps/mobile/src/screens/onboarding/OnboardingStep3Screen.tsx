@@ -7,17 +7,18 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import type { FitnessLevel, PreferredTime, Sport, UpsertSportProfileRequest } from '@protin/shared-types';
 
 import { Screen } from '../../components/Screen';
-import { useProfileStore, SportProfile, SportType } from '../../stores/profile';
+import { useProfileStore } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingStep3'>;
 
-type Level = 'beginner' | 'intermediate' | 'advanced';
-type TimeSlot = 'morning' | 'afternoon' | 'evening' | 'flexible';
+type Level = FitnessLevel;
+type TimeSlot = PreferredTime;
 
 const LEVELS: { value: Level; label: string }[] = [
   { value: 'beginner', label: 'Beginner' },
@@ -33,7 +34,7 @@ const TIME_SLOTS: { value: TimeSlot; label: string }[] = [
 ];
 
 interface SportConfig {
-  value: SportType;
+  value: Sport;
   label: string;
   venueLabel?: string;
   venuePlaceholder?: string;
@@ -58,7 +59,7 @@ const DEFAULT_SPORT_STATE: SportFormState = {
   venueName: '',
 };
 
-function makeInitialStates(): Record<SportType, SportFormState> {
+function makeInitialStates(): Record<Sport, SportFormState> {
   return {
     gym: { ...DEFAULT_SPORT_STATE },
     golf: { ...DEFAULT_SPORT_STATE },
@@ -68,15 +69,15 @@ function makeInitialStates(): Record<SportType, SportFormState> {
 }
 
 export function OnboardingStep3Screen({ navigation }: Props) {
-  const [selected, setSelected] = useState<Set<SportType>>(new Set());
-  const [sportStates, setSportStates] = useState<Record<SportType, SportFormState>>(makeInitialStates);
+  const [selected, setSelected] = useState<Set<Sport>>(new Set());
+  const [sportStates, setSportStates] = useState<Record<Sport, SportFormState>>(makeInitialStates);
   const [goals, setGoals] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { upsertSportProfile } = useProfileStore();
 
-  function toggleSport(sport: SportType) {
+  function toggleSport(sport: Sport) {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(sport)) next.delete(sport); else next.add(sport);
@@ -84,11 +85,11 @@ export function OnboardingStep3Screen({ navigation }: Props) {
     });
   }
 
-  function updateSportState(sport: SportType, patch: Partial<SportFormState>) {
+  function updateSportState(sport: Sport, patch: Partial<SportFormState>) {
     setSportStates((prev) => ({ ...prev, [sport]: { ...prev[sport], ...patch } }));
   }
 
-  function toggleTime(sport: SportType, time: TimeSlot) {
+  function toggleTime(sport: Sport, time: TimeSlot) {
     const times = sportStates[sport].times;
     updateSportState(sport, {
       times: times.includes(time) ? times.filter((t) => t !== time) : [...times, time],
@@ -107,7 +108,7 @@ export function OnboardingStep3Screen({ navigation }: Props) {
       await Promise.all(
         [...selected].map((sport) => {
           const state = sportStates[sport];
-          const profile: SportProfile = {
+          const profile: UpsertSportProfileRequest = {
             sport,
             level: state.level,
             preferredTimes: state.times,

@@ -11,12 +11,13 @@ import {
 import { Screen } from '../../components/Screen';
 import { useProfileStore } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
+import type { GenderPreference } from '@protin/shared-types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingStep2'>;
 
-const OPEN_TO_OPTIONS = [
+const OPEN_TO_OPTIONS: { value: GenderPreference; label: string }[] = [
   { value: 'any', label: 'Any' },
   { value: 'male', label: 'Men' },
   { value: 'female', label: 'Women' },
@@ -26,7 +27,7 @@ const OPEN_TO_OPTIONS = [
 const DISTANCE_OPTIONS = [5, 10, 20, 50];
 
 export function OnboardingStep2Screen({ navigation }: Props) {
-  const [openTo, setOpenTo] = useState<string[]>(['any']);
+  const [openTo, setOpenTo] = useState<GenderPreference[]>(['any']);
   const [ageMin, setAgeMin] = useState('18');
   const [ageMax, setAgeMax] = useState('65');
   const [maxDistance, setMaxDistance] = useState<number>(20);
@@ -35,7 +36,7 @@ export function OnboardingStep2Screen({ navigation }: Props) {
 
   const { upsertIdentityPreferences } = useProfileStore();
 
-  function toggleOpenTo(value: string) {
+  function toggleOpenTo(value: GenderPreference) {
     if (value === 'any') {
       setOpenTo(['any']);
       return;
