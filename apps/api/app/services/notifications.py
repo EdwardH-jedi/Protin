@@ -90,6 +90,15 @@ async def _get_latest_push_token(db: AsyncSession, user_id: UUID) -> str | None:
     return token.token if token else None
 
 
+def _ensure_utc(dt: datetime) -> datetime:
+    # SQLite (and some driver/dialect combos) can hand back naive datetimes
+    # even for timezone=True columns. Treat naive values as UTC — notification
+    # timestamps are always persisted as UTC by this service.
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def _render(template: str, *, partner: str, sport: str) -> str:
     return template.format(partner=partner, sport=sport.capitalize())
 
@@ -180,7 +189,7 @@ async def process_pending_notifications(
         token = fresh_token or event.push_token
 
         if not token:
-            age_hours = (now - event.scheduled_at).total_seconds() / 3600
+            age_hours = (now - _ensure_utc(event.scheduled_at)).total_seconds() / 3600
             if age_hours > 48:
                 event.failed_reason = "no_push_token_after_48h"
                 failed += 1

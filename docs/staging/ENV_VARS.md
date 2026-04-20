@@ -34,6 +34,7 @@ These are loaded by Docker Compose and passed into the relevant containers.
 | `API_PORT` | `8000` | Bind port for uvicorn |
 | `LOG_LEVEL` | `info` | Uvicorn / Python log level: `debug` \| `info` \| `warning` \| `error` |
 | `SECRET_KEY` | — | **Required.** JWT signing secret. Generate: `python3 -c "import secrets; print(secrets.token_hex(32))"` |
+| `INTERNAL_API_TOKEN` | `""` | **Required in staging/production.** Shared secret for `/internal/*` routes (e.g. `/internal/process-notifications`). The API refuses to boot when unset under `APP_ENV=staging` or `production`. Callers must send it as the `X-Internal-Token` header. Generate: `python3 -c "import secrets; print(secrets.token_hex(32))"` |
 
 ### Google OAuth (optional)
 

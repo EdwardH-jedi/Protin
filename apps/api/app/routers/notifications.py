@@ -1,8 +1,10 @@
+import hmac
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.routers.auth import get_current_user
 from app.schemas.notifications import (
@@ -14,6 +16,35 @@ from app.services import notifications as notif_service
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 internal_router = APIRouter(prefix="/internal", tags=["internal"])
+_PROTECTED_ENVS = {"staging", "production"}
+
+
+def validate_internal_api_token_config() -> None:
+    settings = get_settings()
+    if settings.app_env in _PROTECTED_ENVS and not settings.internal_api_token.strip():
+        raise RuntimeError(
+            f"INTERNAL_API_TOKEN must be set in {settings.app_env}. "
+            "Internal endpoints under /internal must not boot without a shared secret."
+        )
+
+
+def require_internal_token(x_internal_token: str | None = Header(default=None)) -> None:
+    settings = get_settings()
+    expected = settings.internal_api_token.strip()
+
+    if not expected:
+        if settings.app_env == "local":
+            return
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Internal API token is not configured on this server.",
+        )
+
+    if x_internal_token is None or not hmac.compare_digest(x_internal_token, expected):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid internal API token.",
+        )
 
 
 @router.post("/token", response_model=PushTokenResponse, status_code=201)
@@ -38,6 +69,7 @@ async def unregister_token(
 
 @internal_router.post("/process-notifications", response_model=ProcessNotificationsResult)
 async def process_notifications(
+    _: None = Depends(require_internal_token),
     db: AsyncSession = Depends(get_db),
 ) -> ProcessNotificationsResult:
     """

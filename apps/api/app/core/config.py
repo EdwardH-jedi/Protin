@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # Leave empty to disable push delivery (staging default)
     expo_push_url: str = "https://exp.host/--/api/v2/push/send"
 
+    # Shared secret for internal-only endpoints such as notification processing.
+    # Required in staging/production for routes mounted under /internal.
+    internal_api_token: str = ""
+
     # Apple Sign-in. Must match the app's bundle identifier (iOS) or the
     # Services ID (web) registered with Apple Developer. Required when the
     # /auth/apple endpoint is enabled in staging/production.
