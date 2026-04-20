@@ -1,4 +1,4 @@
-# Protin Staging — Operational Runbook
+# Protin Staging - Operational Runbook
 
 Day-to-day operations on the RX6600 staging server.
 
@@ -8,6 +8,16 @@ Shorthand used throughout:
 ```bash
 COMPOSE="docker compose -f docker-compose.yml -f docker-compose.staging.yml"
 ```
+
+Canonical operator wrapper:
+```bash
+bash infra/scripts/staging-ops.sh <health|logs|tail|restart|drift|deploy-sanity>
+```
+
+The wrapper is the preferred entry point for day-to-day ops. It composes the
+`$COMPOSE` commands below and adds an env-drift check against
+`.env.staging.example`. The raw `$COMPOSE` recipes remain documented in each
+section as the escape hatch when the wrapper is not enough.
 
 ---
 
@@ -23,7 +33,7 @@ $COMPOSE stop
 # Remove containers (data volumes preserved)
 $COMPOSE down
 
-# Full teardown including volumes — destroys all data
+# Full teardown including volumes - destroys all data
 $COMPOSE down -v
 ```
 
@@ -33,14 +43,24 @@ $COMPOSE down -v
 
 ```bash
 git pull
+bash infra/scripts/staging-ops.sh deploy-sanity
 bash infra/scripts/deploy.sh --build
+bash infra/scripts/staging-ops.sh health
 ```
 
 The script rebuilds images, runs migrations, then performs a rolling restart of api + worker + nginx. It will not restart if the health check fails.
 
+`deploy-sanity` is the preferred pre-deploy gate because it catches:
+- missing keys or placeholder values in `.env.staging`
+- `localhost` accidentally left in staging URLs
+- `POSTGRES_PASSWORD` / `POSTGRES_URL` mismatches
+- compose render failures before `deploy.sh` starts
+
 If you only changed environment variables (no code changes):
 ```bash
+bash infra/scripts/staging-ops.sh drift
 bash infra/scripts/deploy.sh
+bash infra/scripts/staging-ops.sh health
 ```
 
 ---
@@ -48,6 +68,12 @@ bash infra/scripts/deploy.sh
 ## Viewing logs
 
 ```bash
+# Compose status + recent 80-line summary across core services
+bash infra/scripts/staging-ops.sh logs
+
+# Follow api + worker logs (default), or pass services: staging-ops.sh tail api
+bash infra/scripts/staging-ops.sh tail
+
 # All services, follow
 $COMPOSE logs -f
 
@@ -76,6 +102,9 @@ Migrations run automatically during `deploy.sh`. Run manually only if you need t
 ## Health check
 
 ```bash
+# Operator entrypoint (wraps health-check.sh)
+bash infra/scripts/staging-ops.sh health
+
 # Quick check
 curl http://localhost/health
 
@@ -110,7 +139,7 @@ List existing backups:
 ls -lh infra/backups/*.dump
 ```
 
-Old backups must be deleted manually — there is no automatic retention policy.
+Old backups must be deleted manually - there is no automatic retention policy.
 
 ---
 
@@ -137,21 +166,36 @@ $COMPOSE start api worker
 ## Restarting individual services
 
 ```bash
+# Wrapper: runs drift check first, restart, then health check
+bash infra/scripts/staging-ops.sh restart            # api worker nginx (default)
+bash infra/scripts/staging-ops.sh restart api
+bash infra/scripts/staging-ops.sh restart worker
+
+# Raw escape hatch
 $COMPOSE restart api
 $COMPOSE restart worker
 $COMPOSE restart nginx
 $COMPOSE restart postgres   # will cause brief downtime for api/worker
 ```
 
+Prefer the wrapper first. It catches env drift introduced since last restart and re-runs health afterwards.
+
 ---
 
 ## Checking service status
 
 ```bash
+bash infra/scripts/staging-ops.sh deploy-sanity
 $COMPOSE ps
 ```
 
 All services should show `healthy` or `running`. The `migrate` service is one-shot and shows `exited (0)` after a successful run.
+
+`deploy-sanity` is the preferred pre-deploy and post-restart command because it catches:
+- missing or placeholder values in `.env.staging`
+- `localhost` accidentally left in staging URLs
+- `POSTGRES_PASSWORD` / `POSTGRES_URL` mismatches
+- compose render failures before `deploy.sh` starts
 
 ---
 
@@ -198,7 +242,7 @@ docker system df
 # Backup directory
 du -sh infra/backups/
 
-# Prune unused Docker images (safe — only removes untagged/dangling images)
+# Prune unused Docker images (safe - only removes untagged/dangling images)
 docker image prune -f
 ```
 
@@ -212,16 +256,17 @@ If a deploy breaks the API:
 # 1. Check what's wrong
 $COMPOSE logs --tail=50 api
 
-# 2. If code change is the problem — revert and rebuild
+# 2. If code change is the problem - revert and rebuild
 git revert HEAD --no-edit
 bash infra/scripts/deploy.sh --build
 
-# 3. If env/config change is the problem — edit .env.staging and restart
+# 3. If env/config change is the problem - edit .env.staging and restart
 nano .env.staging
-$COMPOSE up -d api worker
-$COMPOSE logs -f api
+bash infra/scripts/staging-ops.sh drift
+bash infra/scripts/staging-ops.sh restart api worker
+bash infra/scripts/staging-ops.sh tail api worker
 
-# 4. If database migration caused data loss — restore from backup
+# 4. If database migration caused data loss - restore from backup
 $COMPOSE stop api worker
 bash infra/scripts/restore.sh infra/backups/<latest>.dump
 $COMPOSE run --rm migrate
@@ -238,7 +283,7 @@ Before deploying a new merge:
 - Confirm the PR went through Claude Code Review and Codex sign-off (see `docs/workflow/PR_WORKFLOW.md`).
 - Check that `git log --oneline -5` on the server shows the expected commits after `git pull`.
 
-If you are deploying a hotfix under time pressure, the Codex review step may be skipped — note it in the PR and deploy as normal.
+If you are deploying a hotfix under time pressure, the Codex review step may be skipped - note it in the PR and deploy as normal.
 
 For the deploy procedure, see the **Deploying a code update** section above.
 
@@ -265,7 +310,7 @@ nano .env.staging  # fill in all placeholders
 bash infra/scripts/deploy.sh --build
 
 # 5. Verify
-curl http://localhost/health
+bash infra/scripts/staging-ops.sh deploy-sanity
 ```
 
 See SETUP.md for the full walkthrough.
