@@ -76,7 +76,7 @@ async def test_register_token_requires_auth(client: AsyncClient) -> None:
         "/notifications/token",
         json={"token": "ExponentPushToken[abc123]", "platform": "ios"},
     )
-    assert r.status_code == 403
+    assert r.status_code == 401
 
 
 async def test_register_token_returns_token_record(client: AsyncClient) -> None:
@@ -105,7 +105,7 @@ async def test_register_token_idempotent(client: AsyncClient) -> None:
 
 async def test_unregister_token_requires_auth(client: AsyncClient) -> None:
     r = await client.delete("/notifications/token/00000000-0000-0000-0000-000000000001")
-    assert r.status_code == 403
+    assert r.status_code == 401
 
 
 async def test_unregister_token(client: AsyncClient) -> None:
@@ -174,6 +174,82 @@ async def test_notification_scheduled_on_booking_proposal(client: AsyncClient) -
 
 
 # ---------------------------------------------------------------------------
+# _ensure_utc + naive-datetime hardening path
+# ---------------------------------------------------------------------------
+
+
+def test_ensure_utc_attaches_utc_to_naive() -> None:
+    from datetime import datetime, timezone
+
+    from app.services.notifications import _ensure_utc
+
+    naive = datetime(2026, 4, 19, 12, 0, 0)
+    out = _ensure_utc(naive)
+    assert out.tzinfo is timezone.utc
+    assert out.replace(tzinfo=None) == naive
+
+
+def test_ensure_utc_converts_non_utc_aware() -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from app.services.notifications import _ensure_utc
+
+    sydney = timezone(timedelta(hours=10))
+    aware = datetime(2026, 4, 19, 22, 0, 0, tzinfo=sydney)
+    out = _ensure_utc(aware)
+    assert out.tzinfo is timezone.utc
+    assert out == datetime(2026, 4, 19, 12, 0, 0, tzinfo=timezone.utc)
+
+
+async def test_process_pending_notifications_handles_naive_scheduled_at() -> None:
+    """Regression: DB returning a naive scheduled_at must not crash processing."""
+    from datetime import datetime, timedelta
+    from types import SimpleNamespace
+    from uuid import uuid4
+
+    from app.services import notifications as notif_svc
+
+    # Naive datetime simulates what SQLite (and some driver combos) return
+    # for a DateTime(timezone=True) column.
+    naive_scheduled = datetime.utcnow() - timedelta(hours=72)
+
+    event = SimpleNamespace(
+        id=uuid4(),
+        user_id=uuid4(),
+        booking_id=None,
+        notification_type="proposal_received",
+        title="t",
+        body="b",
+        push_token=None,  # triggers the no-token aging path that subtracts datetimes
+        scheduled_at=naive_scheduled,
+        sent_at=None,
+        failed_reason=None,
+    )
+
+    class _Result:
+        def scalars(self):
+            class _S:
+                def all(inner_self):
+                    return [event]
+            return _S()
+
+        def scalar_one_or_none(self):
+            return None
+
+    class _FakeDB:
+        async def execute(self, _stmt):
+            return _Result()
+
+        async def commit(self):
+            return None
+
+    result = await notif_svc.process_pending_notifications(_FakeDB())
+    # No TypeError, and >48h-old no-token event is marked failed
+    assert result.failed == 1
+    assert event.failed_reason == "no_push_token_after_48h"
+
+
+# ---------------------------------------------------------------------------
 # _render unit tests  (pure function, no DB)
 # ---------------------------------------------------------------------------
 
@@ -200,21 +276,25 @@ def test_render_substitutes_partner():
 
 async def test_schedule_immediate_notification_sets_scheduled_at_to_now():
     """proposal_received notifications are scheduled immediately."""
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
     from unittest.mock import AsyncMock, MagicMock
 
-    from app.models.booking import Booking
     from app.services.notifications import schedule_booking_notification
 
-    db = AsyncMock()
+    # db.execute is awaited by production code; db.add is called synchronously.
+    # Using MagicMock as the base keeps db.add sync, so the production call
+    # does not produce a "coroutine was never awaited" warning.
+    db = MagicMock()
     db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None)))
 
-    booking = Booking.__new__(Booking)
-    booking.id = None
-    booking.sport = "gym"
-    from datetime import timedelta
-
-    booking.starts_at = datetime.now(tz=timezone.utc) + timedelta(days=7)
+    # Duck-typed booking — schedule_booking_notification only reads id, sport,
+    # starts_at. Avoids SQLAlchemy declarative instrumentation on Booking.__new__.
+    booking = SimpleNamespace(
+        id=None,
+        sport="gym",
+        starts_at=datetime.now(tz=timezone.utc) + timedelta(days=7),
+    )
 
     before = datetime.now(tz=timezone.utc)
     await schedule_booking_notification(db, booking, "proposal_received", None, "Alex")
@@ -228,19 +308,16 @@ async def test_schedule_immediate_notification_sets_scheduled_at_to_now():
 async def test_schedule_reminder_is_24h_before_starts_at():
     """Reminder notifications are scheduled 24 h before starts_at."""
     from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
     from unittest.mock import AsyncMock, MagicMock
 
-    from app.models.booking import Booking
     from app.services.notifications import schedule_booking_notification
 
-    db = AsyncMock()
+    db = MagicMock()
     db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None)))
 
     starts = datetime.now(tz=timezone.utc) + timedelta(days=3)
-    booking = Booking.__new__(Booking)
-    booking.id = None
-    booking.sport = "tennis"
-    booking.starts_at = starts
+    booking = SimpleNamespace(id=None, sport="tennis", starts_at=starts)
 
     await schedule_booking_notification(db, booking, "reminder", None, "Sam")
 
@@ -254,18 +331,19 @@ async def test_schedule_reminder_is_24h_before_starts_at():
 async def test_schedule_reminder_skipped_when_starts_at_in_past():
     """No NotificationEvent is added when starts_at is already past the 24 h window."""
     from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
     from unittest.mock import AsyncMock, MagicMock
 
-    from app.models.booking import Booking
     from app.services.notifications import schedule_booking_notification
 
-    db = AsyncMock()
+    db = MagicMock()
     db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None)))
 
-    booking = Booking.__new__(Booking)
-    booking.id = None
-    booking.sport = "gym"
-    booking.starts_at = datetime.now(tz=timezone.utc) - timedelta(hours=1)
+    booking = SimpleNamespace(
+        id=None,
+        sport="gym",
+        starts_at=datetime.now(tz=timezone.utc) - timedelta(hours=1),
+    )
 
     await schedule_booking_notification(db, booking, "reminder", None, "Lee")
     db.add.assert_not_called()
@@ -571,3 +649,102 @@ async def test_process_skips_already_sent_events(
     await client.post("/internal/process-notifications")
     # No new calls on second run
     assert call_count == first_count
+
+
+# ---------------------------------------------------------------------------
+# INTERNAL_API_TOKEN hardening for /internal/*
+# ---------------------------------------------------------------------------
+
+
+def _fake_settings(*, app_env: str, internal_api_token: str):
+    from types import SimpleNamespace
+    return SimpleNamespace(app_env=app_env, internal_api_token=internal_api_token)
+
+
+def test_validate_internal_api_token_config_raises_in_staging_when_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Boot validator: staging/prod must refuse to start without a configured secret."""
+    from app.routers import notifications as notif_router
+
+    monkeypatch.setattr(
+        notif_router,
+        "get_settings",
+        lambda: _fake_settings(app_env="staging", internal_api_token="   "),
+    )
+    with pytest.raises(RuntimeError, match="INTERNAL_API_TOKEN must be set"):
+        notif_router.validate_internal_api_token_config()
+
+
+def test_validate_internal_api_token_config_passes_in_local_when_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Boot validator: local env is allowed to run without the shared secret."""
+    from app.routers import notifications as notif_router
+
+    monkeypatch.setattr(
+        notif_router,
+        "get_settings",
+        lambda: _fake_settings(app_env="local", internal_api_token=""),
+    )
+    # Should not raise.
+    notif_router.validate_internal_api_token_config()
+
+
+async def test_process_notifications_rejects_wrong_internal_token_in_staging(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Staging + secret configured + wrong X-Internal-Token header -> 401."""
+    from app.routers import notifications as notif_router
+
+    monkeypatch.setattr(
+        notif_router,
+        "get_settings",
+        lambda: _fake_settings(app_env="staging", internal_api_token="correct-secret"),
+    )
+
+    r = await client.post(
+        "/internal/process-notifications",
+        headers={"X-Internal-Token": "wrong-secret"},
+    )
+    assert r.status_code == 401
+    assert "Invalid internal API token" in r.json()["detail"]
+
+
+async def test_process_notifications_accepts_correct_internal_token_in_staging(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Staging + secret configured + correct X-Internal-Token header -> 200."""
+    from app.routers import notifications as notif_router
+
+    monkeypatch.setattr(
+        notif_router,
+        "get_settings",
+        lambda: _fake_settings(app_env="staging", internal_api_token="correct-secret"),
+    )
+
+    r = await client.post(
+        "/internal/process-notifications",
+        headers={"X-Internal-Token": "correct-secret"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert "processed" in body
+    assert "failed" in body
+
+
+async def test_process_notifications_rejects_missing_header_when_secret_unset_in_staging(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Staging + secret NOT configured -> 503 rather than silently allowing traffic."""
+    from app.routers import notifications as notif_router
+
+    monkeypatch.setattr(
+        notif_router,
+        "get_settings",
+        lambda: _fake_settings(app_env="staging", internal_api_token=""),
+    )
+
+    r = await client.post("/internal/process-notifications")
+    assert r.status_code == 503
+    assert "Internal API token is not configured" in r.json()["detail"]
