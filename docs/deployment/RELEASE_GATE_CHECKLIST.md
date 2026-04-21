@@ -9,10 +9,17 @@ Store metadata (see the submission doc), and it does not set product strategy.
 It tells a human whether to **stop, continue verification, or advance** to the
 next gate.
 
-This document is based strictly on **committed, canonical repo state**.
-Work-in-progress on feature branches that has not yet merged is called out
-separately under "Pending branch-local work" in section 6 and is never
-presented as Implemented in Repo.
+This document tracks **current branch/repo readiness**: what is in the
+working repo right now across code, test coverage, and device / Apple-side
+verification. It is a readiness tracker, not a historical committed-main
+audit; a gate row is true when the evidence it cites is present in the
+repo today.
+
+For detailed Apple / TestFlight preparation status (configured / blocked /
+Apple-side setup required / verify on real device, with concrete next
+actions), see `docs/deployment/APPLE_TESTFLIGHT_PREP.md`. That prep doc is
+the source of truth for Apple-side setup detail; this doc is the source of
+truth for the go/no-go gate decision.
 
 ---
 
@@ -34,12 +41,11 @@ Status vocabulary used throughout:
 
 | Status       | Meaning |
 |---           |---|
-| implemented  | Code or config is present in the canonical (committed) repo. Does not imply it works on a device. |
+| implemented  | Code or config is present in the repo. Does not imply it works on a device. |
 | verified     | Proven by a dated device or staging run. Evidence captured in this doc. |
 | required     | Apple-side or external setup that must be completed before a given gate. |
 | blocked      | A concrete gap that prevents the stated gate from passing today. |
 | risky        | Present in the app but unproven; must be verified or hidden before its gate. |
-| pending      | Work exists on a feature branch but is not yet canonical; cannot be relied on. |
 
 Unknown status is treated as **not ready**. Never default to "probably fine".
 
@@ -52,16 +58,16 @@ Rules for reading this document:
 - Repo implementation alone never passes a gate. Every implemented item must
   be paired with a "does not prove" line. Readiness comes from the verified
   and required columns, not the implemented one.
-- "Implemented in Repo" means committed on the canonical branch. Uncommitted
-  or untracked work on feature branches does not count and lives in section 6
-  under "Pending branch-local work".
+- "Implemented in Repo" means the evidence cited is present in the current
+  repo. It does not imply the feature has been exercised on a device or
+  against a live backend.
 - A gate passes only when **every must-pass item** in that gate's section is
   satisfied. Partial is not a pass.
 - If a line item's status is unknown, treat it as **blocked** for the gate in
   question until someone records evidence.
 - Do not copy claims from companion docs. If `APP_STORE_SUBMISSION.md` says a
-  thing is implemented and you cannot see the evidence in the committed repo
-  or in a dated device run, record it as `verify` here.
+  thing is implemented and you cannot see the evidence in the repo or in a
+  dated device run, record it as `verify` here.
 - When an item is verified, write the date and the owner into the evidence
   field. Verification without a date is not verification.
 
@@ -69,9 +75,8 @@ Rules for reading this document:
 
 ## 3. Implemented in Repo
 
-Only items whose evidence lives in the committed repo (current HEAD on the
-canonical branch). "Does not prove" is mandatory - it is the gap this
-checklist is here to close.
+Only items whose evidence lives in the current repo. "Does not prove" is
+mandatory - it is the gap this checklist is here to close.
 
 ### 3.1 Auth / account lifecycle
 
@@ -96,11 +101,8 @@ checklist is here to close.
 | Expo push integration declared | `expo-notifications` plugin entry and `notification-icon` reference in `apps/mobile/app.config.js` | That a signed build can actually register for push on Apple's APNs |
 | iOS background mode for push | `UIBackgroundModes: ["remote-notification"]` in `apps/mobile/app.config.js` | That the entitlement is granted by Apple Developer and that the bundle ID has APNs capability enabled |
 | Backend notification API | `POST /notifications/token` and the internal processor in `apps/api/app/routers/notifications.py` and `app/services/notifications.py` | That Expo's push service is reachable from the deployed backend and that pushes actually arrive on a real iPhone |
-
-Note: internal-endpoint hardening for `/internal/process-notifications` (shared
-token + staging/prod boot validator) is in progress on a feature branch. It
-is not part of canonical repo state yet; see section 6 under "Pending
-branch-local work".
+| Internal-endpoint shared-token gate | `require_internal_token` dependency and `validate_internal_api_token_config` boot gate in `apps/api/app/routers/notifications.py`; `internal_api_token` setting in `apps/api/app/core/config.py`; lifespan wiring in `apps/api/app/main.py`; `INTERNAL_API_TOKEN` entry in `.env.staging.example` | That the secret is actually set on the deployed staging/production host; that callers to `/internal/*` are sending `X-Internal-Token` |
+| UTC-safe scheduling | `_ensure_utc` helper in `apps/api/app/services/notifications.py` applied in `process_pending_notifications` before datetime arithmetic | That the deployed DB + driver combo does not introduce other timezone edge cases |
 
 ### 3.4 Google Calendar integration
 
@@ -114,7 +116,7 @@ branch-local work".
 
 | Capability | Repo evidence | Does not prove |
 |---|---|---|
-| Staging deploy script | `infra/scripts/deploy.sh` and `infra/scripts/health-check.sh` (both tracked); staging operator guide in `docs/staging/RUNBOOK.md` | That a reviewer-usable staging environment is currently live |
+| Staging deploy script and operator wrapper | `infra/scripts/deploy.sh`, `infra/scripts/health-check.sh`, and `infra/scripts/staging-ops.sh` (health / logs / tail / restart / drift / deploy-sanity); staging operator guide in `docs/staging/RUNBOOK.md` | That a reviewer-usable staging environment is currently live |
 | Encryption and boot guards | `validate_encryption_config()` in `apps/api/app/core/encryption.py` refuses to start without `FIELD_ENCRYPTION_KEY` in staging or prod; wired in `apps/api/app/main.py` lifespan | That secrets are actually present on the deployed host |
 | Health endpoint | `/health` handler in `apps/api/app/main.py` | That the external hostname is reachable and HTTPS-only at gate time |
 
@@ -133,7 +135,44 @@ Every item below is **not** proven by repo code. It needs a dated run on a
 real iPhone or a dated, human-attended staging run. Empty evidence means not
 done.
 
+### Current verification state
+
+Single source of truth for where the five priority areas stand right now.
+Subsections 4.1 through 4.5 rest on this summary.
+
+- **Backend coverage is in the repo.** `apps/api/tests/` has
+  `test_auth.py`, `test_notifications.py`, `test_google_calendar.py`, and
+  `test_health.py`. These exercise the full backend surface for auth,
+  delete-account, notification scheduling and delivery, the
+  `X-Internal-Token` gate, Google Calendar OAuth + token-at-rest
+  encryption, and the `/health` endpoint shape. Two pre-existing tests
+  fail against current app behavior and are called out as a blocker in
+  section 6.1; they are unrelated to the five priority areas.
+- **Mobile typecheck is clean** (`tsc --noEmit`) after the shared-types
+  alignment that consolidates auth/onboarding/profile types with
+  `@protin/shared-types`.
+- **No real-iPhone verification has been performed.** Every row in
+  sections 4.1 through 4.5 that requires a device run is `[ ]`.
+- **No live staging URL has been probed.** Backend reachability from
+  outside the Docker network, HTTPS health, and reviewer-account login
+  against a live host are open.
+- **No Apple-side state exercised.** Every row in section 5 remains
+  open.
+
+The per-subsection notes under 4.1 through 4.5 describe which test file
+backs each priority area. They do not add new verification claims beyond
+this summary.
+
 ### 4.1 Auth / account lifecycle
+
+Backend coverage: `apps/api/tests/test_auth.py` covers register, login
+(correct + wrong password), `GET /auth/me` (valid / invalid token),
+delete-account (+ owned-rows cleanup + auth requirement), Apple
+Sign-In (first call, invalid token, 503 when unconfigured,
+email-linking, nonce mismatch, first-time without verified email,
+password-login rejection for Apple-only accounts), and the
+`SECRET_KEY` fail-closed behavior. One baseline test failure is
+tracked in section 6.1. Does **not** prove any real-iPhone behavior.
 
 | Check | Owner | Evidence required | Status / date |
 |---|---|---|---|
@@ -145,6 +184,12 @@ done.
 
 ### 4.2 Delete-account (full end-to-end, device)
 
+Backend coverage: `apps/api/tests/test_auth.py::test_delete_me_removes_user_and_owned_rows`
+and `::test_delete_me_requires_auth`. The endpoint removes the user
+and owned rows at the API/DB layer and refuses unauthenticated
+requests. Device verification still required for the mobile-side
+flow.
+
 | Check | Owner | Evidence required | Status / date |
 |---|---|---|---|
 | Delete button discoverable from Profile on real device | mobile | screenshot | [ ] |
@@ -153,6 +198,15 @@ done.
 | Post-delete: owned rows removed or anonymized as policy requires | api | DB-level spot check notes | [ ] |
 
 ### 4.3 Push notifications (device proof, not code)
+
+Backend coverage: `apps/api/tests/test_notifications.py` exercises
+token register/unregister (auth required), idempotent re-register,
+token reassignment across users, immediate vs 24h-before reminder
+scheduling, `_render` templates, transition notifications
+(confirm / decline / cancel), delivery pass / fail / dedup paths, the
+UTC-safe `_ensure_utc` regression, and the INTERNAL_API_TOKEN boot
+validator + request-time gate. Does **not** prove APNs delivery or
+any real-iPhone behavior.
 
 | Check | Owner | Evidence required | Status / date |
 |---|---|---|---|
@@ -164,6 +218,15 @@ done.
 
 ### 4.4 Google Calendar (optional integration)
 
+Backend coverage: `apps/api/tests/test_google_calendar.py` covers
+OAuth status (connected / not / auth required), auth-URL generation
+(configured / 503 when unconfigured), OAuth-callback token storage
+and at-rest encryption, `sync_booking` guards on status and Google
+connection, Fernet-key encryption round-trip and legacy-plaintext
+path, and the `validate_encryption_config` gate for staging /
+production. Does **not** prove the iOS device permission prompt, the
+OAuth browser round-trip, or the return-to-app redirect.
+
 | Check | Owner | Evidence required | Status / date |
 |---|---|---|---|
 | Calendar permission prompt appears on "Add to calendar" | mobile | screenshot | [ ] |
@@ -171,6 +234,11 @@ done.
 | Permission denial path does not break booking flow | mobile | notes | [ ] |
 
 ### 4.5 Onboarding and session
+
+Backend coverage: `apps/api/tests/test_health.py` covers `/health`
+happy path and service-check shape. One baseline test failure is
+tracked in section 6.1. No backend equivalent exists for onboarding
+screen flow; this area is device-only for the mobile side.
 
 | Check | Owner | Evidence required | Status / date |
 |---|---|---|---|
@@ -207,11 +275,8 @@ unchecked at decision time, the gate does not pass.
 
 ## 6. Blocked or Risky
 
-Concrete gaps as of the last update to this document. This section is where
-missing proof, known-absent repo artifacts, Apple-side unknowns, and
-not-yet-merged feature-branch work live.
-
-### 6.1 Canonical blockers and risks
+Concrete gaps right now. This section is where missing proof,
+known-absent repo artifacts, and Apple-side unknowns live.
 
 | Item | Why it blocks or creates risk | Affected gate | Owner | Resolution condition |
 |---|---|---|---|---|
@@ -222,24 +287,9 @@ not-yet-merged feature-branch work live.
 | Google Calendar flow not yet proven on real iPhone | Surface is exposed in booking UI; if unverified at Gate 3, hide or mark as optional | Gate 3 (risk) | mobile | Section 4.4 rows checked or feature hidden behind a flag |
 | Legal URLs in `apps/mobile/src/lib/legal.ts` still point at unpublished paths | App Store requires reachable Privacy Policy URL; mismatch risks a 5.1.2 rejection | Gate 3 | release owner | URLs live and constant updated |
 | Delete-account not verified on real device | Core Apple 5.1.1(v) requirement; code-only is not proof | Gate 2 and Gate 3 | mobile and api | Section 4.2 rows checked |
-| Reviewer-usable staging environment not confirmed live | "Backend exists" is not "a reviewer can sign in and see seeded data" | Gate 1, Gate 2, Gate 3 | infra | Captured green health run plus reviewer account login on staging |
-
-### 6.2 Pending branch-local work (not canonical yet)
-
-These items exist only on feature branches and must not be treated as
-canonical repo truth. They become either Implemented in Repo or additional
-blockers once they merge.
-
-| Item | Current state | Risk if merged without the matching ops step | Gate it would affect once merged |
-|---|---|---|---|
-| Internal-endpoint shared-token hardening for `/internal/*` | Present on `feature/wave-8-staging-readiness` but not merged; includes a new `internal_api_token` setting and a staging/prod boot validator | Once merged, the deployed API will fail to boot in staging or prod unless the corresponding secret is set on the host and in `.env.staging.example` | Gate 1 reviewer-usable staging |
-| `infra/scripts/staging-ops.sh` operator wrapper | Untracked in the canonical repo | Not a canonical blocker today; do not rely on it in gate checks until it is tracked and merged | Gate 1 ops convenience |
-| `docs/staging/RUNBOOK.md` updates that reference the above wrapper | Uncommitted | Runbook additions describing `staging-ops.sh` should not be cited as canonical procedure until merged | Gate 1 ops convenience |
-| Naive-datetime regression fix in notification processing | Uncommitted on the same feature branch | Not canonical until merged; scheduling correctness on SQLite-backed tests remains the branch's concern | None at Gate level |
-
-Resolution condition for 6.2 is merge to the canonical branch plus a
-corresponding deployment checklist update. Until merge, these rows stay here
-and are never copied into Section 3.
+| Reviewer-usable staging environment not confirmed live | "Backend exists" is not "a reviewer can sign in and see seeded data". No deployed staging URL has been probed; backend tests are green but reachability from outside the Docker network is unknown | Gate 1, Gate 2, Gate 3 | infra | Captured green health run plus reviewer account login on staging |
+| Real-device verification not performed | Sections 4.1 through 4.5 rows that require a real-iPhone run cannot be checked without one. The Current verification state summary in section 4 records what backend-only evidence exists today | Gate 2, Gate 3 | mobile + release owner | A dated device run per section 4 row, captured by owner |
+| Two pre-existing backend test baseline failures | `apps/api/tests/test_auth.py::test_get_me_with_no_token_returns_401` asserts `== 403` but the stack returns `401` for missing credentials. `apps/api/tests/test_health.py::test_health_db_failure_does_not_crash` asserts `== 200` but `apps/api/app/main.py` returns `503` when any check is not `"ok"`. Both fail against current app behavior and keep the backend test suite off a clean-green baseline | Gate 1 (noise), Gate 3 (clean-suite evidence for review) | api | Fix each assertion to match current behavior in a separate slice, or adjust the production code if the intent is different |
 
 ---
 
@@ -279,13 +329,10 @@ Push and Google Calendar may be **partial** at this gate if they are
 explicitly called non-core for the internal beta; they do not have to be
 proven here, but claims about them must read as "not yet verified".
 
-If section 6.2 "pending branch-local work" has landed on the canonical
-branch by the time Gate 1 is re-assessed, the deploy configuration must be
-updated in the same pass (for example, required secrets added to
-`.env.staging` and to `.env.staging.example`). That is tracked as a pre-
-redeploy checklist item, not as a no-go driven by canonical state.
-
 ### Gate 2 - TestFlight
+
+> For detailed Apple-side prep status that feeds into this gate, see
+> `docs/deployment/APPLE_TESTFLIGHT_PREP.md`.
 
 **Entry intent:** A signed iOS build is in TestFlight, installable by real
 testers, and core flows have been proven on a real iPhone against the
@@ -318,6 +365,10 @@ deployed backend.
 - APNs capability is not enabled for the bundle ID.
 
 ### Gate 3 - Submission Prep
+
+> For detailed Apple-side prep status that feeds into this gate, see
+> `docs/deployment/APPLE_TESTFLIGHT_PREP.md`. For ASC metadata form values,
+> see `docs/deployment/APP_STORE_SUBMISSION.md`.
 
 **Entry intent:** Every user-visible feature is either proven or hidden, App
 Store Connect is complete, and a reviewer can get to the core loop with the
@@ -353,6 +404,9 @@ supplied demo account.
 
 Short pointers only. Do not duplicate their content here.
 
+- Apple / TestFlight preparation status (configured / blocked / Apple-side
+  setup required / verify on real device, with next actions):
+  `docs/deployment/APPLE_TESTFLIGHT_PREP.md`.
 - Release mechanics (Fly deploy, EAS build, TestFlight promotion, rollback):
   `docs/deployment/RELEASE_RUNBOOK.md`.
 - App Store Connect field-by-field metadata, review notes template, and
@@ -372,15 +426,13 @@ canonical gate artifact:
 
 - One reader can decide **stop**, **continue verification**, or **advance to
   next gate** in a single pass, without opening any other doc.
-- Every "Implemented in Repo" row cites committed canonical evidence only.
-  Uncommitted or untracked work is never presented as implemented.
-- Every "Implemented in Repo" row is paired with a "does not prove" line.
+- Every "Implemented in Repo" row cites evidence present in the current
+  repo, paired with a "does not prove" line.
 - Every "Needs Real-Device Verification" row has an owner and an explicit
   evidence field, not prose.
 - Every "Apple-Side Setup Required" row states which gate it blocks.
 - Every "Blocked or Risky" row names the affected gate and a concrete
-  resolution condition. "Pending branch-local work" rows name the branch
-  state plus the merge/config step that would retire the risk.
+  resolution condition.
 - No gate section claims a feature is ready without a matching checked row
   in section 3 and section 4 (or section 5 where Apple-side).
 - The doc does not repeat procedural content from `RELEASE_RUNBOOK.md` or
