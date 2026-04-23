@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 
 import { Screen } from '../../components/Screen';
+import { Select, type SelectOption } from '../../components/Select';
+import { SYDNEY_SUBURB_OPTIONS } from '../../data/sydneySuburbs';
 import { useProfileStore } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -17,22 +19,35 @@ import type { RootStackParamList } from '../../navigation/types';
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingStep1'>;
 
 const CURRENT_YEAR = new Date().getFullYear();
+const MIN_AGE = 18;
+const MAX_AGE = 90;
+export const MAX_BIRTH_YEAR = CURRENT_YEAR - MIN_AGE;
+export const MIN_BIRTH_YEAR = CURRENT_YEAR - MAX_AGE;
+const BIO_MAX = 400;
+
+export function buildYearOptions(): SelectOption[] {
+  const years: SelectOption[] = [];
+  // Most recent year first — most users tap near the top of the list.
+  for (let y = MAX_BIRTH_YEAR; y >= MIN_BIRTH_YEAR; y--) {
+    years.push({ value: String(y), label: String(y) });
+  }
+  return years;
+}
 
 export function OnboardingStep1Screen({ navigation }: Props) {
   const [displayName, setDisplayName] = useState('');
-  const [birthYear, setBirthYear] = useState('');
-  const [suburb, setSuburb] = useState('');
+  const [birthYear, setBirthYear] = useState<string | null>(null);
+  const [suburb, setSuburb] = useState<string | null>(null);
   const [bio, setBio] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { upsertProfile } = useProfileStore();
 
-  const birthYearNum = birthYear ? parseInt(birthYear, 10) : undefined;
-  const calculatedAge =
-    birthYearNum && birthYearNum >= 1940 && birthYearNum <= 2005
-      ? CURRENT_YEAR - birthYearNum
-      : null;
+  const yearOptions = useMemo(buildYearOptions, []);
+
+  const birthYearNum = birthYear ? parseInt(birthYear, 10) : null;
+  const calculatedAge = birthYearNum ? CURRENT_YEAR - birthYearNum : null;
 
   async function handleContinue() {
     setError(null);
@@ -40,8 +55,12 @@ export function OnboardingStep1Screen({ navigation }: Props) {
       setError('Please enter a display name.');
       return;
     }
-    if (birthYear && (isNaN(Number(birthYear)) || birthYearNum! < 1940 || birthYearNum! > 2005)) {
-      setError('Please enter a valid birth year between 1940 and 2005.');
+    if (!birthYearNum) {
+      setError('Please select your birth year.');
+      return;
+    }
+    if (!suburb) {
+      setError('Please select your Sydney suburb.');
       return;
     }
     setIsSubmitting(true);
@@ -49,7 +68,7 @@ export function OnboardingStep1Screen({ navigation }: Props) {
       await upsertProfile({
         displayName: displayName.trim(),
         birthYear: birthYearNum,
-        suburb: suburb.trim() || undefined,
+        suburb,
         bio: bio.trim() || undefined,
       });
       navigation.navigate('OnboardingStep2');
@@ -62,7 +81,6 @@ export function OnboardingStep1Screen({ navigation }: Props) {
 
   return (
     <Screen padded scroll withKeyboard>
-      {/* Progress indicator */}
       <View style={styles.progress}>
         <View style={[styles.dot, styles.dotActive]} />
         <View style={styles.dot} />
@@ -77,10 +95,9 @@ export function OnboardingStep1Screen({ navigation }: Props) {
       </View>
 
       <View style={styles.form}>
-        {/* Display name */}
         <View style={styles.field}>
           <Text style={styles.label}>
-            Display name <Text style={styles.required}>*</Text>
+            Display name<Text style={styles.required}> *</Text>
           </Text>
           <TextInput
             style={styles.input}
@@ -94,60 +111,55 @@ export function OnboardingStep1Screen({ navigation }: Props) {
           />
         </View>
 
-        {/* Birth year */}
         <View style={styles.field}>
-          <Text style={styles.label}>Birth year (optional)</Text>
-          <TextInput
-            style={styles.input}
+          <Select
+            label="Birth year"
+            required
             value={birthYear}
-            onChangeText={setBirthYear}
-            placeholder="e.g. 1990"
-            placeholderTextColor={colors.textTertiary}
-            keyboardType="number-pad"
-            maxLength={4}
-            returnKeyType="next"
+            onChange={setBirthYear}
+            placeholder="Select your birth year"
+            options={yearOptions}
+            modalTitle="Birth year"
+            accessibilityLabel="Birth year"
           />
-          {calculatedAge !== null && (
+          {calculatedAge !== null ? (
             <Text style={styles.hint}>Age: {calculatedAge}</Text>
-          )}
+          ) : null}
         </View>
 
-        {/* Suburb */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Your Sydney suburb (optional)</Text>
-          <TextInput
-            style={styles.input}
-            value={suburb}
-            onChangeText={setSuburb}
-            placeholder="e.g. Surry Hills"
-            placeholderTextColor={colors.textTertiary}
-            autoCapitalize="words"
-            returnKeyType="next"
-          />
-        </View>
+        <Select
+          label="Your Sydney suburb"
+          required
+          value={suburb}
+          onChange={setSuburb}
+          placeholder="Select your suburb"
+          options={SYDNEY_SUBURB_OPTIONS}
+          searchable
+          modalTitle="Sydney suburb"
+          accessibilityLabel="Sydney suburb"
+        />
 
-        {/* Bio */}
         <View style={styles.field}>
           <Text style={styles.label}>Bio (optional)</Text>
           <TextInput
-            style={[styles.input, styles.inputMultiline]}
+            style={[styles.input, styles.bioInput]}
             value={bio}
-            onChangeText={(t) => setBio(t.slice(0, 400))}
+            onChangeText={(t) => setBio(t.slice(0, BIO_MAX))}
             placeholder="Tell potential partners a bit about yourself..."
             placeholderTextColor={colors.textTertiary}
             multiline
             numberOfLines={4}
             textAlignVertical="top"
           />
-          <Text style={styles.charCount}>{bio.length} / 400</Text>
+          <Text style={styles.charCount}>{bio.length} / {BIO_MAX}</Text>
         </View>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         <Pressable
           style={({ pressed }) => [
-            styles.buttonPrimary,
-            (pressed || isSubmitting) && styles.pressed,
+            styles.submit,
+            (pressed || isSubmitting) && styles.submitPressed,
           ]}
           onPress={handleContinue}
           disabled={isSubmitting}
@@ -157,7 +169,7 @@ export function OnboardingStep1Screen({ navigation }: Props) {
           {isSubmitting ? (
             <ActivityIndicator color={colors.textInverse} />
           ) : (
-            <Text style={styles.buttonPrimaryText}>Continue</Text>
+            <Text style={styles.submitText}>Continue</Text>
           )}
         </Pressable>
       </View>
@@ -228,8 +240,8 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     backgroundColor: colors.surface,
   },
-  inputMultiline: {
-    height: 100,
+  bioInput: {
+    height: 120,
     paddingTop: spacing.md,
   },
   hint: {
@@ -245,18 +257,21 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.error,
   },
-  buttonPrimary: {
+  submit: {
     backgroundColor: colors.brand,
     borderRadius: radii.md,
     paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
     marginTop: spacing.sm,
   },
-  buttonPrimaryText: {
+  submitPressed: {
+    opacity: 0.65,
+  },
+  submitText: {
     ...typography.button,
     color: colors.textInverse,
-  },
-  pressed: {
-    opacity: 0.65,
   },
 });
