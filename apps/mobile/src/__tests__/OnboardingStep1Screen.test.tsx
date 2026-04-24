@@ -108,14 +108,15 @@ describe('OnboardingStep1Screen', () => {
     getByText('Your profile');
   });
 
-  it('renders all required fields and the bio input', () => {
-    const { getByPlaceholderText, getByLabelText } = render(
+  it('renders the required basic-info fields', () => {
+    const { getByPlaceholderText, getByLabelText, queryByPlaceholderText } = render(
       <OnboardingStep1Screen navigation={makeNavigation() as any} route={{} as any} />
     );
     getByPlaceholderText("How you'll appear to others");
     getByLabelText('Birth year');
     getByLabelText('Sydney suburb');
-    getByPlaceholderText('Tell potential partners a bit about yourself...');
+    // Bio moved to Step 2 (Slice B) — Step 1 must no longer render the bio field.
+    expect(queryByPlaceholderText('Tell potential partners a bit about yourself...')).toBeNull();
   });
 
   // ── Year option bounds ─────────────────────────────────────────────────────
@@ -216,7 +217,6 @@ describe('OnboardingStep1Screen', () => {
         displayName: 'Jordan Lee',
         birthYear: 1990,
         suburb: 'Newtown',
-        bio: undefined,
       });
     });
   });

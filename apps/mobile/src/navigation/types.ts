@@ -12,6 +12,7 @@ export type RootStackParamList = {
   OnboardingStep1: undefined;
   OnboardingStep2: undefined;
   OnboardingStep3: undefined;
+  OnboardingStep4: undefined;
   Main: undefined;
   Chat: { matchId: string; partnerName: string; partnerId: string; sport: string };
   BookingComposer: { matchId: string; sport: string };
@@ -37,6 +38,7 @@ export type RegisterScreenProps = NativeStackScreenProps<RootStackParamList, 'Re
 export type OnboardingStep1ScreenProps = NativeStackScreenProps<RootStackParamList, 'OnboardingStep1'>;
 export type OnboardingStep2ScreenProps = NativeStackScreenProps<RootStackParamList, 'OnboardingStep2'>;
 export type OnboardingStep3ScreenProps = NativeStackScreenProps<RootStackParamList, 'OnboardingStep3'>;
+export type OnboardingStep4ScreenProps = NativeStackScreenProps<RootStackParamList, 'OnboardingStep4'>;
 
 export type DiscoveryScreenProps = BottomTabScreenProps<MainTabParamList, 'Discovery'>;
 export type MatchesScreenProps = BottomTabScreenProps<MainTabParamList, 'Matches'>;

@@ -7,127 +7,73 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { FitnessLevel, PreferredTime, Sport, UpsertSportProfileRequest } from '@protin/shared-types';
 
 import { Screen } from '../../components/Screen';
 import { useProfileStore } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
+import type { GenderPreference } from '@protin/shared-types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingStep3'>;
 
-type Level = FitnessLevel;
-type TimeSlot = PreferredTime;
-
-const LEVELS: { value: Level; label: string }[] = [
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'intermediate', label: 'Intermediate' },
-  { value: 'advanced', label: 'Advanced' },
+const OPEN_TO_OPTIONS: { value: GenderPreference; label: string }[] = [
+  { value: 'any', label: 'Any' },
+  { value: 'male', label: 'Men' },
+  { value: 'female', label: 'Women' },
+  { value: 'non_binary', label: 'Non-binary' },
 ];
 
-const TIME_SLOTS: { value: TimeSlot; label: string }[] = [
-  { value: 'morning', label: 'Morning' },
-  { value: 'afternoon', label: 'Afternoon' },
-  { value: 'evening', label: 'Evening' },
-  { value: 'flexible', label: 'Flexible' },
-];
-
-interface SportConfig {
-  value: Sport;
-  label: string;
-  venueLabel?: string;
-  venuePlaceholder?: string;
-}
-
-const SPORT_CONFIG: SportConfig[] = [
-  { value: 'gym', label: 'Gym', venueLabel: 'Gym name (optional)', venuePlaceholder: 'e.g. Fitness First Surry Hills' },
-  { value: 'golf', label: 'Golf', venueLabel: 'Golf club (optional)', venuePlaceholder: 'e.g. Royal Sydney Golf Club' },
-  { value: 'tennis', label: 'Tennis', venueLabel: 'Tennis club (optional)', venuePlaceholder: 'e.g. White City Tennis Club' },
-  { value: 'running', label: 'Running', venueLabel: 'Regular route (optional)', venuePlaceholder: 'e.g. Centennial Park loop' },
-];
-
-interface SportFormState {
-  level: Level;
-  times: TimeSlot[];
-  venueName: string;
-}
-
-const DEFAULT_SPORT_STATE: SportFormState = {
-  level: 'beginner',
-  times: [],
-  venueName: '',
-};
-
-function makeInitialStates(): Record<Sport, SportFormState> {
-  return {
-    gym: { ...DEFAULT_SPORT_STATE },
-    golf: { ...DEFAULT_SPORT_STATE },
-    tennis: { ...DEFAULT_SPORT_STATE },
-    running: { ...DEFAULT_SPORT_STATE },
-  };
-}
+const DISTANCE_OPTIONS = [5, 10, 20, 50];
 
 export function OnboardingStep3Screen({ navigation }: Props) {
-  const [selected, setSelected] = useState<Set<Sport>>(new Set());
-  const [sportStates, setSportStates] = useState<Record<Sport, SportFormState>>(makeInitialStates);
-  const [goals, setGoals] = useState('');
+  const [openTo, setOpenTo] = useState<GenderPreference[]>(['any']);
+  const [ageMin, setAgeMin] = useState('18');
+  const [ageMax, setAgeMax] = useState('65');
+  const [maxDistance, setMaxDistance] = useState<number>(20);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { upsertSportProfile } = useProfileStore();
+  const { upsertIdentityPreferences } = useProfileStore();
 
-  function toggleSport(sport: Sport) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(sport)) next.delete(sport); else next.add(sport);
-      return next;
+  function toggleOpenTo(value: GenderPreference) {
+    if (value === 'any') {
+      setOpenTo(['any']);
+      return;
+    }
+    setOpenTo((prev) => {
+      const withoutAny = prev.filter((v) => v !== 'any');
+      if (withoutAny.includes(value)) {
+        const next = withoutAny.filter((v) => v !== value);
+        return next.length === 0 ? ['any'] : next;
+      }
+      return [...withoutAny, value];
     });
   }
 
-  function updateSportState(sport: Sport, patch: Partial<SportFormState>) {
-    setSportStates((prev) => ({ ...prev, [sport]: { ...prev[sport], ...patch } }));
-  }
-
-  function toggleTime(sport: Sport, time: TimeSlot) {
-    const times = sportStates[sport].times;
-    updateSportState(sport, {
-      times: times.includes(time) ? times.filter((t) => t !== time) : [...times, time],
-    });
-  }
-
-  async function handleFinish() {
+  async function handleContinue() {
     setError(null);
-    if (selected.size === 0) {
-      setError('Please select at least one sport.');
+    const ageMinNum = parseInt(ageMin, 10);
+    const ageMaxNum = parseInt(ageMax, 10);
+    if (isNaN(ageMinNum) || isNaN(ageMaxNum) || ageMinNum < 18 || ageMaxNum > 65 || ageMinNum > ageMaxNum) {
+      setError('Please enter a valid age range (18–65).');
       return;
     }
     setIsSubmitting(true);
     try {
-      const goalsValue = goals.trim() || undefined;
-      await Promise.all(
-        [...selected].map((sport) => {
-          const state = sportStates[sport];
-          const profile: UpsertSportProfileRequest = {
-            sport,
-            level: state.level,
-            preferredTimes: state.times,
-            gymName: sport === 'gym' ? state.venueName.trim() || undefined : undefined,
-            golfClub: sport === 'golf' ? state.venueName.trim() || undefined : undefined,
-            goals: goalsValue,
-          };
-          return upsertSportProfile(profile);
-        })
-      );
-      navigation.replace('Main');
+      await upsertIdentityPreferences({
+        openTo,
+        ageRangeMin: ageMinNum,
+        ageRangeMax: ageMaxNum,
+        maxDistanceKm: maxDistance,
+      });
+      navigation.navigate('OnboardingStep4');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save sport profile. Please try again.');
+      setError(err instanceof Error ? err.message : 'Could not save preferences. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   }
-
-  const anySelected = selected.size > 0;
 
   return (
     <Screen padded scroll>
@@ -136,36 +82,41 @@ export function OnboardingStep3Screen({ navigation }: Props) {
         <View style={styles.dot} />
         <View style={styles.dot} />
         <View style={[styles.dot, styles.dotActive]} />
-        <Text style={styles.stepLabel}>Step 3 of 3</Text>
+        <View style={styles.dot} />
+        <Text style={styles.stepLabel}>Step 3 of 4</Text>
       </View>
 
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>Sport profile</Text>
-        <Text style={styles.title}>Your sport{'\n'}profile</Text>
-        <Text style={styles.subtitle}>Tell us what you train, so we can match you better.</Text>
+        <Text style={styles.eyebrow}>Preferences</Text>
+        <Text style={styles.title}>Your partner{'\n'}preferences</Text>
+        <Text style={styles.subtitle}>We use this to show you relevant workout partners.</Text>
       </View>
 
-      {/* Sport selection */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Which sports are you into?</Text>
+        <Text style={styles.sectionTitle}>I'm open to training with</Text>
         <View style={styles.toggleRow}>
-          {SPORT_CONFIG.map(({ value, label }) => {
-            const isOn = selected.has(value);
+          {OPEN_TO_OPTIONS.map((opt) => {
+            const isSelected = openTo.includes(opt.value);
             return (
               <Pressable
-                key={value}
+                key={opt.value}
                 style={({ pressed }) => [
                   styles.toggleButton,
-                  isOn && styles.toggleButtonActive,
+                  isSelected && styles.toggleButtonActive,
                   pressed && styles.pressed,
                 ]}
-                onPress={() => toggleSport(value)}
+                onPress={() => toggleOpenTo(opt.value)}
                 accessibilityRole="checkbox"
-                accessibilityLabel={label}
-                accessibilityState={{ checked: isOn }}
+                accessibilityLabel={opt.label}
+                accessibilityState={{ checked: isSelected }}
               >
-                <Text style={[styles.toggleButtonText, isOn && styles.toggleButtonTextActive]}>
-                  {label}
+                <Text
+                  style={[
+                    styles.toggleButtonText,
+                    isSelected && styles.toggleButtonTextActive,
+                  ]}
+                >
+                  {opt.label}
                 </Text>
               </Pressable>
             );
@@ -173,43 +124,68 @@ export function OnboardingStep3Screen({ navigation }: Props) {
         </View>
       </View>
 
-      {/* Per-sport detail sections */}
-      {SPORT_CONFIG.filter(({ value }) => selected.has(value)).map(
-        ({ value, label, venueLabel, venuePlaceholder }, idx, arr) => (
-          <View key={value}>
-            {idx > 0 && <View style={styles.divider} />}
-            <View style={styles.sportBlock}>
-              <Text style={styles.sportBlockTitle}>{label}</Text>
-              <SportFields
-                state={sportStates[value]}
-                venueLabel={venueLabel}
-                venuePlaceholder={venuePlaceholder}
-                onLevelChange={(l) => updateSportState(value, { level: l })}
-                onTimeToggle={(t) => toggleTime(value, t)}
-                onVenueChange={(n) => updateSportState(value, { venueName: n })}
-              />
-            </View>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Partner age range</Text>
+        <View style={styles.ageRow}>
+          <View style={styles.ageField}>
+            <Text style={styles.label}>Min age</Text>
+            <TextInput
+              style={styles.ageInput}
+              value={ageMin}
+              onChangeText={setAgeMin}
+              keyboardType="number-pad"
+              maxLength={2}
+              placeholder="18"
+              placeholderTextColor={colors.textTertiary}
+            />
           </View>
-        )
-      )}
-
-      {/* Goals */}
-      {anySelected && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Fitness goals (optional)</Text>
-          <TextInput
-            style={[styles.input, styles.inputMultiline]}
-            value={goals}
-            onChangeText={(t) => setGoals(t.slice(0, 300))}
-            placeholder="What are your fitness goals?"
-            placeholderTextColor={colors.textTertiary}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
-          <Text style={styles.charCount}>{goals.length} / 300</Text>
+          <Text style={styles.ageSeparator}>–</Text>
+          <View style={styles.ageField}>
+            <Text style={styles.label}>Max age</Text>
+            <TextInput
+              style={styles.ageInput}
+              value={ageMax}
+              onChangeText={setAgeMax}
+              keyboardType="number-pad"
+              maxLength={2}
+              placeholder="65"
+              placeholderTextColor={colors.textTertiary}
+            />
+          </View>
         </View>
-      )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Max distance</Text>
+        <View style={styles.toggleRow}>
+          {DISTANCE_OPTIONS.map((km) => {
+            const isSelected = maxDistance === km;
+            return (
+              <Pressable
+                key={km}
+                style={({ pressed }) => [
+                  styles.toggleButton,
+                  isSelected && styles.toggleButtonActive,
+                  pressed && styles.pressed,
+                ]}
+                onPress={() => setMaxDistance(km)}
+                accessibilityRole="radio"
+                accessibilityLabel={`${km} km`}
+                accessibilityState={{ checked: isSelected }}
+              >
+                <Text
+                  style={[
+                    styles.toggleButtonText,
+                    isSelected && styles.toggleButtonTextActive,
+                  ]}
+                >
+                  {km} km
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -218,113 +194,18 @@ export function OnboardingStep3Screen({ navigation }: Props) {
           styles.buttonPrimary,
           (pressed || isSubmitting) && styles.pressed,
         ]}
-        onPress={handleFinish}
+        onPress={handleContinue}
         disabled={isSubmitting}
         accessibilityRole="button"
-        accessibilityLabel="Let's go"
+        accessibilityLabel="Continue"
       >
         {isSubmitting ? (
           <ActivityIndicator color={colors.textInverse} />
         ) : (
-          <Text style={styles.buttonPrimaryText}>Let's go</Text>
+          <Text style={styles.buttonPrimaryText}>Continue</Text>
         )}
       </Pressable>
     </Screen>
-  );
-}
-
-// ─── Inline sub-component ─────────────────────────────────────────────────────
-
-interface SportFieldsProps {
-  state: SportFormState;
-  venuePlaceholder?: string;
-  venueLabel?: string;
-  onLevelChange: (l: Level) => void;
-  onTimeToggle: (t: TimeSlot) => void;
-  onVenueChange: (n: string) => void;
-}
-
-function SportFields({
-  state,
-  venuePlaceholder,
-  venueLabel,
-  onLevelChange,
-  onTimeToggle,
-  onVenueChange,
-}: SportFieldsProps) {
-  return (
-    <View style={styles.sportFieldsContainer}>
-      {/* Level */}
-      <View style={styles.subSection}>
-        <Text style={styles.subSectionTitle}>Level</Text>
-        <View style={styles.toggleRow}>
-          {LEVELS.map((lv) => {
-            const isSelected = state.level === lv.value;
-            return (
-              <Pressable
-                key={lv.value}
-                style={({ pressed }) => [
-                  styles.toggleButton,
-                  isSelected && styles.toggleButtonActive,
-                  pressed && styles.pressed,
-                ]}
-                onPress={() => onLevelChange(lv.value)}
-                accessibilityRole="radio"
-                accessibilityLabel={lv.label}
-                accessibilityState={{ checked: isSelected }}
-              >
-                <Text style={[styles.toggleButtonText, isSelected && styles.toggleButtonTextActive]}>
-                  {lv.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Preferred times */}
-      <View style={styles.subSection}>
-        <Text style={styles.subSectionTitle}>Preferred times</Text>
-        <View style={styles.toggleRow}>
-          {TIME_SLOTS.map(({ value, label }) => {
-            const isSelected = state.times.includes(value);
-            return (
-              <Pressable
-                key={value}
-                style={({ pressed }) => [
-                  styles.toggleButton,
-                  isSelected && styles.toggleButtonActive,
-                  pressed && styles.pressed,
-                ]}
-                onPress={() => onTimeToggle(value)}
-                accessibilityRole="checkbox"
-                accessibilityLabel={label}
-                accessibilityState={{ checked: isSelected }}
-              >
-                <Text style={[styles.toggleButtonText, isSelected && styles.toggleButtonTextActive]}>
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Venue — only rendered when the sport has a venue concept */}
-      {venueLabel ? (
-        <View style={styles.subSection}>
-          <Text style={styles.subSectionTitle}>{venueLabel}</Text>
-          <TextInput
-            style={styles.input}
-            value={state.venueName}
-            onChangeText={onVenueChange}
-            placeholder={venuePlaceholder}
-            placeholderTextColor={colors.textTertiary}
-            autoCapitalize="words"
-          />
-        </View>
-      ) : null}
-    </View>
   );
 }
 
@@ -399,30 +280,20 @@ const styles = StyleSheet.create({
     color: colors.textInverse,
     fontWeight: '600',
   },
-  sportBlock: {
-    marginBottom: spacing.lg,
-  },
-  sportBlockTitle: {
-    ...typography.h3,
-    color: colors.brand,
-    marginBottom: spacing.md,
-  },
-  sportFieldsContainer: {
+  ageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     gap: spacing.md,
   },
-  subSection: {
-    gap: spacing.sm,
+  ageField: {
+    flex: 1,
+    gap: spacing.xs,
   },
-  subSectionTitle: {
+  label: {
     ...typography.label,
     color: colors.textSecondary,
   },
-  divider: {
-    height: 1,
-    backgroundColor: colors.separator,
-    marginVertical: spacing.lg,
-  },
-  input: {
+  ageInput: {
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radii.md,
@@ -431,15 +302,12 @@ const styles = StyleSheet.create({
     ...typography.bodyLarge,
     color: colors.textPrimary,
     backgroundColor: colors.surface,
+    textAlign: 'center',
   },
-  inputMultiline: {
-    height: 80,
-    paddingTop: spacing.md,
-  },
-  charCount: {
-    ...typography.bodySmall,
+  ageSeparator: {
+    ...typography.h2,
     color: colors.textTertiary,
-    textAlign: 'right',
+    paddingBottom: spacing.sm,
   },
   errorText: {
     ...typography.body,

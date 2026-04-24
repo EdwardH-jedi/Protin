@@ -23,7 +23,6 @@ const MIN_AGE = 18;
 const MAX_AGE = 90;
 export const MAX_BIRTH_YEAR = CURRENT_YEAR - MIN_AGE;
 export const MIN_BIRTH_YEAR = CURRENT_YEAR - MAX_AGE;
-const BIO_MAX = 400;
 
 export function buildYearOptions(): SelectOption[] {
   const years: SelectOption[] = [];
@@ -38,7 +37,6 @@ export function OnboardingStep1Screen({ navigation }: Props) {
   const [displayName, setDisplayName] = useState('');
   const [birthYear, setBirthYear] = useState<string | null>(null);
   const [suburb, setSuburb] = useState<string | null>(null);
-  const [bio, setBio] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -69,7 +67,6 @@ export function OnboardingStep1Screen({ navigation }: Props) {
         displayName: displayName.trim(),
         birthYear: birthYearNum,
         suburb,
-        bio: bio.trim() || undefined,
       });
       navigation.navigate('OnboardingStep2');
     } catch (err) {
@@ -138,21 +135,6 @@ export function OnboardingStep1Screen({ navigation }: Props) {
           modalTitle="Sydney suburb"
           accessibilityLabel="Sydney suburb"
         />
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Bio (optional)</Text>
-          <TextInput
-            style={[styles.input, styles.bioInput]}
-            value={bio}
-            onChangeText={(t) => setBio(t.slice(0, BIO_MAX))}
-            placeholder="Tell potential partners a bit about yourself..."
-            placeholderTextColor={colors.textTertiary}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
-          <Text style={styles.charCount}>{bio.length} / {BIO_MAX}</Text>
-        </View>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -240,18 +222,9 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     backgroundColor: colors.surface,
   },
-  bioInput: {
-    height: 120,
-    paddingTop: spacing.md,
-  },
   hint: {
     ...typography.bodySmall,
     color: colors.textTertiary,
-  },
-  charCount: {
-    ...typography.bodySmall,
-    color: colors.textTertiary,
-    textAlign: 'right',
   },
   errorText: {
     ...typography.body,

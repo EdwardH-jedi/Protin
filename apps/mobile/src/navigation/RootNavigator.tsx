@@ -10,6 +10,7 @@ import { RegisterScreen } from '../screens/auth/RegisterScreen';
 import { OnboardingStep1Screen } from '../screens/onboarding/OnboardingStep1Screen';
 import { OnboardingStep2Screen } from '../screens/onboarding/OnboardingStep2Screen';
 import { OnboardingStep3Screen } from '../screens/onboarding/OnboardingStep3Screen';
+import { OnboardingStep4Screen } from '../screens/onboarding/OnboardingStep4Screen';
 import { DiscoveryScreen } from '../screens/discovery/DiscoveryScreen';
 import { MatchesScreen } from '../screens/matches/MatchesScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
@@ -117,6 +118,11 @@ export function RootNavigator() {
         <Stack.Screen
           name="OnboardingStep3"
           component={OnboardingStep3Screen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="OnboardingStep4"
+          component={OnboardingStep4Screen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen

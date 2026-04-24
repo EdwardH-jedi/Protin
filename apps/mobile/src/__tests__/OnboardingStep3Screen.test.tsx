@@ -1,5 +1,6 @@
 /**
- * OnboardingStep3Screen tests
+ * OnboardingStep3Screen tests (identity preferences, renumbered to 3 of 4
+ * after Slice B inserted photos + bio as Step 2).
  *
  * Mocks:
  *  - stores/profile (useProfileStore)
@@ -14,7 +15,7 @@ import { OnboardingStep3Screen } from '../screens/onboarding/OnboardingStep3Scre
 
 // ─── Mock profile store ───────────────────────────────────────────────────────
 
-const mockUpsertSportProfile = jest.fn();
+const mockUpsertIdentityPreferences = jest.fn();
 
 jest.mock('../stores/profile', () => ({
   useProfileStore: jest.fn(),
@@ -54,7 +55,7 @@ function makeNavigation() {
 function setupStore() {
   const { useProfileStore } = require('../stores/profile');
   (useProfileStore as jest.Mock).mockReturnValue({
-    upsertSportProfile: mockUpsertSportProfile,
+    upsertIdentityPreferences: mockUpsertIdentityPreferences,
   });
 }
 
@@ -68,133 +69,124 @@ describe('OnboardingStep3Screen', () => {
 
   // ── Rendering ──────────────────────────────────────────────────────────────
 
-  it('renders the step indicator', () => {
+  it('renders the step indicator for 4-step flow', () => {
     const { getByText } = render(
       <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
     );
-    getByText('Step 3 of 3');
+    getByText('Step 3 of 4');
   });
 
-  it('renders all four sport options', () => {
+  it('renders the preference options', () => {
+    const { getByText } = render(
+      <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    getByText('Any');
+    getByText('Men');
+    getByText('Women');
+    getByText('Non-binary');
+  });
+
+  it('renders the distance options', () => {
+    const { getByText } = render(
+      <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    getByText('5 km');
+    getByText('10 km');
+    getByText('20 km');
+    getByText('50 km');
+  });
+
+  // ── Open-to toggles ────────────────────────────────────────────────────────
+
+  it('starts with Any selected', () => {
     const { getByRole } = render(
       <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
     );
-    getByRole('checkbox', { name: 'Gym' });
-    getByRole('checkbox', { name: 'Golf' });
-    getByRole('checkbox', { name: 'Tennis' });
-    getByRole('checkbox', { name: 'Running' });
+    const anyCheckbox = getByRole('checkbox', { name: 'Any' });
+    expect(anyCheckbox.props.accessibilityState.checked).toBe(true);
   });
 
-  it('renders the Let\'s go button', () => {
-    const { getByText } = render(
+  it('deselects Any when another option is tapped', () => {
+    const { getByRole } = render(
       <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
     );
-    getByText("Let's go");
+    fireEvent.press(getByRole('checkbox', { name: 'Men' }));
+    expect(getByRole('checkbox', { name: 'Any' }).props.accessibilityState.checked).toBe(false);
+    expect(getByRole('checkbox', { name: 'Men' }).props.accessibilityState.checked).toBe(true);
+  });
+
+  it('resets to Any when the last non-any option is deselected', () => {
+    const { getByRole } = render(
+      <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    fireEvent.press(getByRole('checkbox', { name: 'Women' }));
+    fireEvent.press(getByRole('checkbox', { name: 'Women' })); // deselect
+    expect(getByRole('checkbox', { name: 'Any' }).props.accessibilityState.checked).toBe(true);
   });
 
   // ── Validation ─────────────────────────────────────────────────────────────
 
-  it('shows error when no sport is selected', async () => {
-    const { getByText } = render(
+  it('shows error for an invalid age range (min > max)', async () => {
+    const { getByText, getByPlaceholderText } = render(
       <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
     );
-    fireEvent.press(getByText("Let's go"));
-    await waitFor(() => getByText('Please select at least one sport.'));
-    expect(mockUpsertSportProfile).not.toHaveBeenCalled();
+    fireEvent.changeText(getByPlaceholderText('18'), '50');
+    fireEvent.changeText(getByPlaceholderText('65'), '30');
+    fireEvent.press(getByText('Continue'));
+    await waitFor(() => getByText('Please enter a valid age range (18–65).'));
+    expect(mockUpsertIdentityPreferences).not.toHaveBeenCalled();
   });
 
-  // ── Sport selection ────────────────────────────────────────────────────────
-
-  it('shows sport detail fields when a sport is selected', () => {
-    const { getByRole, getByText } = render(
+  it('shows error when min age is below 18', async () => {
+    const { getByText, getByPlaceholderText } = render(
       <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
     );
-    fireEvent.press(getByRole('checkbox', { name: 'Gym' }));
-    // Level radios should appear
-    getByText('Beginner');
-    getByText('Intermediate');
-    getByText('Advanced');
-  });
-
-  it('hides detail fields when a sport is deselected', () => {
-    const { getByRole, queryByText } = render(
-      <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
-    );
-    fireEvent.press(getByRole('checkbox', { name: 'Gym' }));
-    fireEvent.press(getByRole('checkbox', { name: 'Gym' })); // deselect
-    expect(queryByText('Beginner')).toBeNull();
-  });
-
-  it('shows preferred time slots once a sport is selected', () => {
-    const { getByRole, getByText } = render(
-      <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
-    );
-    fireEvent.press(getByRole('checkbox', { name: 'Golf' }));
-    getByText('Morning');
-    getByText('Afternoon');
-    getByText('Evening');
-    getByText('Flexible');
+    fireEvent.changeText(getByPlaceholderText('18'), '16');
+    fireEvent.press(getByText('Continue'));
+    await waitFor(() => getByText('Please enter a valid age range (18–65).'));
   });
 
   // ── Successful submit ──────────────────────────────────────────────────────
 
-  it('calls upsertSportProfile once when a single sport is selected', async () => {
-    mockUpsertSportProfile.mockResolvedValue(undefined);
+  it('calls upsertIdentityPreferences with correct defaults', async () => {
+    mockUpsertIdentityPreferences.mockResolvedValue(undefined);
     const nav = makeNavigation();
-    const { getByRole, getByText } = render(
+    const { getByText } = render(
       <OnboardingStep3Screen navigation={nav as any} route={{} as any} />
     );
-    fireEvent.press(getByRole('checkbox', { name: 'Gym' }));
-    fireEvent.press(getByText("Let's go"));
+    fireEvent.press(getByText('Continue'));
     await waitFor(() => {
-      expect(mockUpsertSportProfile).toHaveBeenCalledTimes(1);
-      expect(mockUpsertSportProfile).toHaveBeenCalledWith(
-        expect.objectContaining({ sport: 'gym', level: 'beginner' })
-      );
+      expect(mockUpsertIdentityPreferences).toHaveBeenCalledWith({
+        openTo: ['any'],
+        ageRangeMin: 18,
+        ageRangeMax: 65,
+        maxDistanceKm: 20,
+      });
     });
   });
 
-  it('calls upsertSportProfile for each selected sport', async () => {
-    mockUpsertSportProfile.mockResolvedValue(undefined);
+  it('navigates to OnboardingStep4 on success', async () => {
+    mockUpsertIdentityPreferences.mockResolvedValue(undefined);
     const nav = makeNavigation();
-    const { getByRole, getByText } = render(
+    const { getByText } = render(
       <OnboardingStep3Screen navigation={nav as any} route={{} as any} />
     );
-    fireEvent.press(getByRole('checkbox', { name: 'Gym' }));
-    fireEvent.press(getByRole('checkbox', { name: 'Golf' }));
-    fireEvent.press(getByText("Let's go"));
+    fireEvent.press(getByText('Continue'));
     await waitFor(() => {
-      expect(mockUpsertSportProfile).toHaveBeenCalledTimes(2);
-    });
-    const sports = mockUpsertSportProfile.mock.calls.map((c: any[]) => c[0].sport);
-    expect(sports).toContain('gym');
-    expect(sports).toContain('golf');
-  });
-
-  it('navigates to Main after successful submission', async () => {
-    mockUpsertSportProfile.mockResolvedValue(undefined);
-    const nav = makeNavigation();
-    const { getByRole, getByText } = render(
-      <OnboardingStep3Screen navigation={nav as any} route={{} as any} />
-    );
-    fireEvent.press(getByRole('checkbox', { name: 'Running' }));
-    fireEvent.press(getByText("Let's go"));
-    await waitFor(() => {
-      expect(nav.replace).toHaveBeenCalledWith('Main');
+      expect(nav.navigate).toHaveBeenCalledWith('OnboardingStep4');
     });
   });
 
   // ── API error ──────────────────────────────────────────────────────────────
 
-  it('shows error message when upsertSportProfile fails', async () => {
-    mockUpsertSportProfile.mockRejectedValue(new Error('Save failed'));
+  it('shows error message when upsertIdentityPreferences fails', async () => {
+    mockUpsertIdentityPreferences.mockRejectedValue(new Error('Network error'));
     const nav = makeNavigation();
-    const { getByRole, getByText } = render(
+    const { getByText } = render(
       <OnboardingStep3Screen navigation={nav as any} route={{} as any} />
     );
-    fireEvent.press(getByRole('checkbox', { name: 'Tennis' }));
-    fireEvent.press(getByText("Let's go"));
-    await waitFor(() => getByText('Save failed'));
-    expect(nav.replace).not.toHaveBeenCalled();
+    fireEvent.press(getByText('Continue'));
+    await waitFor(() => getByText('Network error'));
+    expect(nav.navigate).not.toHaveBeenCalled();
   });
 });

@@ -27,8 +27,14 @@ interface ProfileState {
   profile: UserProfile | null;
   identityPreferences: IdentityPreferences | null;
   sportProfiles: SportProfile[] | null;
+  // Local-only: the backend currently persists a single avatar_url and has no
+  // multi-photo column. Slice B keeps selected photo URIs in memory so the
+  // onboarding UI can enforce min/max and continue the flow. Real upload /
+  // persistence is deferred to a later slice.
+  photoUris: string[];
   fetchProfile: () => Promise<void>;
   upsertProfile: (data: Partial<UserProfile>) => Promise<void>;
+  setPhotoUris: (uris: string[]) => void;
   upsertIdentityPreferences: (data: SetIdentityPreferencesRequest) => Promise<void>;
   upsertSportProfile: (data: UpsertSportProfileRequest) => Promise<void>;
 }
@@ -37,6 +43,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   profile: null,
   identityPreferences: null,
   sportProfiles: null,
+  photoUris: [],
 
   fetchProfile: async () => {
     const profile = await api.get<UserProfile>('/users/me/profile');
@@ -48,6 +55,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   upsertProfile: async (data) => {
     const updated = await api.put<UserProfile>('/users/me/profile', data);
     set({ profile: updated });
+  },
+
+  setPhotoUris: (uris) => {
+    set({ photoUris: uris });
   },
 
   upsertIdentityPreferences: async (data) => {
