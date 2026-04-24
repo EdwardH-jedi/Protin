@@ -82,7 +82,8 @@ export function OnboardingStep1Screen({ navigation }: Props) {
         <View style={[styles.dot, styles.dotActive]} />
         <View style={styles.dot} />
         <View style={styles.dot} />
-        <Text style={styles.stepLabel}>Step 1 of 3</Text>
+        <View style={styles.dot} />
+        <Text style={styles.stepLabel}>Step 1 of 4</Text>
       </View>
 
       <View style={styles.header}>

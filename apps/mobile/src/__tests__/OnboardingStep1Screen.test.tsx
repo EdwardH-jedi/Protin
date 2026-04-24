@@ -98,7 +98,7 @@ describe('OnboardingStep1Screen', () => {
     const { getByText } = render(
       <OnboardingStep1Screen navigation={makeNavigation() as any} route={{} as any} />
     );
-    getByText('Step 1 of 3');
+    getByText('Step 1 of 4');
   });
 
   it('renders the profile title', () => {

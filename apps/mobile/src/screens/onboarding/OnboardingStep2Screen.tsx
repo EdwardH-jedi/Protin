@@ -25,7 +25,9 @@ const BIO_MAX = 400;
 
 export function OnboardingStep2Screen({ navigation }: Props) {
   const { profile, photoUris, setPhotoUris, upsertProfile } = useProfileStore();
-  const [photos, setPhotos] = useState<string[]>(photoUris);
+  // Hard-clamp hydrated state to MAX_PHOTOS so an over-long persisted/preloaded
+  // list cannot silently survive into the screen's working copy.
+  const [photos, setPhotos] = useState<string[]>(() => photoUris.slice(0, MAX_PHOTOS));
   const [bio, setBio] = useState<string>(profile?.bio ?? '');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,6 +65,13 @@ export function OnboardingStep2Screen({ navigation }: Props) {
     setError(null);
     if (photos.length < MIN_PHOTOS) {
       setError(`Please add at least ${MIN_PHOTOS} photos.`);
+      return;
+    }
+    if (photos.length > MAX_PHOTOS) {
+      // Defence-in-depth against malformed hydrated state: the picker already
+      // refuses to add past MAX_PHOTOS, but submit must also reject it rather
+      // than silently persisting an over-long list downstream.
+      setError(`You can only keep up to ${MAX_PHOTOS} photos.`);
       return;
     }
     const trimmedBio = bio.trim();
