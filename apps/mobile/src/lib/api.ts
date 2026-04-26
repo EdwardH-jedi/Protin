@@ -49,7 +49,8 @@ function transformKeys(obj: unknown, transform: (k: string) => string): unknown 
 async function request<T>(
   method: string,
   path: string,
-  body?: unknown
+  body?: unknown,
+  options?: { form?: boolean }
 ): Promise<T> {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
 
@@ -67,8 +68,14 @@ async function request<T>(
   }
 
   if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    init.body = JSON.stringify(transformKeys(body, toSnakeCase));
+    if (options?.form) {
+      // Multipart: let fetch set Content-Type with the boundary. Snake-case
+      // key transformation does not apply to FormData fields.
+      init.body = body as BodyInit;
+    } else {
+      headers['Content-Type'] = 'application/json';
+      init.body = JSON.stringify(transformKeys(body, toSnakeCase));
+    }
   }
 
   const controller = new AbortController();
@@ -148,6 +155,9 @@ export const api = {
   },
   put<T>(path: string, body?: unknown): Promise<T> {
     return request<T>('PUT', path, body);
+  },
+  putForm<T>(path: string, form: FormData): Promise<T> {
+    return request<T>('PUT', path, form, { form: true });
   },
   patch<T>(path: string, body?: unknown): Promise<T> {
     return request<T>('PATCH', path, body);

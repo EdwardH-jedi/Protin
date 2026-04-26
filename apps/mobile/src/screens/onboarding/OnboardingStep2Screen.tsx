@@ -24,7 +24,7 @@ export const MAX_PHOTOS = 4;
 const BIO_MAX = 400;
 
 export function OnboardingStep2Screen({ navigation }: Props) {
-  const { profile, photoUris, setPhotoUris, upsertProfile } = useProfileStore();
+  const { profile, photoUris, uploadProfilePhotos, upsertProfile } = useProfileStore();
   // Hard-clamp hydrated state to MAX_PHOTOS so an over-long persisted/preloaded
   // list cannot silently survive into the screen's working copy.
   const [photos, setPhotos] = useState<string[]>(() => photoUris.slice(0, MAX_PHOTOS));
@@ -87,16 +87,19 @@ export function OnboardingStep2Screen({ navigation }: Props) {
     }
     setIsSubmitting(true);
     try {
+      // Upload photos first: avatar_url on the profile is synced server-side
+      // to the first photo, so persisting bio afterwards keeps the latest
+      // updated_at while preserving the server-assigned avatar.
+      await uploadProfilePhotos(photos);
       await upsertProfile({
         displayName: profile.displayName,
         birthYear: profile.birthYear,
         suburb: profile.suburb,
         bio: trimmedBio,
       });
-      setPhotoUris(photos);
       navigation.navigate('OnboardingStep3');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save bio. Please try again.');
+      setError(err instanceof Error ? err.message : 'Could not save your photos and bio. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

@@ -8,7 +8,7 @@ import type {
   UserProfile,
 } from '@protin/shared-types';
 
-import { api } from '../lib/api';
+import { api, BASE_URL } from '../lib/api';
 
 export type SportType = Sport;
 
@@ -23,20 +23,61 @@ export function sportLabel(sport: string): string {
   return SPORT_LABELS[sport as SportType] ?? sport.charAt(0).toUpperCase() + sport.slice(1);
 }
 
+interface ProfilePhotoResponse {
+  id: string;
+  photoUrl: string;
+  position: number;
+}
+
+interface ProfilePhotosResponse {
+  photos: ProfilePhotoResponse[];
+  avatarUrl: string | null;
+}
+
+// The backend returns media URLs as relative paths (e.g. "/media/...") served
+// from the same API origin. React Native's <Image> needs absolute URLs, so we
+// prepend the API base URL when the value is relative.
+function absolutizeMediaUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  const path = url.startsWith('/') ? url : `/${url}`;
+  return `${BASE_URL}${path}`;
+}
+
+// Profile responses now include the persisted ordered photo list so the app
+// can rehydrate after restart/store reset.
+type ProfileResponse = UserProfile & { photos?: ProfilePhotoResponse[] };
+
 interface ProfileState {
   profile: UserProfile | null;
   identityPreferences: IdentityPreferences | null;
   sportProfiles: SportProfile[] | null;
-  // Local-only: the backend currently persists a single avatar_url and has no
-  // multi-photo column. Slice B keeps selected photo URIs in memory so the
-  // onboarding UI can enforce min/max and continue the flow. Real upload /
-  // persistence is deferred to a later slice.
+  // URLs returned by the backend after a successful PUT /users/me/photos.
+  // Locally selected file URIs are held in screen-local state and are not
+  // promoted into the store until the backend has persisted them.
   photoUris: string[];
   fetchProfile: () => Promise<void>;
   upsertProfile: (data: Partial<UserProfile>) => Promise<void>;
-  setPhotoUris: (uris: string[]) => void;
+  uploadProfilePhotos: (uris: string[]) => Promise<string[]>;
   upsertIdentityPreferences: (data: SetIdentityPreferencesRequest) => Promise<void>;
   upsertSportProfile: (data: UpsertSportProfileRequest) => Promise<void>;
+}
+
+function inferMimeFromUri(uri: string): string {
+  const lower = uri.toLowerCase().split('?')[0];
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.heic') || lower.endsWith('.heif')) return 'image/heic';
+  return 'image/jpeg';
+}
+
+function inferNameFromUri(uri: string, index: number): string {
+  const tail = uri.split('/').pop() ?? '';
+  const cleaned = tail.split('?')[0];
+  if (cleaned && /\.[a-z0-9]+$/i.test(cleaned)) return cleaned;
+  const mime = inferMimeFromUri(uri);
+  const ext = mime.split('/')[1] ?? 'jpg';
+  return `photo_${index}.${ext}`;
 }
 
 export const useProfileStore = create<ProfileState>((set, get) => ({
@@ -46,19 +87,53 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   photoUris: [],
 
   fetchProfile: async () => {
-    const profile = await api.get<UserProfile>('/users/me/profile');
+    const raw = await api.get<ProfileResponse>('/users/me/profile');
     const identityPreferences = await api.get<IdentityPreferences>('/users/me/identity-preferences');
     const sportProfiles = await api.get<SportProfile[]>('/users/me/sport-profiles');
-    set({ profile, identityPreferences, sportProfiles });
+    const photoUris = (raw.photos ?? [])
+      .slice()
+      .sort((a, b) => a.position - b.position)
+      .map((p) => absolutizeMediaUrl(p.photoUrl))
+      .filter((u): u is string => u !== null);
+    const { photos: _photos, ...profileFields } = raw;
+    const profile: UserProfile = {
+      ...profileFields,
+      avatarUrl: absolutizeMediaUrl(profileFields.avatarUrl) ?? undefined,
+    };
+    set({ profile, identityPreferences, sportProfiles, photoUris });
   },
 
   upsertProfile: async (data) => {
-    const updated = await api.put<UserProfile>('/users/me/profile', data);
+    const raw = await api.put<ProfileResponse>('/users/me/profile', data);
+    const { photos: _photos, ...profileFields } = raw;
+    const updated: UserProfile = {
+      ...profileFields,
+      avatarUrl: absolutizeMediaUrl(profileFields.avatarUrl) ?? undefined,
+    };
     set({ profile: updated });
   },
 
-  setPhotoUris: (uris) => {
-    set({ photoUris: uris });
+  uploadProfilePhotos: async (uris) => {
+    const form = new FormData();
+    uris.forEach((uri, index) => {
+      form.append('files', {
+        uri,
+        name: inferNameFromUri(uri, index),
+        type: inferMimeFromUri(uri),
+      } as unknown as Blob);
+    });
+    const response = await api.putForm<ProfilePhotosResponse>('/users/me/photos', form);
+    const photoUrls = response.photos
+      .map((p) => absolutizeMediaUrl(p.photoUrl))
+      .filter((u): u is string => u !== null);
+    const absoluteAvatar = absolutizeMediaUrl(response.avatarUrl) ?? undefined;
+    set((state) => ({
+      photoUris: photoUrls,
+      profile: state.profile
+        ? { ...state.profile, avatarUrl: absoluteAvatar ?? state.profile.avatarUrl }
+        : state.profile,
+    }));
+    return photoUrls;
   },
 
   upsertIdentityPreferences: async (data) => {

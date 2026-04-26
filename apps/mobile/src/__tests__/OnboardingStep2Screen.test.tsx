@@ -32,7 +32,7 @@ const ImagePicker = require('expo-image-picker');
 // ─── Mock profile store ───────────────────────────────────────────────────────
 
 const mockUpsertProfile = jest.fn();
-const mockSetPhotoUris = jest.fn();
+const mockUploadProfilePhotos = jest.fn();
 
 jest.mock('../stores/profile', () => ({
   useProfileStore: jest.fn(),
@@ -83,7 +83,7 @@ function setupStore(overrides: Record<string, unknown> = {}) {
       updatedAt: '2026-01-01T00:00:00Z',
     },
     photoUris: [],
-    setPhotoUris: mockSetPhotoUris,
+    uploadProfilePhotos: mockUploadProfilePhotos,
     upsertProfile: mockUpsertProfile,
     ...overrides,
   });
@@ -213,7 +213,11 @@ describe('OnboardingStep2Screen', () => {
 
   // ── Successful submit ──────────────────────────────────────────────────────
 
-  it('persists bio via upsertProfile and photos via setPhotoUris, then navigates', async () => {
+  it('uploads photos to the backend and persists bio, then navigates', async () => {
+    mockUploadProfilePhotos.mockResolvedValue([
+      'https://api/media/profile_photos/u1/00.jpg',
+      'https://api/media/profile_photos/u1/01.jpg',
+    ]);
     mockUpsertProfile.mockResolvedValue(undefined);
     const nav = makeNavigation();
     const utils = render(
@@ -224,23 +228,42 @@ describe('OnboardingStep2Screen', () => {
     fireEvent.changeText(utils.getByLabelText('Bio'), '  Early-morning runner in the Inner West.  ');
     fireEvent.press(utils.getByLabelText('Continue'));
     await waitFor(() => {
-      expect(mockUpsertProfile).toHaveBeenCalledWith({
-        displayName: 'Jordan Lee',
-        birthYear: 1990,
-        suburb: 'Newtown',
-        bio: 'Early-morning runner in the Inner West.',
-      });
+      expect(mockUploadProfilePhotos).toHaveBeenCalledWith([
+        'file:///tmp/p1.jpg',
+        'file:///tmp/p2.jpg',
+      ]);
     });
-    expect(mockSetPhotoUris).toHaveBeenCalledWith([
-      'file:///tmp/p1.jpg',
-      'file:///tmp/p2.jpg',
-    ]);
+    expect(mockUpsertProfile).toHaveBeenCalledWith({
+      displayName: 'Jordan Lee',
+      birthYear: 1990,
+      suburb: 'Newtown',
+      bio: 'Early-morning runner in the Inner West.',
+    });
     expect(nav.navigate).toHaveBeenCalledWith('OnboardingStep3');
   });
 
   // ── API error ──────────────────────────────────────────────────────────────
 
-  it('shows error message when upsertProfile fails', async () => {
+  it('does not advance and surfaces the error if photo upload fails', async () => {
+    mockUploadProfilePhotos.mockRejectedValue(new Error('Upload failed'));
+    const nav = makeNavigation();
+    const utils = render(
+      <OnboardingStep2Screen navigation={nav as any} route={{} as any} />
+    );
+    await addPhoto(utils, 'Add photo 1', 'file:///tmp/p1.jpg');
+    await addPhoto(utils, 'Add photo 2', 'file:///tmp/p2.jpg');
+    fireEvent.changeText(utils.getByLabelText('Bio'), 'Ready to train.');
+    fireEvent.press(utils.getByLabelText('Continue'));
+    await waitFor(() => utils.getByText('Upload failed'));
+    expect(mockUpsertProfile).not.toHaveBeenCalled();
+    expect(nav.navigate).not.toHaveBeenCalled();
+  });
+
+  it('does not advance if bio persistence fails after a successful upload', async () => {
+    mockUploadProfilePhotos.mockResolvedValue([
+      'https://api/media/profile_photos/u1/00.jpg',
+      'https://api/media/profile_photos/u1/01.jpg',
+    ]);
     mockUpsertProfile.mockRejectedValue(new Error('Server error'));
     const nav = makeNavigation();
     const utils = render(
@@ -251,6 +274,7 @@ describe('OnboardingStep2Screen', () => {
     fireEvent.changeText(utils.getByLabelText('Bio'), 'Ready to train.');
     fireEvent.press(utils.getByLabelText('Continue'));
     await waitFor(() => utils.getByText('Server error'));
+    expect(mockUpsertProfile).toHaveBeenCalled();
     expect(nav.navigate).not.toHaveBeenCalled();
   });
 

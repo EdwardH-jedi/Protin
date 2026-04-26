@@ -1,12 +1,14 @@
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import redis.asyncio as aioredis
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
@@ -118,3 +120,13 @@ app.include_router(google_calendar.booking_sync_router)
 app.include_router(notifications.router)
 app.include_router(notifications.internal_router)
 app.include_router(safety.router)
+
+# Serve uploaded profile photos from local disk in dev. Production replaces
+# this with cloud object storage; the URL prefix stays the same.
+_media_root = Path(settings.media_root)
+_media_root.mkdir(parents=True, exist_ok=True)
+app.mount(
+    settings.media_url_prefix,
+    StaticFiles(directory=_media_root),
+    name="media",
+)

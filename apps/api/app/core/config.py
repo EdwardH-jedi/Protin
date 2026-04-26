@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     # Comma-separated allowed CORS origins. Empty = wildcard (local dev only).
     cors_origins: str = ""
 
+    # Local/dev media storage. Profile photos are written to
+    # ``{media_root}/profile_photos/{user_id}/{file}`` and exposed at
+    # ``{media_url_prefix}/profile_photos/{user_id}/{file}`` via StaticFiles.
+    # Cloud object storage (S3/GCS) is a future replacement.
+    media_root: str = "media"
+    media_url_prefix: str = "/media"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

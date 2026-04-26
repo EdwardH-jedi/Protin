@@ -19,6 +19,14 @@ class UserProfileUpdate(BaseModel):
     suburb: Optional[str] = Field(None, max_length=80)
 
 
+class ProfilePhotoResponse(BaseModel):
+    id: UUID
+    photo_url: str
+    position: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class UserProfileResponse(BaseModel):
     id: UUID
     user_id: UUID
@@ -27,10 +35,16 @@ class UserProfileResponse(BaseModel):
     birth_year: Optional[int]
     suburb: Optional[str]
     avatar_url: Optional[str]
+    photos: list[ProfilePhotoResponse] = []
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProfilePhotosResponse(BaseModel):
+    photos: list[ProfilePhotoResponse]
+    avatar_url: Optional[str]
 
 
 _VALID_OPEN_TO = {"any", "male", "female", "non_binary"}

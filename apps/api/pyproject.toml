@@ -21,6 +21,9 @@ dependencies = [
   "PyJWT>=2.8.0,<3.0.0",
   "httpx>=0.28.0,<1.0.0",
   "slowapi>=0.1.9,<1.0.0",
+  # Required by FastAPI's UploadFile/File for multipart/form-data handling
+  # used by /users/me/photos.
+  "python-multipart>=0.0.20,<1.0.0",
 ]
 
 [tool.uv]

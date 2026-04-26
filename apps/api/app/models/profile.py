@@ -4,10 +4,12 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+PROFILE_PHOTO_MAX = 4
 
 
 class UserProfile(Base):
@@ -24,6 +26,33 @@ class UserProfile(Base):
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
     user: Mapped["User"] = relationship(back_populates="profile")  # noqa: F821
+    photos: Mapped[list["ProfilePhoto"]] = relationship(
+        back_populates="profile",
+        cascade="all, delete-orphan",
+        order_by="ProfilePhoto.position",
+    )
+
+
+class ProfilePhoto(Base):
+    __tablename__ = "profile_photos"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    profile_id: Mapped[UUID] = mapped_column(
+        ForeignKey("user_profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    photo_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    position: Mapped[int] = mapped_column(nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    profile: Mapped["UserProfile"] = relationship(back_populates="photos")
+
+    __table_args__ = (
+        UniqueConstraint("profile_id", "position", name="uq_profile_photos_profile_position"),
+        CheckConstraint(
+            "position >= 0 AND position <= 3",
+            name="ck_profile_photos_position_range",
+        ),
+    )
 
 
 class IdentityPreferences(Base):

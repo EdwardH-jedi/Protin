@@ -1,19 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
-from app.models.profile import IdentityPreferences, SportProfile, UserProfile
+from app.models.profile import IdentityPreferences, ProfilePhoto, SportProfile, UserProfile
 from app.models.user import User
 from app.routers.auth import get_current_user
 from app.schemas.profile import (
     IdentityPreferencesCreate,
     IdentityPreferencesResponse,
+    ProfilePhotosResponse,
     SportProfileCreate,
     SportProfileResponse,
     UserProfileCreate,
     UserProfileResponse,
 )
+from app.services import media_storage
+
+PROFILE_PHOTO_MIN = 2
+PROFILE_PHOTO_MAX = 4
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -23,7 +29,11 @@ async def get_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> UserProfile:
-    result = await db.execute(select(UserProfile).where(UserProfile.user_id == current_user.id))
+    result = await db.execute(
+        select(UserProfile)
+        .options(selectinload(UserProfile.photos))
+        .where(UserProfile.user_id == current_user.id)
+    )
     profile = result.scalar_one_or_none()
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
@@ -36,7 +46,11 @@ async def upsert_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> UserProfile:
-    result = await db.execute(select(UserProfile).where(UserProfile.user_id == current_user.id))
+    result = await db.execute(
+        select(UserProfile)
+        .options(selectinload(UserProfile.photos))
+        .where(UserProfile.user_id == current_user.id)
+    )
     profile = result.scalar_one_or_none()
 
     if profile is None:
@@ -47,8 +61,14 @@ async def upsert_profile(
             setattr(profile, field, value)
 
     await db.commit()
-    await db.refresh(profile)
-    return profile
+    # Re-fetch with the photos relationship eagerly loaded so the response
+    # serialization does not trigger a lazy load on the async session.
+    refreshed = await db.execute(
+        select(UserProfile)
+        .options(selectinload(UserProfile.photos))
+        .where(UserProfile.user_id == current_user.id)
+    )
+    return refreshed.scalar_one()
 
 
 @router.get("/me/identity-preferences", response_model=IdentityPreferencesResponse)
@@ -121,6 +141,51 @@ async def upsert_sport_profile(
     await db.commit()
     await db.refresh(sp)
     return sp
+
+
+@router.put("/me/photos", response_model=ProfilePhotosResponse)
+async def replace_profile_photos(
+    files: list[UploadFile] = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ProfilePhotosResponse:
+    """Replace the current user's profile photos.
+
+    Accepts 2-4 multipart files. Existing photo rows for this profile are
+    deleted, the uploads are persisted to local media storage, and new rows
+    are written in upload order. ``avatar_url`` on the profile is synced to
+    the first photo URL so existing avatar consumers keep working.
+    """
+    if not (PROFILE_PHOTO_MIN <= len(files) <= PROFILE_PHOTO_MAX):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Must upload {PROFILE_PHOTO_MIN}-{PROFILE_PHOTO_MAX} photos",
+        )
+
+    result = await db.execute(select(UserProfile).where(UserProfile.user_id == current_user.id))
+    profile = result.scalar_one_or_none()
+    if profile is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
+
+    await db.execute(delete(ProfilePhoto).where(ProfilePhoto.profile_id == profile.id))
+
+    media_storage.clear_user_photos(current_user.id)
+    urls = media_storage.save_user_photos(current_user.id, files)
+
+    new_photos = [
+        ProfilePhoto(profile_id=profile.id, photo_url=url, position=index)
+        for index, url in enumerate(urls)
+    ]
+    db.add_all(new_photos)
+
+    profile.avatar_url = urls[0]
+
+    await db.commit()
+    for photo in new_photos:
+        await db.refresh(photo)
+    await db.refresh(profile)
+
+    return ProfilePhotosResponse(photos=new_photos, avatar_url=profile.avatar_url)
 
 
 @router.delete("/me/sport-profiles/{sport}", status_code=status.HTTP_204_NO_CONTENT)
