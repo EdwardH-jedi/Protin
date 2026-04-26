@@ -12,6 +12,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 
 import { Screen } from '../../components/Screen';
 import { useAuthStore } from '../../stores/auth';
+import { useProfileStore } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/types';
@@ -36,6 +37,25 @@ export function LoginScreen({ navigation }: Props) {
 
   const { login, loginWithApple, isLoading } = useAuthStore();
 
+  async function routeAfterAuth() {
+    // Mirror SplashScreen's onboarding gate so a returning user with a
+    // missing/incomplete Step 1 lands in onboarding instead of Main with
+    // a blank display name.
+    try {
+      await useProfileStore.getState().fetchProfile();
+      const { profile } = useProfileStore.getState();
+      const step1Complete =
+        !!profile &&
+        !!profile.displayName &&
+        profile.displayName.trim().length > 0 &&
+        !!profile.birthYear &&
+        !!profile.suburb;
+      navigation.replace(step1Complete ? 'Main' : 'OnboardingStep1');
+    } catch {
+      navigation.replace('OnboardingStep1');
+    }
+  }
+
   async function handleLogin() {
     setError(null);
     if (!email.trim() || !password) {
@@ -44,8 +64,7 @@ export function LoginScreen({ navigation }: Props) {
     }
     try {
       await login(email.trim(), password);
-      // After login, navigate to Main. Onboarding is for new users only.
-      navigation.replace('Main');
+      await routeAfterAuth();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     }
@@ -76,7 +95,7 @@ export function LoginScreen({ navigation }: Props) {
         email: credential.email ?? null,
         name: composedName,
       });
-      navigation.replace('Main');
+      await routeAfterAuth();
     } catch (err) {
       // User canceling the sheet is not a real error — swallow silently.
       if (err && typeof err === 'object' && (err as { code?: string }).code === 'ERR_REQUEST_CANCELED') {

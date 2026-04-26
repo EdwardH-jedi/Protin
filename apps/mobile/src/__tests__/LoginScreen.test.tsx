@@ -24,6 +24,37 @@ jest.mock('../stores/auth', () => ({
   useAuthStore: jest.fn(),
 }));
 
+// ─── Mock profile store (for the post-auth onboarding gate) ─────────────────
+
+const mockFetchProfile = jest.fn();
+const mockProfileGetState = jest.fn();
+
+jest.mock('../stores/profile', () => ({
+  useProfileStore: Object.assign(jest.fn(() => ({})), {
+    getState: (...args: unknown[]) => mockProfileGetState(...args),
+  }),
+}));
+
+function setupProfileStore(profile: Record<string, unknown> | null) {
+  mockProfileGetState.mockReturnValue({
+    fetchProfile: mockFetchProfile,
+    profile,
+  });
+}
+
+function step1CompleteProfile() {
+  return {
+    id: 'p1',
+    userId: 'u1',
+    displayName: 'Jordan Lee',
+    birthYear: 1990,
+    suburb: 'Newtown',
+    avatarUrl: undefined,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  };
+}
+
 // ─── Mock expo-apple-authentication ───────────────────────────────────────────
 
 const mockSignInAsync = jest.fn();
@@ -160,8 +191,10 @@ describe('LoginScreen', () => {
     });
   });
 
-  it('navigates to Main after successful login', async () => {
+  it('navigates to Main after successful login when Step 1 profile fields are complete', async () => {
     mockLogin.mockResolvedValue(undefined);
+    mockFetchProfile.mockResolvedValue(undefined);
+    setupProfileStore(step1CompleteProfile());
     const nav = makeNavigation();
     const { getByLabelText, getByPlaceholderText } = render(
       <LoginScreen navigation={nav as any} route={{} as any} />
@@ -171,6 +204,38 @@ describe('LoginScreen', () => {
     fireEvent.press(getByLabelText('Log in'));
     await waitFor(() => {
       expect(nav.replace).toHaveBeenCalledWith('Main');
+    });
+  });
+
+  it('navigates to OnboardingStep1 after successful login when profile fetch fails', async () => {
+    mockLogin.mockResolvedValue(undefined);
+    mockFetchProfile.mockRejectedValue(new Error('Profile not found'));
+    setupProfileStore(null);
+    const nav = makeNavigation();
+    const { getByLabelText, getByPlaceholderText } = render(
+      <LoginScreen navigation={nav as any} route={{} as any} />
+    );
+    fireEvent.changeText(getByPlaceholderText('you@example.com'), 'user@test.com');
+    fireEvent.changeText(getByPlaceholderText('Your password'), 'secret123');
+    fireEvent.press(getByLabelText('Log in'));
+    await waitFor(() => {
+      expect(nav.replace).toHaveBeenCalledWith('OnboardingStep1');
+    });
+  });
+
+  it('navigates to OnboardingStep1 after successful login when display_name is blank', async () => {
+    mockLogin.mockResolvedValue(undefined);
+    mockFetchProfile.mockResolvedValue(undefined);
+    setupProfileStore({ ...step1CompleteProfile(), displayName: '   ' });
+    const nav = makeNavigation();
+    const { getByLabelText, getByPlaceholderText } = render(
+      <LoginScreen navigation={nav as any} route={{} as any} />
+    );
+    fireEvent.changeText(getByPlaceholderText('you@example.com'), 'user@test.com');
+    fireEvent.changeText(getByPlaceholderText('Your password'), 'secret123');
+    fireEvent.press(getByLabelText('Log in'));
+    await waitFor(() => {
+      expect(nav.replace).toHaveBeenCalledWith('OnboardingStep1');
     });
   });
 
@@ -229,6 +294,8 @@ describe('LoginScreen', () => {
         fullName: { givenName: 'Alex', familyName: 'Kim' },
       });
       mockLoginWithApple.mockResolvedValue(undefined);
+      mockFetchProfile.mockResolvedValue(undefined);
+      setupProfileStore(step1CompleteProfile());
       const nav = makeNavigation();
       const { getByTestId } = render(
         <LoginScreen navigation={nav as any} route={{} as any} />

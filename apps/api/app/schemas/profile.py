@@ -1,22 +1,53 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+# Birth-year bounds match the mobile Step 1 picker: [today - MAX_AGE, today - MIN_AGE].
+# Computed at validation time so the bounds advance with the calendar year — the
+# previous static `le=2005` rejected every Step 1 submit by users picking the
+# top of the picker (today - 18) once today >= 2024, which silently dropped
+# display_name along with the rest of the upsert payload.
+MIN_PROFILE_AGE = 18
+MAX_PROFILE_AGE = 90
+
+
+def _validate_birth_year(value: Optional[int]) -> Optional[int]:
+    if value is None:
+        return value
+    current_year = date.today().year
+    min_year = current_year - MAX_PROFILE_AGE
+    max_year = current_year - MIN_PROFILE_AGE
+    if value < min_year or value > max_year:
+        raise ValueError(
+            f"birth_year must be between {min_year} and {max_year}"
+        )
+    return value
+
 
 class UserProfileCreate(BaseModel):
     display_name: str = Field(max_length=80)
     bio: Optional[str] = Field(None, max_length=400)
-    birth_year: Optional[int] = Field(None, ge=1940, le=2005)
+    birth_year: Optional[int] = None
     suburb: Optional[str] = Field(None, max_length=80)
+
+    @field_validator("birth_year")
+    @classmethod
+    def _check_birth_year(cls, v: Optional[int]) -> Optional[int]:
+        return _validate_birth_year(v)
 
 
 class UserProfileUpdate(BaseModel):
     display_name: Optional[str] = Field(None, max_length=80)
     bio: Optional[str] = Field(None, max_length=400)
-    birth_year: Optional[int] = Field(None, ge=1940, le=2005)
+    birth_year: Optional[int] = None
     suburb: Optional[str] = Field(None, max_length=80)
+
+    @field_validator("birth_year")
+    @classmethod
+    def _check_birth_year(cls, v: Optional[int]) -> Optional[int]:
+        return _validate_birth_year(v)
 
 
 class ProfilePhotoResponse(BaseModel):
