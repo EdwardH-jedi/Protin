@@ -109,11 +109,13 @@ export function OnboardingStep2Screen({ navigation }: Props) {
 
   return (
     <Screen padded scroll withKeyboard>
-      <View style={styles.progress}>
-        <View style={styles.dot} />
-        <View style={[styles.dot, styles.dotActive]} />
-        <View style={styles.dot} />
-        <View style={styles.dot} />
+      <View style={styles.progressBlock}>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressSegment, styles.progressSegmentActive]} />
+          <View style={[styles.progressSegment, styles.progressSegmentActive]} />
+          <View style={styles.progressSegment} />
+          <View style={styles.progressSegment} />
+        </View>
         <Text style={styles.stepLabel}>Step 2 of 4</Text>
       </View>
 
@@ -197,7 +199,7 @@ interface PhotoSlotProps {
 function PhotoSlot({ uri, index, canAdd, onAdd, onRemove }: PhotoSlotProps) {
   if (uri) {
     return (
-      <View style={styles.slot}>
+      <View style={[styles.slot, styles.slotFilled]}>
         <Image source={{ uri }} style={styles.slotImage} resizeMode="cover" />
         <Pressable
           style={styles.removeButton}
@@ -227,34 +229,34 @@ function PhotoSlot({ uri, index, canAdd, onAdd, onRemove }: PhotoSlotProps) {
 }
 
 const styles = StyleSheet.create({
-  progress: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
+  progressBlock: {
     paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.lg,
+    gap: spacing.sm,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: radii.full,
-    backgroundColor: colors.border,
+  progressBar: {
+    flexDirection: 'row',
+    gap: spacing.xs,
   },
-  dotActive: {
-    backgroundColor: colors.accent,
-    width: 20,
+  progressSegment: {
+    flex: 1,
+    height: 4,
+    borderRadius: radii.pill,
+    backgroundColor: colors.separator,
+  },
+  progressSegmentActive: {
+    backgroundColor: colors.brand,
   },
   stepLabel: {
     ...typography.label,
     color: colors.textTertiary,
-    marginLeft: spacing.xs,
   },
   header: {
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   eyebrow: {
     ...typography.label,
-    color: colors.accent,
+    color: colors.brand,
     marginBottom: spacing.sm,
   },
   title: {
@@ -288,20 +290,25 @@ const styles = StyleSheet.create({
   slot: {
     width: '48%',
     aspectRatio: 1,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     overflow: 'hidden',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.inputBackground,
+  },
+  slotFilled: {
+    borderWidth: 2,
+    borderColor: colors.brand,
   },
   slotImage: {
     width: '100%',
     height: '100%',
   },
   slotAdd: {
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 2,
+    borderColor: colors.brand,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.brandSoft,
   },
   slotPressed: {
     opacity: 0.65,
@@ -309,16 +316,19 @@ const styles = StyleSheet.create({
   slotEmpty: {
     borderWidth: 1,
     borderColor: colors.separator,
-    backgroundColor: colors.surface,
-    opacity: 0.4,
+    backgroundColor: colors.inputBackground,
+    opacity: 0.5,
   },
   slotAddPlus: {
     ...typography.h1,
-    color: colors.textTertiary,
+    color: colors.brand,
+    fontSize: 36,
+    lineHeight: 40,
   },
   slotAddLabel: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: colors.brand,
+    fontWeight: '600',
   },
   removeButton: {
     position: 'absolute',
@@ -327,7 +337,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: radii.full,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(15,23,42,0.65)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -345,7 +355,7 @@ const styles = StyleSheet.create({
     minHeight: 120,
     ...typography.bodyLarge,
     color: colors.textPrimary,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.inputBackground,
   },
   charCount: {
     ...typography.bodySmall,
@@ -360,7 +370,7 @@ const styles = StyleSheet.create({
   },
   submit: {
     backgroundColor: colors.brand,
-    borderRadius: radii.md,
+    borderRadius: radii.pill,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
@@ -374,5 +384,6 @@ const styles = StyleSheet.create({
   submitText: {
     ...typography.button,
     color: colors.textInverse,
+    fontSize: 17,
   },
 });

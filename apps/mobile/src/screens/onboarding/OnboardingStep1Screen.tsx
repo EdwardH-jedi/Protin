@@ -78,11 +78,13 @@ export function OnboardingStep1Screen({ navigation }: Props) {
 
   return (
     <Screen padded scroll withKeyboard>
-      <View style={styles.progress}>
-        <View style={[styles.dot, styles.dotActive]} />
-        <View style={styles.dot} />
-        <View style={styles.dot} />
-        <View style={styles.dot} />
+      <View style={styles.progressBlock}>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressSegment, styles.progressSegmentActive]} />
+          <View style={styles.progressSegment} />
+          <View style={styles.progressSegment} />
+          <View style={styles.progressSegment} />
+        </View>
         <Text style={styles.stepLabel}>Step 1 of 4</Text>
       </View>
 
@@ -161,34 +163,34 @@ export function OnboardingStep1Screen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  progress: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
+  progressBlock: {
     paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.lg,
+    gap: spacing.sm,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: radii.full,
-    backgroundColor: colors.border,
+  progressBar: {
+    flexDirection: 'row',
+    gap: spacing.xs,
   },
-  dotActive: {
-    backgroundColor: colors.accent,
-    width: 20,
+  progressSegment: {
+    flex: 1,
+    height: 4,
+    borderRadius: radii.pill,
+    backgroundColor: colors.separator,
+  },
+  progressSegmentActive: {
+    backgroundColor: colors.brand,
   },
   stepLabel: {
     ...typography.label,
     color: colors.textTertiary,
-    marginLeft: spacing.xs,
   },
   header: {
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   eyebrow: {
     ...typography.label,
-    color: colors.accent,
+    color: colors.brand,
     marginBottom: spacing.sm,
   },
   title: {
@@ -200,7 +202,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   form: {
-    gap: spacing.md,
+    gap: spacing.lg,
     paddingBottom: spacing.xl,
   },
   field: {
@@ -221,7 +223,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     ...typography.bodyLarge,
     color: colors.textPrimary,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.inputBackground,
   },
   hint: {
     ...typography.bodySmall,
@@ -233,13 +235,13 @@ const styles = StyleSheet.create({
   },
   submit: {
     backgroundColor: colors.brand,
-    borderRadius: radii.md,
+    borderRadius: radii.pill,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 52,
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
   },
   submitPressed: {
     opacity: 0.65,
@@ -247,5 +249,6 @@ const styles = StyleSheet.create({
   submitText: {
     ...typography.button,
     color: colors.textInverse,
+    fontSize: 17,
   },
 });
