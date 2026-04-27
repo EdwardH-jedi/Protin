@@ -232,6 +232,11 @@ async def _upsert_bot(
         user = User(email=bot["email"], hashed_password=None, is_active=True)
         session.add(user)
         await session.flush()
+    else:
+        # Re-seeding must restore visibility — if the bot was manually
+        # deactivated locally (e.g. to test deactivation flows), re-running
+        # the seed brings it back into Discovery.
+        user.is_active = True
 
     # 2. Profile (upsert by user_id).
     res = await session.execute(select(UserProfile).where(UserProfile.user_id == user.id))
@@ -265,7 +270,17 @@ async def _upsert_bot(
         )
     profile.avatar_url = urls[0] if urls else None
 
-    # 4. Sport profiles (upsert by (user_id, sport)).
+    # 4. Sport profiles.
+    # Drop any sport_profile rows for this bot whose sport is no longer in
+    # the configured set so editing the seed config to remove a sport doesn't
+    # leave orphaned rows behind. Then upsert by (user_id, sport).
+    configured_sports = {sp["sport"] for sp in bot["sport_profiles"]}
+    await session.execute(
+        delete(SportProfile).where(
+            SportProfile.user_id == user.id,
+            SportProfile.sport.notin_(configured_sports),
+        )
+    )
     for sp_data in bot["sport_profiles"]:
         res = await session.execute(
             select(SportProfile).where(
