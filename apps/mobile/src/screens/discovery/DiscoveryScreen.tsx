@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -19,29 +20,58 @@ function MatchBanner({ visible }: { visible: boolean }) {
   if (!visible) return null;
   return (
     <View style={styles.matchBanner} pointerEvents="none">
+      <Text style={styles.matchBannerEyebrow}>Match</Text>
       <Text style={styles.matchBannerText}>It's a match!</Text>
     </View>
   );
 }
 
-// ─── Avatar ───────────────────────────────────────────────────────────────────
+// ─── Hero / avatar ────────────────────────────────────────────────────────────
 
-function Avatar({
+function CardHero({
   displayName,
   avatarUrl,
+  age,
+  suburb,
 }: {
   displayName: string;
   avatarUrl?: string;
+  age?: number | null;
+  suburb?: string | null;
 }) {
   const initials = displayName
     .split(' ')
     .map((w) => w[0]?.toUpperCase() ?? '')
     .slice(0, 2)
     .join('');
+  const ageStr = age ? `, ${age}` : '';
 
   return (
-    <View style={styles.avatar}>
-      <Text style={styles.avatarInitials}>{initials}</Text>
+    <View style={styles.hero}>
+      {avatarUrl ? (
+        <Image
+          source={{ uri: avatarUrl }}
+          style={styles.heroImage}
+          resizeMode="cover"
+          accessibilityLabel={`${displayName} profile photo`}
+        />
+      ) : (
+        <View style={styles.heroFallback}>
+          <Text style={styles.heroFallbackInitials}>{initials || '·'}</Text>
+        </View>
+      )}
+
+      {/* Gradient-ish darken layered on top of the image so the name reads
+          on any photo without depending on a gradient library. */}
+      <View style={styles.heroDarken} />
+
+      <View style={styles.heroOverlay}>
+        <Text style={styles.heroName}>
+          {displayName}
+          {ageStr}
+        </Text>
+        {suburb ? <Text style={styles.heroSuburb}>{suburb}</Text> : null}
+      </View>
     </View>
   );
 }
@@ -50,7 +80,6 @@ function Avatar({
 
 function SportBadge({ sport, level }: { sport: string; level: string }) {
   const label = `${sportLabel(sport)} · ${level.charAt(0).toUpperCase() + level.slice(1)}`;
-
   return (
     <View style={styles.sportBadge}>
       <Text style={styles.sportBadgeText}>{label}</Text>
@@ -75,66 +104,73 @@ function PartnerCardView({
   onSave,
   actionInFlight,
 }: PartnerCardProps) {
-  const ageStr = partner.age ? `, ${partner.age}` : '';
-
   return (
     <View style={styles.card}>
-      <View style={styles.cardTop}>
-        <Avatar displayName={partner.displayName} avatarUrl={partner.avatarUrl} />
-        <View style={styles.cardInfo}>
-          <Text style={styles.cardName}>
-            {partner.displayName}
-            {ageStr}
-          </Text>
-          {partner.suburb ? (
-            <View style={styles.suburbBadge}>
-              <Text style={styles.suburbBadgeText}>{partner.suburb}</Text>
-            </View>
-          ) : null}
+      <CardHero
+        displayName={partner.displayName}
+        avatarUrl={partner.avatarUrl}
+        age={partner.age}
+        suburb={partner.suburb}
+      />
+
+      <View style={styles.cardBody}>
+        {partner.sportProfiles.length > 0 ? (
           <View style={styles.sportBadges}>
             {partner.sportProfiles.map((sp) => (
               <SportBadge key={sp.sport} sport={sp.sport} level={sp.level} />
             ))}
           </View>
+        ) : null}
+
+        {partner.bioExcerpt ? (
+          <Text style={styles.bio} numberOfLines={3}>
+            {partner.bioExcerpt}
+          </Text>
+        ) : null}
+
+        <View style={styles.cardActions}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.actionButton,
+              styles.actionPass,
+              pressed && styles.pressed,
+            ]}
+            onPress={onPass}
+            disabled={actionInFlight}
+            accessibilityRole="button"
+            accessibilityLabel="Pass"
+          >
+            <Text style={styles.actionPassText}>Pass</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.actionButton,
+              styles.actionSave,
+              pressed && styles.pressed,
+            ]}
+            onPress={onSave}
+            disabled={actionInFlight}
+            accessibilityRole="button"
+            accessibilityLabel="Save"
+          >
+            <Text style={styles.actionSaveText}>Save</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.actionButton,
+              styles.actionLike,
+              pressed && styles.pressed,
+            ]}
+            onPress={onLike}
+            disabled={actionInFlight}
+            accessibilityRole="button"
+            accessibilityLabel="Like"
+          >
+            <Text style={styles.actionLikeText}>Like</Text>
+          </Pressable>
         </View>
-      </View>
-
-      {partner.bioExcerpt ? (
-        <Text style={styles.bio} numberOfLines={2}>
-          {partner.bioExcerpt}
-        </Text>
-      ) : null}
-
-      <View style={styles.cardActions}>
-        <Pressable
-          style={({ pressed }) => [styles.actionButton, styles.actionPass, pressed && styles.pressed]}
-          onPress={onPass}
-          disabled={actionInFlight}
-          accessibilityRole="button"
-          accessibilityLabel="Pass"
-        >
-          <Text style={styles.actionPassText}>Pass</Text>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.actionButton, styles.actionSave, pressed && styles.pressed]}
-          onPress={onSave}
-          disabled={actionInFlight}
-          accessibilityRole="button"
-          accessibilityLabel="Save"
-        >
-          <Text style={styles.actionSaveText}>Save</Text>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.actionButton, styles.actionLike, pressed && styles.pressed]}
-          onPress={onLike}
-          disabled={actionInFlight}
-          accessibilityRole="button"
-          accessibilityLabel="Like"
-        >
-          <Text style={styles.actionLikeText}>Like</Text>
-        </Pressable>
       </View>
     </View>
   );
@@ -193,7 +229,6 @@ export function DiscoveryScreen() {
           <Text style={styles.eyebrow}>Sydney</Text>
           <Text style={styles.headerTitle}>Discover</Text>
         </View>
-        {/* Filter icon — placeholder for Wave 3 */}
         <Pressable
           style={styles.filterButton}
           accessibilityRole="button"
@@ -204,7 +239,7 @@ export function DiscoveryScreen() {
         </Pressable>
       </View>
 
-      {/* Sport toggle */}
+      {/* Sport toggle — pill chips */}
       <View style={styles.sportToggle}>
         {(['gym', 'golf', 'tennis', 'running'] as const).map((s) => (
           <Pressable
@@ -234,7 +269,7 @@ export function DiscoveryScreen() {
       {/* Content */}
       {isLoading ? (
         <View style={styles.centred}>
-          <ActivityIndicator size="large" color={colors.accent} />
+          <ActivityIndicator size="large" color={colors.brand} />
           <Text style={styles.loadingText}>Finding partners...</Text>
         </View>
       ) : error ? (
@@ -250,6 +285,9 @@ export function DiscoveryScreen() {
         </View>
       ) : partners.length === 0 ? (
         <View style={styles.centred}>
+          <View style={styles.emptyIcon}>
+            <Text style={styles.emptyIconText}>·</Text>
+          </View>
           <Text style={styles.emptyTitle}>You've seen everyone for now.</Text>
           <Text style={styles.emptyBody}>Check back soon for new workout partners.</Text>
           <Pressable
@@ -269,13 +307,17 @@ export function DiscoveryScreen() {
         />
       )}
 
-      {/* Match banner overlay */}
       <MatchBanner visible={matchVisible} />
     </Screen>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const HERO_HEIGHT = 280;
+
 const styles = StyleSheet.create({
+  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -286,7 +328,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     ...typography.label,
-    color: colors.accent,
+    color: colors.brand,
     marginBottom: spacing.xs,
   },
   headerTitle: {
@@ -297,86 +339,120 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radii.md,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
   },
   filterIcon: {
     ...typography.label,
     color: colors.textTertiary,
   },
+
+  // Sport toggle (pill chips)
   sportToggle: {
     flexDirection: 'row',
+    gap: spacing.xs,
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
   },
   sportTab: {
     flex: 1,
     paddingVertical: spacing.sm,
     alignItems: 'center',
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.surface,
   },
   sportTabActive: {
     backgroundColor: colors.brand,
+    borderColor: colors.brand,
   },
   sportTabText: {
     ...typography.button,
+    fontSize: 14,
     color: colors.textSecondary,
   },
   sportTabTextActive: {
     color: colors.textInverse,
   },
+
+  // List
   list: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
-    gap: spacing.md,
+    gap: spacing.lg,
   },
+
+  // Card
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.md,
+    borderRadius: radii.xl,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.separator,
+    shadowColor: colors.brandDarkest,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 3,
   },
-  cardTop: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.md,
+
+  // Hero
+  hero: {
+    width: '100%',
+    height: HERO_HEIGHT,
+    backgroundColor: colors.brandSoft,
   },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: radii.full,
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+  heroFallback: {
+    width: '100%',
+    height: '100%',
     backgroundColor: colors.brand,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
   },
-  avatarInitials: {
-    fontSize: 22,
+  heroFallbackInitials: {
+    fontSize: 64,
     fontWeight: '700',
     color: colors.textInverse,
+    letterSpacing: -2,
+  },
+  heroDarken: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: HERO_HEIGHT * 0.5,
+    backgroundColor: 'rgba(15,23,42,0.55)',
+  },
+  heroOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+    paddingTop: spacing.xl,
+  },
+  heroName: {
+    fontSize: 28,
+    fontWeight: '700',
     letterSpacing: -0.5,
+    color: colors.textInverse,
   },
-  cardInfo: {
-    flex: 1,
-    gap: spacing.xs,
+  heroSuburb: {
+    ...typography.bodyLarge,
+    color: 'rgba(255,255,255,0.92)',
+    marginTop: 2,
   },
-  cardName: {
-    ...typography.h3,
-  },
-  suburbBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  suburbBadgeText: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
+
+  // Card body
+  cardBody: {
+    padding: spacing.lg,
+    gap: spacing.md,
   },
   sportBadges: {
     flexDirection: 'row',
@@ -384,35 +460,40 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   sportBadge: {
-    backgroundColor: colors.background,
-    borderRadius: radii.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: colors.separator,
+    backgroundColor: colors.brandSoft,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
   },
   sportBadgeText: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    fontWeight: '600',
+    color: colors.brand,
   },
   bio: {
-    ...typography.body,
+    ...typography.bodyLarge,
     color: colors.textSecondary,
-    marginBottom: spacing.md,
+    lineHeight: 24,
   },
+
+  // Actions
   cardActions: {
     flexDirection: 'row',
     gap: spacing.sm,
+    paddingTop: spacing.xs,
   },
   actionButton: {
     flex: 1,
-    borderRadius: radii.md,
-    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    paddingVertical: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
   },
   actionPass: {
     borderWidth: 1,
     borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   actionPassText: {
     ...typography.button,
@@ -421,18 +502,26 @@ const styles = StyleSheet.create({
   actionSave: {
     borderWidth: 1,
     borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   actionSaveText: {
     ...typography.button,
-    color: colors.textSecondary,
+    color: colors.textPrimary,
   },
   actionLike: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
+    shadowColor: colors.brand,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
   },
   actionLikeText: {
     ...typography.button,
     color: colors.textInverse,
   },
+
+  // Centred container (loading / empty / error)
   centred: {
     flex: 1,
     alignItems: 'center',
@@ -456,6 +545,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: radii.full,
+    backgroundColor: colors.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  emptyIconText: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: colors.brand,
+    lineHeight: 36,
+  },
   emptyTitle: {
     ...typography.h3,
     textAlign: 'center',
@@ -466,36 +570,46 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.lg,
-    maxWidth: 260,
+    maxWidth: 280,
   },
   retryButton: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
+    backgroundColor: colors.brand,
+    borderRadius: radii.pill,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   retryText: {
     ...typography.button,
-    color: colors.textPrimary,
+    color: colors.textInverse,
   },
+
   pressed: {
     opacity: 0.65,
   },
+
+  // Match banner
   matchBanner: {
     position: 'absolute',
-    top: '40%',
+    top: '38%',
     left: spacing.xl,
     right: spacing.xl,
-    backgroundColor: colors.accent,
-    borderRadius: radii.lg,
+    backgroundColor: colors.brand,
+    borderRadius: radii.xl,
     paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowColor: colors.brandDarkest,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  matchBannerEyebrow: {
+    ...typography.label,
+    color: colors.brandSoft,
+    marginBottom: spacing.xs,
   },
   matchBannerText: {
     ...typography.h2,
