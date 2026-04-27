@@ -1,37 +1,51 @@
 /**
- * Protin design tokens.
+ * MoveMate design tokens.
  *
- * Palette intention:
- *   background  — warm off-white, feels premium not clinical
- *   brand       — deep navy, authority without aggression
- *   accent      — warm amber, energy without neon loudness
- *   text*       — navy-based greys, not pure black, softer on screen
+ * Translated from references/movemate_web_export — visual direction only,
+ * not the literal CSS variables (the export uses Tailwind/oklch which
+ * doesn't translate to React Native).
+ *
+ * Visual direction:
+ *   background  — clean white, mobile-app feel
+ *   brand       — athletic blue (Tailwind blue-600), primary CTA + accent text
+ *   brandDark*  — deep navy used in hero gradient on Welcome / AuthEntry
+ *   accent      — slightly lighter blue, for active states
+ *   text*       — neutral grey ramp (gray-900 → gray-400)
+ *
+ * Token *names* are kept stable so onboarding / profile / discovery screens
+ * compile against the new values without code changes. New MoveMate-only
+ * keys (brandDark, brandDarkest, brandSoft, inputBackground) are additive
+ * and only consumed by the auth screens.
  */
 
 export const colors = {
   // Backgrounds
-  background: '#F6F4EE',
+  background: '#FFFFFF',
   surface: '#FFFFFF',
-  surfaceElevated: '#FAFAF9',
+  surfaceElevated: '#F9FAFB',
 
   // Text
-  textPrimary: '#102A43',
-  textSecondary: '#486581',
-  textTertiary: '#829AB1',
+  textPrimary: '#0F172A',   // slate-900 — strong on white
+  textSecondary: '#475569', // slate-600 — body copy
+  textTertiary: '#94A3B8',  // slate-400 — hints, placeholders
   textInverse: '#FFFFFF',
 
-  // Brand
-  brand: '#102A43',
-  accent: '#B87333',   // copper-amber: premium, warm, distinct from generic orange
+  // Brand — MoveMate blue family
+  brand: '#2563EB',         // blue-600 — primary CTAs, links
+  brandDark: '#1E3A8A',     // blue-900 — hero gradient mid
+  brandDarkest: '#172554',  // blue-950 — hero gradient base
+  brandSoft: '#DBEAFE',     // blue-100 — light tint, supporting copy on dark
+  accent: '#3B82F6',        // blue-500 — active/hover state on light surfaces
 
   // UI chrome
-  border: '#D9D6CE',
-  separator: '#EAE8E3',
-  overlay: 'rgba(16, 42, 67, 0.5)',
+  border: '#E5E7EB',        // gray-200 — input + card edges
+  separator: '#F1F5F9',     // slate-100 — soft list dividers
+  overlay: 'rgba(15, 23, 42, 0.55)',
+  inputBackground: '#F3F4F6', // gray-100 — matches reference --input-background
 
   // Feedback
-  error: '#C53030',
-  success: '#276749',
+  error: '#DC2626',         // red-600
+  success: '#16A34A',       // green-600
 } as const;
 
 export const spacing = {
@@ -46,23 +60,22 @@ export const spacing = {
 
 export const radii = {
   sm: 6,
-  md: 10,
-  lg: 16,
+  md: 12,
+  lg: 18,
   xl: 24,
+  pill: 9999,
   full: 9999,
 } as const;
 
 /**
- * Typography scale.
- * All weights use system font stack (SF Pro / Roboto).
- * No external font dependency needed for the foundation.
+ * Typography scale. System font (SF Pro / Roboto), no external font dep.
  */
 export const typography = {
   display: {
-    fontSize: 42,
+    fontSize: 48,
     fontWeight: '700' as const,
-    lineHeight: 50,
-    letterSpacing: -1.5,
+    lineHeight: 54,
+    letterSpacing: -1.8,
     color: colors.textPrimary,
   },
   h1: {

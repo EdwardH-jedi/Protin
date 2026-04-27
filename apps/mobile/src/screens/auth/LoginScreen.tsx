@@ -108,6 +108,7 @@ export function LoginScreen({ navigation }: Props) {
   return (
     <Screen padded scroll withKeyboard>
       <View style={styles.header}>
+        <Text style={styles.wordmark}>movemate</Text>
         <Text style={styles.eyebrow}>Welcome back</Text>
         <Text style={styles.title}>Log in</Text>
       </View>
@@ -199,10 +200,18 @@ const styles = StyleSheet.create({
   header: {
     paddingTop: spacing.xl,
     paddingBottom: spacing.xl,
+    gap: spacing.xs,
+  },
+  wordmark: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -1,
+    color: colors.brand,
+    marginBottom: spacing.md,
   },
   eyebrow: {
     ...typography.label,
-    color: colors.accent,
+    color: colors.brand,
     marginBottom: spacing.sm,
   },
   title: {
@@ -226,7 +235,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     ...typography.bodyLarge,
     color: colors.textPrimary,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.inputBackground,
   },
   errorText: {
     ...typography.body,
@@ -234,14 +243,17 @@ const styles = StyleSheet.create({
   },
   buttonPrimary: {
     backgroundColor: colors.brand,
-    borderRadius: radii.md,
+    borderRadius: radii.pill,
     paddingVertical: spacing.md,
     alignItems: 'center',
+    minHeight: 52,
+    justifyContent: 'center',
     marginTop: spacing.sm,
   },
   buttonPrimaryText: {
     ...typography.button,
     color: colors.textInverse,
+    fontSize: 17,
   },
   pressed: {
     opacity: 0.65,
@@ -251,7 +263,7 @@ const styles = StyleSheet.create({
   },
   appleButton: {
     width: '100%',
-    height: 48,
+    height: 52,
   },
   footer: {
     paddingVertical: spacing.xl,
@@ -262,7 +274,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   footerLink: {
-    color: colors.accent,
+    color: colors.brand,
     fontWeight: '600',
   },
 });
