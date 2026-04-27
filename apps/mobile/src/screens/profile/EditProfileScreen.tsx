@@ -151,54 +151,44 @@ export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
         </View>
 
         <View style={styles.form}>
-          <View style={styles.field}>
-            <Text style={styles.label}>
-              Display name<Text style={styles.required}> *</Text>
-            </Text>
-            <TextInput
-              style={styles.input}
-              value={displayName}
-              onChangeText={setDisplayName}
-              placeholder="How you'll appear to others"
-              placeholderTextColor={colors.textTertiary}
-              autoCapitalize="words"
-              autoCorrect={false}
-              accessibilityLabel="Display name"
-            />
+          {/* Section: Basic info */}
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Basic info</Text>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>
+                Display name<Text style={styles.required}> *</Text>
+              </Text>
+              <TextInput
+                style={styles.input}
+                value={displayName}
+                onChangeText={setDisplayName}
+                placeholder="How you'll appear to others"
+                placeholderTextColor={colors.textTertiary}
+                autoCapitalize="words"
+                autoCorrect={false}
+                accessibilityLabel="Display name"
+              />
+            </View>
+
+            <View style={styles.field}>
+              <Select
+                label="Your Sydney suburb"
+                required
+                value={suburb}
+                onChange={setSuburb}
+                placeholder="Select your suburb"
+                options={SYDNEY_SUBURB_OPTIONS}
+                searchable
+                modalTitle="Sydney suburb"
+                accessibilityLabel="Sydney suburb"
+              />
+            </View>
           </View>
 
-          <View style={styles.field}>
-            <Select
-              label="Your Sydney suburb"
-              required
-              value={suburb}
-              onChange={setSuburb}
-              placeholder="Select your suburb"
-              options={SYDNEY_SUBURB_OPTIONS}
-              searchable
-              modalTitle="Sydney suburb"
-              accessibilityLabel="Sydney suburb"
-            />
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Bio</Text>
-            <TextInput
-              style={styles.bioInput}
-              value={bio}
-              onChangeText={(t) => setBio(t.slice(0, BIO_MAX))}
-              placeholder="Tell partners a bit about yourself..."
-              placeholderTextColor={colors.textTertiary}
-              multiline
-              numberOfLines={5}
-              textAlignVertical="top"
-              accessibilityLabel="Bio"
-            />
-            <Text style={styles.charCount}>{bio.length} / {BIO_MAX}</Text>
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Photos</Text>
+          {/* Section: Photos */}
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Photos</Text>
             {!replaceMode ? (
               <>
                 {photoUris.length > 0 ? (
@@ -260,6 +250,23 @@ export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
                 </Pressable>
               </>
             )}
+          </View>
+
+          {/* Section: Bio */}
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Bio</Text>
+            <TextInput
+              style={styles.bioInput}
+              value={bio}
+              onChangeText={(t) => setBio(t.slice(0, BIO_MAX))}
+              placeholder="Tell partners a bit about yourself..."
+              placeholderTextColor={colors.textTertiary}
+              multiline
+              numberOfLines={5}
+              textAlignVertical="top"
+              accessibilityLabel="Bio"
+            />
+            <Text style={styles.charCount}>{bio.length} / {BIO_MAX}</Text>
           </View>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -329,6 +336,7 @@ function PhotoSlot({ uri, index, canAdd, onAdd, onRemove }: PhotoSlotProps) {
 const styles = StyleSheet.create({
   scroll: {
     paddingBottom: spacing.xxxl,
+    backgroundColor: colors.surfaceElevated,
   },
   header: {
     flexDirection: 'row',
@@ -336,7 +344,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: spacing.lg,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.lg,
+    backgroundColor: colors.surfaceElevated,
   },
   title: {
     ...typography.h3,
@@ -347,11 +356,31 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     ...typography.body,
-    color: colors.accent,
+    color: colors.brand,
+    fontWeight: '600',
   },
   form: {
     paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
+    gap: spacing.md,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.separator,
+    shadowColor: colors.brandDarkest,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+    gap: spacing.md,
+  },
+  sectionTitle: {
+    ...typography.h3,
+    fontSize: 17,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
   },
   field: {
     gap: spacing.xs,
@@ -371,7 +400,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     ...typography.bodyLarge,
     color: colors.textPrimary,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.inputBackground,
   },
   bioInput: {
     borderWidth: 1,
@@ -382,7 +411,7 @@ const styles = StyleSheet.create({
     minHeight: 120,
     ...typography.bodyLarge,
     color: colors.textPrimary,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.inputBackground,
   },
   charCount: {
     ...typography.bodySmall,
@@ -402,8 +431,10 @@ const styles = StyleSheet.create({
   previewThumb: {
     width: 72,
     height: 72,
-    borderRadius: radii.sm,
-    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    backgroundColor: colors.inputBackground,
+    borderWidth: 1,
+    borderColor: colors.brandSoft,
   },
   editGrid: {
     flexDirection: 'row',
@@ -414,34 +445,38 @@ const styles = StyleSheet.create({
   slot: {
     width: '48%',
     aspectRatio: 1,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     overflow: 'hidden',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.inputBackground,
   },
   slotImage: {
     width: '100%',
     height: '100%',
   },
   slotAdd: {
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 2,
+    borderColor: colors.brand,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.brandSoft,
   },
   slotEmpty: {
     borderWidth: 1,
     borderColor: colors.separator,
-    backgroundColor: colors.surface,
-    opacity: 0.4,
+    backgroundColor: colors.inputBackground,
+    opacity: 0.5,
   },
   slotAddPlus: {
     ...typography.h1,
-    color: colors.textTertiary,
+    color: colors.brand,
+    fontSize: 36,
+    lineHeight: 40,
   },
   slotAddLabel: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: colors.brand,
+    fontWeight: '600',
   },
   removeButton: {
     position: 'absolute',
@@ -450,7 +485,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: radii.full,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(15,23,42,0.65)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -461,16 +496,17 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
+    borderColor: colors.brand,
+    borderRadius: radii.pill,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
     marginTop: spacing.sm,
+    backgroundColor: colors.brandSoft,
   },
   secondaryButtonText: {
     ...typography.button,
-    color: colors.textPrimary,
+    color: colors.brand,
   },
   errorText: {
     ...typography.body,
@@ -478,7 +514,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: colors.brand,
-    borderRadius: radii.md,
+    borderRadius: radii.pill,
     paddingVertical: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -491,6 +527,7 @@ const styles = StyleSheet.create({
   saveButtonText: {
     ...typography.button,
     color: colors.textInverse,
+    fontSize: 17,
   },
   pressed: {
     opacity: 0.65,

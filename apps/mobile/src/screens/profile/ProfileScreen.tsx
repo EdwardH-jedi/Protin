@@ -104,7 +104,7 @@ export function ProfileScreen() {
     return (
       <Screen padded>
         <View style={styles.centred}>
-          <ActivityIndicator size="large" color={colors.accent} />
+          <ActivityIndicator size="large" color={colors.brand} />
         </View>
       </Screen>
     );
@@ -116,53 +116,72 @@ export function ProfileScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.eyebrow}>Account</Text>
-          <Text style={styles.title}>Profile</Text>
-        </View>
-
-        {error ? (
-          <View style={styles.section}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : profile ? (
-          <>
-            {/* Avatar + name */}
-            <View style={styles.avatarRow}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {profile.displayName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <View style={styles.avatarInfo}>
-                <Text style={styles.displayName}>{profile.displayName}</Text>
-                {profile.suburb ? (
-                  <Text style={styles.suburb}>{profile.suburb}</Text>
-                ) : null}
-              </View>
+        {/* Brand banner — blue MoveMate hero with the avatar overlapping the
+            bottom edge. Two layered fills approximate the reference's blue-500
+            -> blue-600 gradient without a gradient library. */}
+        <View style={styles.banner}>
+          <View style={styles.bannerOverlay} />
+          <View style={styles.bannerHeader}>
+            <Text style={styles.bannerEyebrow}>Account</Text>
+            {profile ? (
               <Pressable
                 onPress={() => navigation.navigate('EditProfile')}
-                style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.editChip, pressed && styles.pressed]}
                 accessibilityRole="button"
                 accessibilityLabel="Edit profile"
               >
-                <Text style={styles.editButtonText}>Edit</Text>
+                <Text style={styles.editChipText}>Edit</Text>
               </Pressable>
-            </View>
+            ) : null}
+          </View>
+        </View>
 
-            {/* Bio */}
+        {/* Avatar + name block — overlaps the banner via negative top margin.
+            We keep the page title `Profile` for parity with the reference page
+            structure even though the banner now carries the brand. */}
+        <View style={styles.identityBlock}>
+          <View style={styles.avatarRing}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {profile?.displayName?.charAt(0).toUpperCase() ?? '·'}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.pageTitle}>Profile</Text>
+
+          {error ? (
+            <Text style={styles.errorText}>{error}</Text>
+          ) : profile ? (
+            <>
+              <Text style={styles.displayName}>{profile.displayName}</Text>
+              {profile.suburb ? (
+                <Text style={styles.suburb}>{profile.suburb}</Text>
+              ) : null}
+            </>
+          ) : (
+            <View style={styles.emptyBlock}>
+              <Text style={styles.emptyTitle}>Profile not set up</Text>
+              <Text style={styles.emptyBody}>
+                Complete onboarding to build your workout partner profile.
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Profile content cards — only shown when a profile exists. */}
+        {!error && profile ? (
+          <View style={styles.cardStack}>
             {profile.bio ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>About</Text>
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>About</Text>
                 <Text style={styles.bioText}>{profile.bio}</Text>
               </View>
             ) : null}
 
-            {/* Sport profiles */}
             {sportProfiles && sportProfiles.length > 0 ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Sports</Text>
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Sports</Text>
                 <View style={styles.sportList}>
                   {sportProfiles.map((sp) => (
                     <View key={sp.sport} style={styles.sportRow}>
@@ -177,72 +196,66 @@ export function ProfileScreen() {
                 </View>
               </View>
             ) : null}
-          </>
-        ) : (
-          /* No profile created yet */
-          <View style={styles.section}>
-            <Text style={styles.emptyTitle}>Profile not set up</Text>
-            <Text style={styles.emptyBody}>
-              Complete onboarding to build your workout partner profile.
-            </Text>
           </View>
-        )}
+        ) : null}
 
         {/* Google Calendar */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Integrations</Text>
-          {gcalConnected ? (
-            <View style={styles.integrationRow}>
-              <Text style={styles.integrationLabel}>Google Calendar</Text>
+        <View style={styles.cardStack}>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Integrations</Text>
+            {gcalConnected ? (
+              <View style={styles.integrationRow}>
+                <Text style={styles.integrationLabel}>Google Calendar</Text>
+                <Pressable
+                  style={({ pressed }) => [styles.integrationAction, pressed && styles.pressed]}
+                  onPress={handleGoogleCalendarDisconnect}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.integrationActionText}>Disconnect</Text>
+                </Pressable>
+              </View>
+            ) : (
               <Pressable
-                style={({ pressed }) => [styles.integrationAction, pressed && styles.pressed]}
-                onPress={handleGoogleCalendarDisconnect}
+                style={({ pressed }) => [styles.integrationButton, pressed && styles.pressed]}
+                onPress={handleGoogleCalendarConnect}
+                disabled={gcalConnecting}
                 accessibilityRole="button"
               >
-                <Text style={styles.integrationActionText}>Disconnect</Text>
+                {gcalConnecting ? (
+                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                ) : (
+                  <Text style={styles.integrationButtonText}>Connect Google Calendar</Text>
+                )}
+              </Pressable>
+            )}
+          </View>
+
+          {/* Legal */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Legal</Text>
+            <View style={styles.legalList}>
+              <Pressable
+                style={({ pressed }) => [styles.legalRow, pressed && styles.pressed]}
+                onPress={() => Linking.openURL(PRIVACY_URL)}
+                accessibilityRole="link"
+                accessibilityLabel="Privacy Policy"
+              >
+                <Text style={styles.legalRowText}>Privacy Policy</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.legalRow, pressed && styles.pressed]}
+                onPress={() => Linking.openURL(TERMS_URL)}
+                accessibilityRole="link"
+                accessibilityLabel="Terms of Service"
+              >
+                <Text style={styles.legalRowText}>Terms of Service</Text>
               </Pressable>
             </View>
-          ) : (
-            <Pressable
-              style={({ pressed }) => [styles.integrationButton, pressed && styles.pressed]}
-              onPress={handleGoogleCalendarConnect}
-              disabled={gcalConnecting}
-              accessibilityRole="button"
-            >
-              {gcalConnecting ? (
-                <ActivityIndicator size="small" color={colors.textSecondary} />
-              ) : (
-                <Text style={styles.integrationButtonText}>Connect Google Calendar</Text>
-              )}
-            </Pressable>
-          )}
-        </View>
-
-        {/* Legal */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Legal</Text>
-          <View style={styles.legalList}>
-            <Pressable
-              style={({ pressed }) => [styles.legalRow, pressed && styles.pressed]}
-              onPress={() => Linking.openURL(PRIVACY_URL)}
-              accessibilityRole="link"
-              accessibilityLabel="Privacy Policy"
-            >
-              <Text style={styles.legalRowText}>Privacy Policy</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.legalRow, pressed && styles.pressed]}
-              onPress={() => Linking.openURL(TERMS_URL)}
-              accessibilityRole="link"
-              accessibilityLabel="Terms of Service"
-            >
-              <Text style={styles.legalRowText}>Terms of Service</Text>
-            </Pressable>
           </View>
         </View>
 
-        {/* Logout */}
-        <View style={styles.logoutSection}>
+        {/* Account actions */}
+        <View style={styles.actionStack}>
           <Pressable
             style={({ pressed }) => [styles.logoutButton, pressed && styles.pressed]}
             onPress={logout}
@@ -251,10 +264,7 @@ export function ProfileScreen() {
           >
             <Text style={styles.logoutText}>Log out</Text>
           </Pressable>
-        </View>
 
-        {/* Delete account */}
-        <View style={styles.deleteSection}>
           <Pressable
             style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
             onPress={handleDeleteAccount}
@@ -269,107 +279,112 @@ export function ProfileScreen() {
   );
 }
 
+const BANNER_HEIGHT = 168;
+const AVATAR_SIZE = 104;
+
 const styles = StyleSheet.create({
   scroll: {
     paddingBottom: spacing.xxxl,
-  },
-  header: {
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
-    paddingHorizontal: spacing.lg,
-  },
-  eyebrow: {
-    ...typography.label,
-    color: colors.accent,
-    marginBottom: spacing.xs,
-  },
-  title: {
-    ...typography.h2,
+    backgroundColor: colors.surfaceElevated,
   },
   centred: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarRow: {
+
+  // Hero banner
+  banner: {
+    height: BANNER_HEIGHT,
+    backgroundColor: colors.brand,
+    overflow: 'hidden',
+  },
+  bannerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.brandDark,
+    opacity: 0.35,
+  },
+  bannerHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  bannerEyebrow: {
+    ...typography.label,
+    color: colors.brandSoft,
+  },
+  editChip: {
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  editChipText: {
+    ...typography.label,
+    color: colors.textInverse,
+    letterSpacing: 0.6,
+  },
+
+  // Identity block (overlaps banner)
+  identityBlock: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    marginTop: -AVATAR_SIZE / 2,
+  },
+  avatarRing: {
+    width: AVATAR_SIZE + 8,
+    height: AVATAR_SIZE + 8,
+    borderRadius: radii.full,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.brandDarkest,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 6,
   },
   avatar: {
-    width: 64,
-    height: 64,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
     borderRadius: radii.full,
     backgroundColor: colors.brand,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: 24,
+    fontSize: 40,
     fontWeight: '700',
     color: colors.textInverse,
   },
-  avatarInfo: {
-    flex: 1,
-  },
-  editButton: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-  },
-  editButtonText: {
+  pageTitle: {
     ...typography.label,
-    color: colors.textPrimary,
+    color: colors.textTertiary,
+    marginTop: spacing.md,
   },
   displayName: {
-    ...typography.h3,
+    ...typography.h1,
+    fontSize: 26,
     color: colors.textPrimary,
+    marginTop: spacing.xs,
+    textAlign: 'center',
   },
   suburb: {
     ...typography.body,
     color: colors.textSecondary,
     marginTop: 2,
   },
-  section: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-  },
-  sectionLabel: {
-    ...typography.label,
-    color: colors.textTertiary,
-    marginBottom: spacing.sm,
-  },
-  bioText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    lineHeight: 22,
-  },
-  sportList: {
-    gap: spacing.sm,
-  },
-  sportRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  emptyBlock: {
     alignItems: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.separator,
-  },
-  sportName: {
-    ...typography.bodyLarge,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  sportLevel: {
-    ...typography.body,
-    color: colors.textSecondary,
+    paddingTop: spacing.md,
   },
   emptyTitle: {
     ...typography.h3,
@@ -378,21 +393,76 @@ const styles = StyleSheet.create({
   emptyBody: {
     ...typography.body,
     color: colors.textSecondary,
+    textAlign: 'center',
   },
   errorText: {
     ...typography.body,
     color: colors.error,
+    marginTop: spacing.md,
+    textAlign: 'center',
   },
+
+  // Card stack
+  cardStack: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    gap: spacing.md,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.separator,
+    shadowColor: colors.brandDarkest,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  cardTitle: {
+    ...typography.h3,
+    fontSize: 17,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  bioText: {
+    ...typography.bodyLarge,
+    color: colors.textSecondary,
+    lineHeight: 24,
+  },
+  sportList: {
+    gap: spacing.sm,
+  },
+  sportRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.inputBackground,
+    borderRadius: radii.md,
+  },
+  sportName: {
+    ...typography.bodyLarge,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  sportLevel: {
+    ...typography.body,
+    color: colors.brand,
+    fontWeight: '600',
+  },
+
+  // Integrations
   integrationRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.inputBackground,
     borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.separator,
   },
   integrationLabel: {
     ...typography.body,
@@ -408,48 +478,49 @@ const styles = StyleSheet.create({
   },
   integrationButton: {
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
+    borderColor: colors.brand,
+    borderRadius: radii.pill,
     paddingVertical: spacing.md,
     alignItems: 'center',
+    backgroundColor: colors.brandSoft,
   },
   integrationButtonText: {
     ...typography.button,
-    color: colors.textPrimary,
+    color: colors.brand,
   },
-  logoutSection: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-  },
-  logoutButton: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  logoutText: {
-    ...typography.button,
-    color: colors.textSecondary,
-  },
+
+  // Legal
   legalList: {
     gap: spacing.xs,
   },
   legalRow: {
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.inputBackground,
     borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.separator,
   },
   legalRowText: {
     ...typography.body,
     color: colors.textPrimary,
   },
-  deleteSection: {
+
+  // Account actions
+  actionStack: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    paddingTop: spacing.xl,
+    gap: spacing.sm,
+  },
+  logoutButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.pill,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+  },
+  logoutText: {
+    ...typography.button,
+    color: colors.textSecondary,
   },
   deleteButton: {
     paddingVertical: spacing.md,
