@@ -14,6 +14,7 @@ import { OnboardingStep4Screen } from '../screens/onboarding/OnboardingStep4Scre
 import { DiscoveryScreen } from '../screens/discovery/DiscoveryScreen';
 import { MatchesScreen } from '../screens/matches/MatchesScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
+import { EditProfileScreen } from '../screens/profile/EditProfileScreen';
 import { ChatScreen } from '../screens/chat/ChatScreen';
 import { BookingComposerScreen } from '../screens/bookings/BookingComposerScreen';
 import { BookingDetailScreen } from '../screens/bookings/BookingDetailScreen';
@@ -129,6 +130,11 @@ export function RootNavigator() {
           name="Main"
           component={MainTabs}
           options={{ animation: 'fade' }}
+        />
+        <Stack.Screen
+          name="EditProfile"
+          component={EditProfileScreen}
+          options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
           name="Chat"

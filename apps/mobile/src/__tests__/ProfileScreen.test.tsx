@@ -28,6 +28,14 @@ jest.mock('../lib/api', () => ({
   },
 }));
 
+// ─── Mock @react-navigation/native ────────────────────────────────────────────
+
+const mockNavigate = jest.fn();
+
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: () => ({ navigate: mockNavigate }),
+}));
+
 // ─── Mock auth store ──────────────────────────────────────────────────────────
 
 const mockLogout = jest.fn();
@@ -215,6 +223,29 @@ describe('ProfileScreen', () => {
     expect(mockOpenAuthSession).toHaveBeenCalledWith(
       'https://accounts.google.com/o/oauth2/auth?...'
     );
+  });
+
+  // ── Edit profile ───────────────────────────────────────────────────────────
+
+  it('renders an Edit profile button when profile is loaded', async () => {
+    mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+    const { getByLabelText } = render(<ProfileScreen />);
+    await waitFor(() => getByLabelText('Edit profile'));
+  });
+
+  it('navigates to EditProfile when Edit profile is pressed', async () => {
+    mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+    const { getByLabelText } = render(<ProfileScreen />);
+    await waitFor(() => getByLabelText('Edit profile'));
+    fireEvent.press(getByLabelText('Edit profile'));
+    expect(mockNavigate).toHaveBeenCalledWith('EditProfile');
+  });
+
+  it('does not render Edit profile when no profile exists', async () => {
+    mockProfile = null;
+    const { queryByLabelText, getByText } = render(<ProfileScreen />);
+    await waitFor(() => getByText('Profile not set up'));
+    expect(queryByLabelText('Edit profile')).toBeNull();
   });
 
   // ── Logout ─────────────────────────────────────────────────────────────────

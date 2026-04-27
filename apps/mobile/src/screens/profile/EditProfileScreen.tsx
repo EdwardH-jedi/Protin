@@ -1,0 +1,495 @@
+import { useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+
+import { Screen } from '../../components/Screen';
+import { Select } from '../../components/Select';
+import { SYDNEY_SUBURB_OPTIONS } from '../../data/sydneySuburbs';
+import { useProfileStore } from '../../stores/profile';
+import { colors, radii, spacing, typography } from '../../theme';
+import type { EditProfileScreenProps } from '../../navigation/types';
+
+const BIO_MAX = 400;
+export const MIN_PHOTOS = 2;
+export const MAX_PHOTOS = 4;
+
+export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
+  const { profile, photoUris, upsertProfile, uploadProfilePhotos, fetchProfile } =
+    useProfileStore();
+
+  const [displayName, setDisplayName] = useState<string>(profile?.displayName ?? '');
+  const [suburb, setSuburb] = useState<string | null>(profile?.suburb ?? null);
+  const [bio, setBio] = useState<string>(profile?.bio ?? '');
+
+  // Photo replacement is opt-in. The backend's PUT /users/me/photos replaces
+  // the entire set with uploaded files; existing absolute media URLs in
+  // photoUris cannot be re-submitted as files. So we keep the existing photos
+  // untouched unless the user explicitly enters "replace" mode and picks a
+  // fresh 2-4 set.
+  const [replaceMode, setReplaceMode] = useState(false);
+  const [newPhotos, setNewPhotos] = useState<string[]>([]);
+
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function pickPhoto() {
+    setError(null);
+    if (newPhotos.length >= MAX_PHOTOS) {
+      setError(`You can add up to ${MAX_PHOTOS} photos.`);
+      return;
+    }
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        'Photo library access needed',
+        'Protin needs permission to your photo library so you can update your profile photos.'
+      );
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: false,
+      quality: 0.8,
+    });
+    if (result.canceled) return;
+    const uri = result.assets?.[0]?.uri;
+    if (!uri) return;
+    setNewPhotos((prev) => (prev.length >= MAX_PHOTOS ? prev : [...prev, uri]));
+  }
+
+  function removeNewPhoto(index: number) {
+    setNewPhotos((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function cancelReplaceMode() {
+    setReplaceMode(false);
+    setNewPhotos([]);
+    setError(null);
+  }
+
+  async function handleSave() {
+    setError(null);
+    const trimmedName = displayName.trim();
+    if (!trimmedName) {
+      setError('Please enter a display name.');
+      return;
+    }
+    if (!suburb) {
+      setError('Please select your Sydney suburb.');
+      return;
+    }
+    if (replaceMode) {
+      if (newPhotos.length < MIN_PHOTOS) {
+        setError(`Please add at least ${MIN_PHOTOS} photos or cancel replacing.`);
+        return;
+      }
+      if (newPhotos.length > MAX_PHOTOS) {
+        setError(`You can only keep up to ${MAX_PHOTOS} photos.`);
+        return;
+      }
+    }
+
+    setIsSaving(true);
+    try {
+      if (replaceMode) {
+        await uploadProfilePhotos(newPhotos);
+      }
+      const trimmedBio = bio.trim();
+      await upsertProfile({
+        displayName: trimmedName,
+        // Preserve birthYear from the existing profile so we don't accidentally
+        // null it out — onboarding routing depends on it.
+        birthYear: profile?.birthYear,
+        suburb,
+        bio: trimmedBio.length > 0 ? trimmedBio : undefined,
+      });
+      // Re-fetch so the Profile screen we return to renders the persisted
+      // values (including any photo URLs the server just minted).
+      await fetchProfile();
+      navigation.goBack();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save your profile. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  const newPhotoSlots = Array.from({ length: MAX_PHOTOS }, (_, i) => newPhotos[i] ?? null);
+
+  return (
+    <Screen padded={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+            disabled={isSaving}
+          >
+            <Text style={styles.backButtonText}>Cancel</Text>
+          </Pressable>
+          <Text style={styles.title}>Edit profile</Text>
+          <View style={styles.backButton} />
+        </View>
+
+        <View style={styles.form}>
+          <View style={styles.field}>
+            <Text style={styles.label}>
+              Display name<Text style={styles.required}> *</Text>
+            </Text>
+            <TextInput
+              style={styles.input}
+              value={displayName}
+              onChangeText={setDisplayName}
+              placeholder="How you'll appear to others"
+              placeholderTextColor={colors.textTertiary}
+              autoCapitalize="words"
+              autoCorrect={false}
+              accessibilityLabel="Display name"
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Select
+              label="Your Sydney suburb"
+              required
+              value={suburb}
+              onChange={setSuburb}
+              placeholder="Select your suburb"
+              options={SYDNEY_SUBURB_OPTIONS}
+              searchable
+              modalTitle="Sydney suburb"
+              accessibilityLabel="Sydney suburb"
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Bio</Text>
+            <TextInput
+              style={styles.bioInput}
+              value={bio}
+              onChangeText={(t) => setBio(t.slice(0, BIO_MAX))}
+              placeholder="Tell partners a bit about yourself..."
+              placeholderTextColor={colors.textTertiary}
+              multiline
+              numberOfLines={5}
+              textAlignVertical="top"
+              accessibilityLabel="Bio"
+            />
+            <Text style={styles.charCount}>{bio.length} / {BIO_MAX}</Text>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Photos</Text>
+            {!replaceMode ? (
+              <>
+                {photoUris.length > 0 ? (
+                  <View style={styles.previewGrid}>
+                    {photoUris.map((uri, idx) => (
+                      <Image
+                        key={`${uri}-${idx}`}
+                        source={{ uri }}
+                        style={styles.previewThumb}
+                        resizeMode="cover"
+                        accessibilityLabel={`Saved photo ${idx + 1}`}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.helperText}>No photos saved yet.</Text>
+                )}
+                <Pressable
+                  onPress={() => {
+                    setReplaceMode(true);
+                    setError(null);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Replace photos"
+                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                  disabled={isSaving}
+                >
+                  <Text style={styles.secondaryButtonText}>Replace photos</Text>
+                </Pressable>
+                <Text style={styles.helperText}>
+                  Replacing photos uploads a fresh {MIN_PHOTOS}-{MAX_PHOTOS} set from your library.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.helperText}>
+                  {newPhotos.length} of {MAX_PHOTOS} selected · at least {MIN_PHOTOS} required
+                </Text>
+                <View style={styles.editGrid}>
+                  {newPhotoSlots.map((uri, index) => (
+                    <PhotoSlot
+                      key={`slot-${index}`}
+                      uri={uri}
+                      index={index}
+                      canAdd={index === newPhotos.length && newPhotos.length < MAX_PHOTOS}
+                      onAdd={pickPhoto}
+                      onRemove={() => removeNewPhoto(index)}
+                    />
+                  ))}
+                </View>
+                <Pressable
+                  onPress={cancelReplaceMode}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel photo replacement"
+                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                  disabled={isSaving}
+                >
+                  <Text style={styles.secondaryButtonText}>Keep current photos</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.saveButton,
+              (pressed || isSaving) && styles.saveButtonPressed,
+            ]}
+            onPress={handleSave}
+            disabled={isSaving}
+            accessibilityRole="button"
+            accessibilityLabel="Save profile"
+          >
+            {isSaving ? (
+              <ActivityIndicator color={colors.textInverse} />
+            ) : (
+              <Text style={styles.saveButtonText}>Save</Text>
+            )}
+          </Pressable>
+        </View>
+      </ScrollView>
+    </Screen>
+  );
+}
+
+interface PhotoSlotProps {
+  uri: string | null;
+  index: number;
+  canAdd: boolean;
+  onAdd: () => void;
+  onRemove: () => void;
+}
+
+function PhotoSlot({ uri, index, canAdd, onAdd, onRemove }: PhotoSlotProps) {
+  if (uri) {
+    return (
+      <View style={styles.slot}>
+        <Image source={{ uri }} style={styles.slotImage} resizeMode="cover" />
+        <Pressable
+          style={styles.removeButton}
+          onPress={onRemove}
+          accessibilityRole="button"
+          accessibilityLabel={`Remove photo ${index + 1}`}
+        >
+          <Text style={styles.removeButtonText}>×</Text>
+        </Pressable>
+      </View>
+    );
+  }
+  if (canAdd) {
+    return (
+      <Pressable
+        style={({ pressed }) => [styles.slot, styles.slotAdd, pressed && styles.pressed]}
+        onPress={onAdd}
+        accessibilityRole="button"
+        accessibilityLabel={`Add photo ${index + 1}`}
+      >
+        <Text style={styles.slotAddPlus}>+</Text>
+        <Text style={styles.slotAddLabel}>Add photo</Text>
+      </Pressable>
+    );
+  }
+  return <View style={[styles.slot, styles.slotEmpty]} />;
+}
+
+const styles = StyleSheet.create({
+  scroll: {
+    paddingBottom: spacing.xxxl,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  title: {
+    ...typography.h3,
+    color: colors.textPrimary,
+  },
+  backButton: {
+    minWidth: 64,
+  },
+  backButtonText: {
+    ...typography.body,
+    color: colors.accent,
+  },
+  form: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
+  },
+  field: {
+    gap: spacing.xs,
+  },
+  label: {
+    ...typography.label,
+    color: colors.textSecondary,
+  },
+  required: {
+    color: colors.error,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    ...typography.bodyLarge,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
+  },
+  bioInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    minHeight: 120,
+    ...typography.bodyLarge,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
+  },
+  charCount: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
+    textAlign: 'right',
+  },
+  helperText: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
+  },
+  previewGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  previewThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: radii.sm,
+    backgroundColor: colors.surface,
+  },
+  editGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginVertical: spacing.sm,
+  },
+  slot: {
+    width: '48%',
+    aspectRatio: 1,
+    borderRadius: radii.md,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+  },
+  slotImage: {
+    width: '100%',
+    height: '100%',
+  },
+  slotAdd: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  slotEmpty: {
+    borderWidth: 1,
+    borderColor: colors.separator,
+    backgroundColor: colors.surface,
+    opacity: 0.4,
+  },
+  slotAddPlus: {
+    ...typography.h1,
+    color: colors.textTertiary,
+  },
+  slotAddLabel: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
+  },
+  removeButton: {
+    position: 'absolute',
+    top: spacing.xs,
+    right: spacing.xs,
+    width: 28,
+    height: 28,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeButtonText: {
+    color: colors.textInverse,
+    fontSize: 20,
+    lineHeight: 22,
+  },
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  secondaryButtonText: {
+    ...typography.button,
+    color: colors.textPrimary,
+  },
+  errorText: {
+    ...typography.body,
+    color: colors.error,
+  },
+  saveButton: {
+    backgroundColor: colors.brand,
+    borderRadius: radii.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+    marginTop: spacing.md,
+  },
+  saveButtonPressed: {
+    opacity: 0.65,
+  },
+  saveButtonText: {
+    ...typography.button,
+    color: colors.textInverse,
+  },
+  pressed: {
+    opacity: 0.65,
+  },
+});

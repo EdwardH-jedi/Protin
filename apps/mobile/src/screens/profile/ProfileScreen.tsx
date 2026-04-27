@@ -10,6 +10,8 @@ import {
   View,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { Screen } from '../../components/Screen';
 import { api } from '../../lib/api';
@@ -17,10 +19,12 @@ import { PRIVACY_URL, TERMS_URL } from '../../lib/legal';
 import { useAuthStore } from '../../stores/auth';
 import { sportLabel, useProfileStore } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
+import type { RootStackParamList } from '../../navigation/types';
 
 export function ProfileScreen() {
   const { logout } = useAuthStore();
   const { profile, sportProfiles, fetchProfile } = useProfileStore();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [gcalConnected, setGcalConnected] = useState(false);
@@ -137,6 +141,14 @@ export function ProfileScreen() {
                   <Text style={styles.suburb}>{profile.suburb}</Text>
                 ) : null}
               </View>
+              <Pressable
+                onPress={() => navigation.navigate('EditProfile')}
+                style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Edit profile"
+              >
+                <Text style={styles.editButtonText}>Edit</Text>
+              </Pressable>
             </View>
 
             {/* Bio */}
@@ -301,6 +313,17 @@ const styles = StyleSheet.create({
   },
   avatarInfo: {
     flex: 1,
+  },
+  editButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+  },
+  editButtonText: {
+    ...typography.label,
+    color: colors.textPrimary,
   },
   displayName: {
     ...typography.h3,
