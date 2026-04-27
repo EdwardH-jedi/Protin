@@ -111,7 +111,10 @@ export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
         // null it out — onboarding routing depends on it.
         birthYear: profile?.birthYear,
         suburb,
-        bio: trimmedBio.length > 0 ? trimmedBio : undefined,
+        // Send `null` (not `undefined`) when the user clears the bio so the
+        // backend explicitly sets the column to NULL. JSON.stringify drops
+        // undefined keys, which would leave the previous bio in place.
+        bio: trimmedBio.length > 0 ? trimmedBio : null,
       });
       // Re-fetch so the Profile screen we return to renders the persisted
       // values (including any photo URLs the server just minted).

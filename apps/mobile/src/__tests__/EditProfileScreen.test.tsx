@@ -162,6 +162,31 @@ describe('EditProfileScreen', () => {
 
   // ── Save without changing photos ───────────────────────────────────────────
 
+  it('persists a changed suburb selected through the Select UI', async () => {
+    mockUpsertProfile.mockResolvedValue(undefined);
+    mockFetchProfile.mockResolvedValue(undefined);
+    const nav = makeNavigation();
+    const utils = render(
+      <EditProfileScreen navigation={nav as any} route={{} as any} />
+    );
+
+    // Open the suburb picker and choose a different suburb than the
+    // pre-populated one ("Newtown" → "Bondi"). The first matching label
+    // is the option in the modal list.
+    fireEvent.press(utils.getByLabelText('Sydney suburb'));
+    fireEvent.press(utils.getAllByText('Bondi')[0]);
+
+    fireEvent.press(utils.getByLabelText('Save profile'));
+
+    await waitFor(() => {
+      expect(mockUpsertProfile).toHaveBeenCalledWith(
+        expect.objectContaining({ suburb: 'Bondi' })
+      );
+    });
+    expect(mockFetchProfile).toHaveBeenCalledTimes(1);
+    expect(nav.goBack).toHaveBeenCalled();
+  });
+
   it('saves profile fields without uploading photos, then refreshes and goes back', async () => {
     mockUpsertProfile.mockResolvedValue(undefined);
     mockFetchProfile.mockResolvedValue(undefined);
@@ -186,16 +211,27 @@ describe('EditProfileScreen', () => {
     expect(nav.goBack).toHaveBeenCalled();
   });
 
-  it('sends bio as undefined when cleared so the backend can null it', async () => {
+  it('sends bio: null (not undefined) when the user clears the bio so the backend nulls it', async () => {
     mockUpsertProfile.mockResolvedValue(undefined);
     mockFetchProfile.mockResolvedValue(undefined);
+    const nav = makeNavigation();
     const utils = render(
-      <EditProfileScreen navigation={makeNavigation() as any} route={{} as any} />
+      <EditProfileScreen navigation={nav as any} route={{} as any} />
     );
     fireEvent.changeText(utils.getByLabelText('Bio'), '   ');
     fireEvent.press(utils.getByLabelText('Save profile'));
+
     await waitFor(() => expect(mockUpsertProfile).toHaveBeenCalled());
-    expect(mockUpsertProfile.mock.calls[0][0].bio).toBeUndefined();
+    const payload = mockUpsertProfile.mock.calls[0][0];
+    // Must be exactly `null` so JSON.stringify emits `"bio": null`. `undefined`
+    // would be dropped by the serializer and the backend would preserve the
+    // previous bio.
+    expect(payload.bio).toBeNull();
+    expect('bio' in payload).toBe(true);
+
+    // Save still completes the rest of the flow.
+    expect(mockFetchProfile).toHaveBeenCalledTimes(1);
+    expect(nav.goBack).toHaveBeenCalled();
   });
 
   // ── Save with replaced photos ──────────────────────────────────────────────

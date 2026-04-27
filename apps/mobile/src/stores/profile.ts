@@ -48,6 +48,15 @@ function absolutizeMediaUrl(url: string | null | undefined): string | null {
 // can rehydrate after restart/store reset.
 type ProfileResponse = UserProfile & { photos?: ProfilePhotoResponse[] };
 
+// Edits may explicitly clear the bio. JSON.stringify drops `undefined` keys,
+// so the call site must pass `null` to tell the backend "set this column to
+// NULL"; otherwise the previous value is preserved server-side. The shared
+// UserProfile type models a *read* shape (bio?: string) and intentionally
+// stays narrow — only the upsert input widens here.
+export type UpsertProfileInput = Omit<Partial<UserProfile>, 'bio'> & {
+  bio?: string | null;
+};
+
 interface ProfileState {
   profile: UserProfile | null;
   identityPreferences: IdentityPreferences | null;
@@ -57,7 +66,7 @@ interface ProfileState {
   // promoted into the store until the backend has persisted them.
   photoUris: string[];
   fetchProfile: () => Promise<void>;
-  upsertProfile: (data: Partial<UserProfile>) => Promise<void>;
+  upsertProfile: (data: UpsertProfileInput) => Promise<void>;
   uploadProfilePhotos: (uris: string[]) => Promise<string[]>;
   upsertIdentityPreferences: (data: SetIdentityPreferencesRequest) => Promise<void>;
   upsertSportProfile: (data: UpsertSportProfileRequest) => Promise<void>;
