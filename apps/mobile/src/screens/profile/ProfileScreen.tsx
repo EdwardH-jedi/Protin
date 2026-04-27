@@ -29,6 +29,13 @@ export function ProfileScreen() {
   const [error, setError] = useState<string | null>(null);
   const [gcalConnected, setGcalConnected] = useState(false);
   const [gcalConnecting, setGcalConnecting] = useState(false);
+  // `configured` is gated by the server having GOOGLE_CLIENT_ID set in its
+  // env. Default to true so older API builds (no `configured` in payload)
+  // keep showing the Connect button. The server stamps it false in
+  // unconfigured local/dev builds, which lets us hide the Connect button
+  // and avoid spamming /auth-url -> 503.
+  const [gcalConfigured, setGcalConfigured] = useState(true);
+  const [gcalError, setGcalError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProfile()
@@ -44,27 +51,39 @@ export function ProfileScreen() {
 
   useEffect(() => {
     api
-      .get<{ connected: boolean }>('/users/me/google-calendar/status')
-      .then((data) => setGcalConnected(data.connected))
+      .get<{ connected: boolean; configured?: boolean }>('/users/me/google-calendar/status')
+      .then((data) => {
+        setGcalConnected(data.connected);
+        if (typeof data.configured === 'boolean') setGcalConfigured(data.configured);
+      })
       .catch(() => {});
   }, []);
 
   const handleGoogleCalendarConnect = useCallback(async () => {
+    if (!gcalConfigured) return; // defensive: button is hidden, but never call /auth-url unconfigured
+    setGcalError(null);
     setGcalConnecting(true);
     try {
       const { url } = await api.get<{ url: string }>('/users/me/google-calendar/auth-url');
       const result = await WebBrowser.openAuthSessionAsync(url);
       if (result.type === 'success') {
         // Re-check status after browser closes
-        const status = await api.get<{ connected: boolean }>('/users/me/google-calendar/status');
+        const status = await api.get<{ connected: boolean; configured?: boolean }>(
+          '/users/me/google-calendar/status'
+        );
         setGcalConnected(status.connected);
+        if (typeof status.configured === 'boolean') setGcalConfigured(status.configured);
       }
-    } catch {
-      // Swallow — server may not have Google configured yet
+    } catch (err) {
+      // Surface the failure inline rather than silently swallowing — the
+      // disabled-feature path is handled separately via `gcalConfigured`.
+      setGcalError(
+        err instanceof Error ? err.message : "Couldn't open Google Calendar sign-in."
+      );
     } finally {
       setGcalConnecting(false);
     }
-  }, []);
+  }, [gcalConfigured]);
 
   const handleGoogleCalendarDisconnect = useCallback(async () => {
     try {
@@ -214,19 +233,33 @@ export function ProfileScreen() {
                   <Text style={styles.integrationActionText}>Disconnect</Text>
                 </Pressable>
               </View>
+            ) : !gcalConfigured ? (
+              <View style={styles.integrationDisabled}>
+                <Text style={styles.integrationDisabledTitle}>Google Calendar</Text>
+                <Text style={styles.integrationDisabledBody}>
+                  Calendar sync isn't configured for this build. It will be enabled in a future
+                  release.
+                </Text>
+              </View>
             ) : (
-              <Pressable
-                style={({ pressed }) => [styles.integrationButton, pressed && styles.pressed]}
-                onPress={handleGoogleCalendarConnect}
-                disabled={gcalConnecting}
-                accessibilityRole="button"
-              >
-                {gcalConnecting ? (
-                  <ActivityIndicator size="small" color={colors.textSecondary} />
-                ) : (
-                  <Text style={styles.integrationButtonText}>Connect Google Calendar</Text>
-                )}
-              </Pressable>
+              <>
+                <Pressable
+                  style={({ pressed }) => [styles.integrationButton, pressed && styles.pressed]}
+                  onPress={handleGoogleCalendarConnect}
+                  disabled={gcalConnecting}
+                  accessibilityRole="button"
+                  accessibilityLabel="Connect Google Calendar"
+                >
+                  {gcalConnecting ? (
+                    <ActivityIndicator size="small" color={colors.textSecondary} />
+                  ) : (
+                    <Text style={styles.integrationButtonText}>Connect Google Calendar</Text>
+                  )}
+                </Pressable>
+                {gcalError ? (
+                  <Text style={styles.integrationErrorText}>{gcalError}</Text>
+                ) : null}
+              </>
             )}
           </View>
 
@@ -487,6 +520,28 @@ const styles = StyleSheet.create({
   integrationButtonText: {
     ...typography.button,
     color: colors.brand,
+  },
+  integrationDisabled: {
+    backgroundColor: colors.inputBackground,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.xs,
+  },
+  integrationDisabledTitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  integrationDisabledBody: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
+  },
+  integrationErrorText: {
+    ...typography.bodySmall,
+    color: colors.error,
+    marginTop: spacing.sm,
+    textAlign: 'center',
   },
 
   // Legal

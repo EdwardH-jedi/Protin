@@ -143,14 +143,16 @@ async def handle_oauth_callback(
 
 
 async def get_status(db: AsyncSession, user_id: UUID) -> GoogleCalendarStatus:
+    configured = bool(get_settings().google_client_id)
     stmt = select(GoogleCalendarToken).where(GoogleCalendarToken.user_id == user_id)
     token = (await db.execute(stmt)).scalar_one_or_none()
     if token is None:
-        return GoogleCalendarStatus(connected=False)
+        return GoogleCalendarStatus(connected=False, configured=configured)
     return GoogleCalendarStatus(
         connected=True,
         calendar_id=token.calendar_id,
         connected_at=token.connected_at,
+        configured=configured,
     )
 
 

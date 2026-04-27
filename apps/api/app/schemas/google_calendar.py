@@ -17,6 +17,11 @@ class GoogleCalendarStatus(BaseModel):
     connected: bool
     calendar_id: str | None = None
     connected_at: datetime | None = None
+    # ``configured`` reports whether the server has Google OAuth credentials
+    # set in the environment. Mobile uses it to hide the Connect button when
+    # the integration is unavailable in a given build, so tapping does not
+    # produce a 503 from /auth-url.
+    configured: bool = False
 
 
 class CalendarBookingSyncStatus(BaseModel):
