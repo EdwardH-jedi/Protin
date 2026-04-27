@@ -42,7 +42,7 @@ export function OnboardingStep2Screen({ navigation }: Props) {
     if (!permission.granted) {
       Alert.alert(
         'Photo library access needed',
-        'Protin needs permission to your photo library so you can add profile photos.'
+        'MoveMate needs permission to your photo library so you can add profile photos.'
       );
       return;
     }

@@ -52,7 +52,7 @@ export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
     if (!permission.granted) {
       Alert.alert(
         'Photo library access needed',
-        'Protin needs permission to your photo library so you can update your profile photos.'
+        'MoveMate needs permission to your photo library so you can update your profile photos.'
       );
       return;
     }
