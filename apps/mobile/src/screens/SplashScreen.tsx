@@ -60,7 +60,7 @@ export function SplashScreen({ navigation }: SplashScreenProps) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.wordmark}>PROTIN</Text>
+      <Text style={styles.wordmark}>MOVEMATE</Text>
     </View>
   );
 }

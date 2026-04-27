@@ -97,7 +97,7 @@ describe('SplashScreen', () => {
     jest.useRealTimers();
   });
 
-  it('renders the PROTIN wordmark', () => {
+  it('renders the MOVEMATE wordmark', () => {
     mockAuthGetState.mockReturnValue({
       initialize: jest.fn().mockResolvedValue(undefined),
       token: null,
@@ -106,7 +106,7 @@ describe('SplashScreen', () => {
     const { getByText } = render(
       <SplashScreen navigation={nav as any} route={{} as any} />
     );
-    getByText('PROTIN');
+    getByText('MOVEMATE');
   });
 
   it('navigates to AuthEntry when no token is found after init', async () => {
