@@ -38,3 +38,8 @@ runs/*
 
 # Claude Code — hook state (session → run-file mapping)
 .claude/tmp/
+
+# Local development artifacts
+apps/api/.venv_win/
+apps/api/media/
+references/
