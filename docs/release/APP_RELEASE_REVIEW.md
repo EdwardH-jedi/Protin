@@ -126,6 +126,8 @@ Execute on a fresh Expo Go install on a real device (iOS first, then Android if 
 | `CORS_ORIGINS` | empty (wildcard) | comma-separated | comma-separated |
 | `MEDIA_ROOT` | `media` | container path | object-storage prefix when migrated |
 | `MEDIA_URL_PREFIX` | `/media` | `/media` | `/media` (until S3/GCS migration) |
+| `EXPO_PUBLIC_PRIVACY_URL` | optional (Alert if unset) | optional (Alert if unset) | **required** — hosted Privacy Policy URL |
+| `EXPO_PUBLIC_TERMS_URL` | optional (Alert if unset) | optional (Alert if unset) | **required** — hosted Terms of Service URL |
 
 **Other config / runtime checks**:
 - [ ] Auth secret is at least 32 bytes (current local default is shorter — `jwt` warns `InsecureKeyLengthWarning`). Production must rotate to a strong random.
@@ -171,7 +173,7 @@ Execute on a fresh Expo Go install on a real device (iOS first, then Android if 
 4. **Google Calendar OAuth check** — full connect / disconnect / event-sync round trip with real credentials.
 5. **Push notification device check** — token registration end-to-end.
 6. **Production / staging env review** — every env var in the table above present, `SECRET_KEY` rotated, `FIELD_ENCRYPTION_KEY` set, `INTERNAL_API_TOKEN` set, CORS origins explicit.
-7. **Privacy policy / Terms of Service / safety reporting policy** — copy linked from `apps/mobile/src/lib/legal.ts`, hosted at `PRIVACY_URL` and `TERMS_URL` (Apple Guideline 5.1.1, App Store metadata).
+7. **Privacy policy / Terms of Service / safety reporting policy** — copy linked from `apps/mobile/src/lib/legal.ts`, hosted at the URLs supplied via `EXPO_PUBLIC_PRIVACY_URL` and `EXPO_PUBLIC_TERMS_URL` (Apple Guideline 5.1.1, App Store metadata). The previous hardcoded `https://protin.app/{terms,privacy}` fallbacks have been removed because they 404; internal Expo Go builds without these env vars now show a "not configured" Alert instead of opening a broken page. Production / store builds MUST set both env vars to live URLs before submission.
 8. **App Store metadata and screenshots** — App Store Connect listing, age rating, support URL, marketing URL, screenshots per device size.
 9. **Crash monitoring / logging decision** — Sentry or equivalent on mobile + API; redaction of any PII.
 10. **Final clean git status** — only intentional release docs / commits on the release branch; no stray local files.

@@ -31,9 +31,15 @@ jest.mock('../lib/api', () => ({
 // ─── Mock @react-navigation/native ────────────────────────────────────────────
 
 const mockNavigate = jest.fn();
+const mockReset = jest.fn();
+const mockGetParent = jest.fn(() => ({ reset: mockReset }));
 
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: mockNavigate }),
+  useNavigation: () => ({
+    navigate: mockNavigate,
+    reset: mockReset,
+    getParent: mockGetParent,
+  }),
 }));
 
 // ─── Mock auth store ──────────────────────────────────────────────────────────
@@ -250,11 +256,20 @@ describe('ProfileScreen', () => {
 
   // ── Logout ─────────────────────────────────────────────────────────────────
 
-  it('calls logout when Log out is pressed', async () => {
+  it('calls logout and resets navigation to AuthEntry when Log out is pressed', async () => {
+    mockLogout.mockResolvedValue(undefined);
     const { getByLabelText } = render(<ProfileScreen />);
     await waitFor(() => getByLabelText('Log out'));
-    fireEvent.press(getByLabelText('Log out'));
+    await act(async () => {
+      fireEvent.press(getByLabelText('Log out'));
+    });
     expect(mockLogout).toHaveBeenCalledTimes(1);
+    // RootNavigator is not token-gated, so logout must explicitly reset the
+    // root stack; otherwise the user stays on the Profile tab with stale data.
+    expect(mockReset).toHaveBeenCalledWith({
+      index: 0,
+      routes: [{ name: 'AuthEntry' }],
+    });
   });
 
   // ── Delete account ─────────────────────────────────────────────────────────
@@ -301,8 +316,9 @@ describe('ProfileScreen', () => {
       expect(mockLogout).not.toHaveBeenCalled();
     });
 
-    it('calls DELETE /auth/me and logout when the user confirms', async () => {
+    it('calls DELETE /auth/me, logs out, and resets to AuthEntry on confirm', async () => {
       mockApiDelete.mockResolvedValue(undefined);
+      mockLogout.mockResolvedValue(undefined);
       const { getByLabelText } = render(<ProfileScreen />);
       await waitFor(() => getByLabelText('Delete my account'));
       fireEvent.press(getByLabelText('Delete my account'));
@@ -321,9 +337,22 @@ describe('ProfileScreen', () => {
 
       expect(mockApiDelete).toHaveBeenCalledWith('/auth/me');
       expect(mockLogout).toHaveBeenCalledTimes(1);
+      // Navigation reset must hit the *parent* (root) stack — that is where
+      // AuthEntry is registered. Resetting only the tab navigator would
+      // leave the user inside the authenticated stack.
+      expect(mockGetParent).toHaveBeenCalled();
+      expect(mockReset).toHaveBeenCalledWith({
+        index: 0,
+        routes: [{ name: 'AuthEntry' }],
+      });
+      // logout must be called BEFORE reset so the reset never re-renders
+      // Profile against the stale (just-deleted) account's state.
+      const logoutOrder = mockLogout.mock.invocationCallOrder[0];
+      const resetOrder = mockReset.mock.invocationCallOrder.at(-1)!;
+      expect(logoutOrder).toBeLessThan(resetOrder);
     });
 
-    it('shows a failure alert when the delete request rejects', async () => {
+    it('shows a failure alert and does not log out or reset nav when delete rejects', async () => {
       mockApiDelete.mockRejectedValue(new Error('500 server error'));
       const { getByLabelText } = render(<ProfileScreen />);
       await waitFor(() => getByLabelText('Delete my account'));
@@ -341,7 +370,11 @@ describe('ProfileScreen', () => {
       });
 
       expect(mockApiDelete).toHaveBeenCalledWith('/auth/me');
+      // Failed deletion must not clear the local session or send the user
+      // to AuthEntry — otherwise the user is stranded in a logged-out state
+      // even though their account still exists on the server.
       expect(mockLogout).not.toHaveBeenCalled();
+      expect(mockReset).not.toHaveBeenCalled();
       // Second alert call is the failure message
       expect(alertSpy).toHaveBeenCalledTimes(2);
       expect(alertSpy.mock.calls[1][0]).toBe('Delete failed');

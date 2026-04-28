@@ -70,6 +70,10 @@ interface ProfileState {
   uploadProfilePhotos: (uris: string[]) => Promise<string[]>;
   upsertIdentityPreferences: (data: SetIdentityPreferencesRequest) => Promise<void>;
   upsertSportProfile: (data: UpsertSportProfileRequest) => Promise<void>;
+  // Drop every cached field tied to the current session. Called from
+  // auth.logout() so a logout/delete-account flow cannot leave a stale
+  // profile (display name, photos, sport rows) visible to the next user.
+  reset: () => void;
 }
 
 function inferMimeFromUri(uri: string): string {
@@ -156,5 +160,14 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     const idx = current.findIndex((sp) => sp.sport === data.sport);
     const next = idx >= 0 ? current.map((sp, i) => (i === idx ? updated : sp)) : [...current, updated];
     set({ sportProfiles: next });
+  },
+
+  reset: () => {
+    set({
+      profile: null,
+      identityPreferences: null,
+      sportProfiles: null,
+      photoUris: [],
+    });
   },
 }));

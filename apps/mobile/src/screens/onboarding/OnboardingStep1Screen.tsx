@@ -108,6 +108,21 @@ export function OnboardingStep1Screen({ navigation }: Props) {
             autoCapitalize="words"
             autoCorrect={false}
             returnKeyType="next"
+            // iOS-specific: declare this is a nickname/display-name field, NOT
+            // a credential field. The previous version used "none", but on iOS
+            // "none" means "no declared type → use heuristics". After the
+            // RegisterScreen's newPassword field, iOS heuristics decide the
+            // next text input is part of the same credential flow and engage
+            // Strong Password Autofill — which paints the field background
+            // yellow and captures keystrokes before they reach React, so
+            // typed text never appears and the "Please enter a display name"
+            // error fires on Continue. "nickname" is the unambiguous iOS
+            // hint for a display-name field and breaks that association.
+            textContentType="nickname"
+            // Android-side belt-and-braces: keep system autofill off so the
+            // OS cannot inject a value without firing onChangeText.
+            autoComplete="off"
+            importantForAutofill="no"
           />
         </View>
 
@@ -221,7 +236,11 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    ...typography.bodyLarge,
+    // Use explicit fontSize/fontWeight from the bodyLarge token but omit
+    // lineHeight: setting lineHeight on a TextInput clips descenders (g, y, p)
+    // on Android and is unnecessary since TextInput is single-line here.
+    fontSize: typography.bodyLarge.fontSize,
+    fontWeight: typography.bodyLarge.fontWeight,
     color: colors.textPrimary,
     backgroundColor: colors.inputBackground,
   },

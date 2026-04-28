@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -10,7 +9,7 @@ import {
 } from 'react-native';
 
 import { Screen } from '../../components/Screen';
-import { PRIVACY_URL, TERMS_URL } from '../../lib/legal';
+import { openLegal, PRIVACY_URL, TERMS_URL } from '../../lib/legal';
 import { useAuthStore } from '../../stores/auth';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -107,7 +106,7 @@ export function RegisterScreen({ navigation }: Props) {
           <Text
             style={styles.legalLink}
             accessibilityRole="link"
-            onPress={() => Linking.openURL(TERMS_URL)}
+            onPress={() => openLegal(TERMS_URL, 'Terms of Service')}
           >
             Terms of Service
           </Text>
@@ -115,7 +114,7 @@ export function RegisterScreen({ navigation }: Props) {
           <Text
             style={styles.legalLink}
             accessibilityRole="link"
-            onPress={() => Linking.openURL(PRIVACY_URL)}
+            onPress={() => openLegal(PRIVACY_URL, 'Privacy Policy')}
           >
             Privacy Policy
           </Text>
@@ -176,7 +175,11 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    ...typography.bodyLarge,
+    // Use explicit fontSize/fontWeight from the bodyLarge token but omit
+    // lineHeight: setting lineHeight on a TextInput clips descenders (g, y, p)
+    // on Android and is unnecessary since TextInput is single-line here.
+    fontSize: typography.bodyLarge.fontSize,
+    fontWeight: typography.bodyLarge.fontWeight,
     color: colors.textPrimary,
     backgroundColor: colors.inputBackground,
   },

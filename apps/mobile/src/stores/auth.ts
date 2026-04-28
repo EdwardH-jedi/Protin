@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import type { AppleSignInRequest, MeResponse, TokenResponse } from '@protin/shared-types';
 
 import { api, setToken } from '../lib/api';
+import { useProfileStore } from './profile';
 
 const TOKEN_KEY = 'protin.auth.token';
 
@@ -67,6 +68,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     setToken(null);
     set({ token: null, user: null });
+    // Drop every session-bound row out of the profile store too.
+    // Without this, a logged-out (or just-deleted) user could briefly see
+    // the previous account's display name, photos and sport rows on the
+    // Profile tab while navigation is being reset.
+    useProfileStore.getState().reset();
   },
 
   initialize: async () => {

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,7 +14,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { Screen } from '../../components/Screen';
 import { api } from '../../lib/api';
-import { PRIVACY_URL, TERMS_URL } from '../../lib/legal';
+import { openLegal, PRIVACY_URL, TERMS_URL } from '../../lib/legal';
 import { useAuthStore } from '../../stores/auth';
 import { sportLabel, useProfileStore } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -92,6 +91,20 @@ export function ProfileScreen() {
     } catch {}
   }, []);
 
+  // Reset the root stack to AuthEntry. RootNavigator is not token-gated, so
+  // after logout/delete-account the user would otherwise stay on the Profile
+  // tab. We reset the *parent* navigator (the root native-stack) because the
+  // tab navigator does not own the AuthEntry route.
+  const resetToAuthEntry = useCallback(() => {
+    const parent = navigation.getParent();
+    (parent ?? navigation).reset({ index: 0, routes: [{ name: 'AuthEntry' }] });
+  }, [navigation]);
+
+  const handleLogout = useCallback(async () => {
+    await logout();
+    resetToAuthEntry();
+  }, [logout, resetToAuthEntry]);
+
   const handleDeleteAccount = useCallback(() => {
     Alert.alert(
       'Delete your account?',
@@ -104,9 +117,11 @@ export function ProfileScreen() {
           onPress: async () => {
             try {
               await api.delete('/auth/me');
-              // RootNavigator is token-gated, so clearing the store routes
-              // the user back to the auth entry automatically.
+              // Order matters: clear local session first (logout drops the
+              // token + resets the profile store), then reset navigation so
+              // we never re-render Profile against stale state.
               await logout();
+              resetToAuthEntry();
             } catch {
               Alert.alert(
                 'Delete failed',
@@ -117,7 +132,7 @@ export function ProfileScreen() {
         },
       ]
     );
-  }, [logout]);
+  }, [logout, resetToAuthEntry]);
 
   if (isLoading) {
     return (
@@ -269,7 +284,7 @@ export function ProfileScreen() {
             <View style={styles.legalList}>
               <Pressable
                 style={({ pressed }) => [styles.legalRow, pressed && styles.pressed]}
-                onPress={() => Linking.openURL(PRIVACY_URL)}
+                onPress={() => openLegal(PRIVACY_URL, 'Privacy Policy')}
                 accessibilityRole="link"
                 accessibilityLabel="Privacy Policy"
               >
@@ -277,7 +292,7 @@ export function ProfileScreen() {
               </Pressable>
               <Pressable
                 style={({ pressed }) => [styles.legalRow, pressed && styles.pressed]}
-                onPress={() => Linking.openURL(TERMS_URL)}
+                onPress={() => openLegal(TERMS_URL, 'Terms of Service')}
                 accessibilityRole="link"
                 accessibilityLabel="Terms of Service"
               >
@@ -291,7 +306,7 @@ export function ProfileScreen() {
         <View style={styles.actionStack}>
           <Pressable
             style={({ pressed }) => [styles.logoutButton, pressed && styles.pressed]}
-            onPress={logout}
+            onPress={handleLogout}
             accessibilityRole="button"
             accessibilityLabel="Log out"
           >

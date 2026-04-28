@@ -261,4 +261,98 @@ describe('OnboardingStep1Screen', () => {
     await waitFor(() => utils.getByText('Server error'));
     expect(nav.navigate).not.toHaveBeenCalled();
   });
+
+  // ── Display name input rendering bug regression ────────────────────────────
+  // History on this field, all real-device-only bugs that synthetic Jest
+  // events cannot reproduce — these tests pin the *contract* that defeats
+  // each one so the regression cannot recur silently:
+  //   1. Text clipped vertically because the input style spread a typography
+  //      token whose lineHeight was larger than the fontSize (Android cuts
+  //      descenders in single-line TextInput when lineHeight > fontSize).
+  //   2. iOS Password Autofill carry-over: after RegisterScreen's
+  //      textContentType="newPassword" field, iOS put the next text input
+  //      on OnboardingStep1 into Strong Password context — yellow background,
+  //      keystrokes captured by autofill before reaching React state, so
+  //      typing "Jordan" left displayName='' and Continue showed
+  //      "Please enter a display name". A previous fix set
+  //      textContentType="none" thinking that disabled autofill; on iOS
+  //      "none" means "use heuristics" and is exactly what let the carry-over
+  //      win. The fix is textContentType="nickname" — an unambiguous
+  //      non-credential semantic that breaks the carry-over.
+  //   3. Android system autofill writing to the native input without firing
+  //      onChangeText — covered by autoComplete="off" + importantForAutofill="no".
+  describe('display name input rendering (regression)', () => {
+    function getDisplayNameInput(utils: ReturnType<typeof render>) {
+      return utils.getByPlaceholderText("How you'll appear to others");
+    }
+
+    it('does not set a TextInput lineHeight that would clip descenders', () => {
+      const utils = render(
+        <OnboardingStep1Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const input = getDisplayNameInput(utils);
+      const style = Array.isArray(input.props.style)
+        ? Object.assign({}, ...input.props.style)
+        : input.props.style;
+      // lineHeight on a single-line TextInput clips descenders on Android.
+      expect(style.lineHeight).toBeUndefined();
+      // Text colour must be the explicit primary text colour from the theme,
+      // not a transient yellow autofill tint or undefined.
+      const { colors: themeColors } = require('../theme');
+      expect(style.color).toBe(themeColors.textPrimary);
+    });
+
+    it('declares an iOS non-credential content type so Strong Password Autofill cannot capture the field', () => {
+      const utils = render(
+        <OnboardingStep1Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const input = getDisplayNameInput(utils);
+      // Must NOT be "none": on iOS that means "use heuristics", which after
+      // the RegisterScreen newPassword field carries the credential context
+      // forward and yellows this field. Must be a name-type semantic so iOS
+      // unambiguously knows this is not a credential entry.
+      expect(input.props.textContentType).not.toBe('none');
+      expect(['nickname', 'username', 'givenName', 'name']).toContain(
+        input.props.textContentType
+      );
+    });
+
+    it('disables Android system autofill so typed text stays in React state', () => {
+      const utils = render(
+        <OnboardingStep1Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const input = getDisplayNameInput(utils);
+      expect(input.props.autoComplete).toBe('off');
+      expect(input.props.importantForAutofill).toBe('no');
+    });
+
+    // State-payload contract test: this is the structural assertion that
+    // would catch a state-desync regression on this field even when the
+    // *cause* is native (autofill capture / IME composing region) and Jest
+    // cannot reproduce it. The contract is: whatever string the field's
+    // onChangeText receives must end up in the upsertProfile payload as
+    // `displayName`, and the "Please enter a display name" error must not
+    // appear. Any future change that reads the value from somewhere other
+    // than the controlled `value` state — or renames the payload key — will
+    // fail this test.
+    it('flows the typed value through to the upsertProfile payload as displayName, no validation error', async () => {
+      mockUpsertProfile.mockResolvedValue(undefined);
+      const utils = render(
+        <OnboardingStep1Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      fillRequired(utils, { name: 'Jordan Lee', year: '1990', suburb: 'Newtown' });
+      fireEvent.press(utils.getByText('Continue'));
+      await waitFor(() => {
+        expect(mockUpsertProfile).toHaveBeenCalledWith(
+          expect.objectContaining({ displayName: 'Jordan Lee' })
+        );
+      });
+      // The display-name validation message must never appear when the
+      // user actually typed a name. Birth year + suburb errors must also
+      // not appear because they were filled.
+      expect(utils.queryByText('Please enter a display name.')).toBeNull();
+      expect(utils.queryByText('Please select your birth year.')).toBeNull();
+      expect(utils.queryByText('Please select your Sydney suburb.')).toBeNull();
+    });
+  });
 });

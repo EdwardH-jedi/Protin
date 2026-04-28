@@ -174,4 +174,20 @@ describe('RegisterScreen', () => {
     fireEvent.press(getByText('Log in'));
     expect(nav.replace).toHaveBeenCalledWith('LoginScreen');
   });
+
+  // ── Email input rendering bug regression ───────────────────────────────────
+  // Earlier the email input visibly clipped descenders ("g", "y", "p") near
+  // the bottom of the field. The cause was the input style spreading a
+  // typography token whose lineHeight (26) was larger than the fontSize on a
+  // single-line TextInput, which clips descenders on Android.
+  it('does not set a TextInput lineHeight that would clip the email text', () => {
+    const { getByPlaceholderText } = render(
+      <RegisterScreen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    const input = getByPlaceholderText('you@example.com');
+    const style = Array.isArray(input.props.style)
+      ? Object.assign({}, ...input.props.style)
+      : input.props.style;
+    expect(style.lineHeight).toBeUndefined();
+  });
 });
