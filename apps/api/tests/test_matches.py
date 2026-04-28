@@ -97,7 +97,7 @@ async def _mutual_like(
 
 async def test_matches_requires_auth(client: AsyncClient) -> None:
     r = await client.get("/matches")
-    assert r.status_code == 403
+    assert r.status_code in (401, 403)
 
 
 async def test_matches_empty_for_new_user(client: AsyncClient) -> None:

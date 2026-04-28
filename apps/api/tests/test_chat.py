@@ -97,7 +97,7 @@ async def _mutual_like_and_get_match_id(
 
 async def test_list_messages_requires_auth(client: AsyncClient) -> None:
     r = await client.get("/matches/00000000-0000-0000-0000-000000000001/messages")
-    assert r.status_code == 403
+    assert r.status_code in (401, 403)
 
 
 async def test_send_message_requires_auth(client: AsyncClient) -> None:
@@ -105,7 +105,7 @@ async def test_send_message_requires_auth(client: AsyncClient) -> None:
         "/matches/00000000-0000-0000-0000-000000000001/messages",
         json={"body": "hello"},
     )
-    assert r.status_code == 403
+    assert r.status_code in (401, 403)
 
 
 async def test_list_messages_nonexistent_match_returns_404(client: AsyncClient) -> None:

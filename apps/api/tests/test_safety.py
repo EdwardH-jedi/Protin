@@ -76,7 +76,7 @@ async def test_create_report_requires_auth(client: AsyncClient) -> None:
             "reason": "spam",
         },
     )
-    assert r.status_code == 403
+    assert r.status_code in (401, 403)
 
 
 async def test_create_report_returns_record(client: AsyncClient) -> None:
@@ -124,7 +124,7 @@ async def test_report_with_context(client: AsyncClient) -> None:
 
 async def test_block_requires_auth(client: AsyncClient) -> None:
     r = await client.post("/blocks/00000000-0000-0000-0000-000000000001")
-    assert r.status_code == 403
+    assert r.status_code in (401, 403)
 
 
 async def test_block_user(client: AsyncClient) -> None:

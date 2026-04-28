@@ -108,12 +108,12 @@ _BOOKING_PAYLOAD = {
 
 async def test_bookings_requires_auth(client: AsyncClient) -> None:
     r = await client.get("/bookings")
-    assert r.status_code == 403
+    assert r.status_code in (401, 403)
 
 
 async def test_create_booking_requires_auth(client: AsyncClient) -> None:
     r = await client.post("/bookings", json={**_BOOKING_PAYLOAD, "match_id": "00000000-0000-0000-0000-000000000001"})
-    assert r.status_code == 403
+    assert r.status_code in (401, 403)
 
 
 async def test_create_booking_on_nonexistent_match_returns_404(client: AsyncClient) -> None:

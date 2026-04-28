@@ -134,7 +134,10 @@ async def test_get_me_with_valid_token_returns_user(client: AsyncClient) -> None
 
 async def test_get_me_with_no_token_returns_401(client: AsyncClient) -> None:
     r = await client.get("/auth/me")
-    assert r.status_code == 403  # HTTPBearer returns 403 when no credentials supplied
+    # FastAPI's HTTPBearer returned 403 historically; current versions
+    # return 401 with `Not authenticated`. Accept both so we don't pin the
+    # test to one FastAPI/Starlette internals revision.
+    assert r.status_code in (401, 403)
 
 
 async def test_get_me_with_invalid_token_returns_401(client: AsyncClient) -> None:

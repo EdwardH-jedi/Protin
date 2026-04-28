@@ -64,6 +64,17 @@ async def _register(client: AsyncClient, email: str) -> str:
     return r.json()["access_token"]
 
 
+async def _register_with_id(client: AsyncClient, email: str) -> tuple[str, str]:
+    """Register and additionally fetch the user id via /auth/me.
+
+    Used by tests that need to assert on user_id ordering in the discovery
+    feed without making the broader test fixture more invasive.
+    """
+    token = await _register(client, email)
+    me = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    return token, me.json()["id"]
+
+
 def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
@@ -75,7 +86,10 @@ def _auth(token: str) -> dict[str, str]:
 
 async def test_discovery_requires_auth(client: AsyncClient) -> None:
     r = await client.get("/discovery?sport=gym")
-    assert r.status_code == 403
+    # FastAPI's HTTPBearer (auto_error=True) returns 401 with
+    # `Not authenticated` when no credentials are presented; accept either
+    # 401 or 403 to stay robust to FastAPI/Starlette internals changes.
+    assert r.status_code in (401, 403)
 
 
 async def test_discovery_returns_paginated_shape(client: AsyncClient) -> None:
@@ -147,7 +161,7 @@ async def test_record_action_requires_auth(client: AsyncClient) -> None:
             "sport": "gym",
         },
     )
-    assert r.status_code == 403
+    assert r.status_code in (401, 403)
 
 
 async def test_record_action_returns_shape(client: AsyncClient) -> None:
@@ -273,13 +287,16 @@ async def test_acted_on_users_excluded_from_feed(client: AsyncClient) -> None:
 
 
 def _make_sp(level: str, preferred_times: list[str]):
-    """Build a minimal SportProfile-like object for scoring tests."""
-    from app.models.profile import SportProfile
+    """Build a minimal SportProfile-shaped duck-typed object.
 
-    sp = SportProfile.__new__(SportProfile)
-    sp.level = level
-    sp.preferred_times = preferred_times
-    return sp
+    `_score_compatibility` only reads ``level`` and ``preferred_times``,
+    so a SimpleNamespace is enough — and avoids the SQLAlchemy 2.x
+    ``InstrumentedAttribute`` machinery that rejects writes on instances
+    created via ``__new__`` without state-tracking.
+    """
+    from types import SimpleNamespace
+
+    return SimpleNamespace(level=level, preferred_times=preferred_times)
 
 
 def test_score_same_level_flexible_is_one():
@@ -333,9 +350,9 @@ def test_score_partial_time_overlap():
 
 async def test_feed_orders_by_compatibility(client: AsyncClient) -> None:
     """Higher-compatibility partner must appear before lower-compatibility one."""
-    token_actor, uid_actor = await _register(client, "score_actor@example.com")
-    token_hi, uid_hi = await _register(client, "score_hi@example.com")
-    token_lo, uid_lo = await _register(client, "score_lo@example.com")
+    token_actor, uid_actor = await _register_with_id(client, "score_actor@example.com")
+    token_hi, uid_hi = await _register_with_id(client, "score_hi@example.com")
+    token_lo, uid_lo = await _register_with_id(client, "score_lo@example.com")
 
     # Actor: intermediate gym, morning
     await client.put(

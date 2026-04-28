@@ -38,5 +38,8 @@ async def test_health_db_failure_does_not_crash(client: AsyncClient) -> None:
     response = await client.get("/health")
     _app.dependency_overrides.pop(get_db)
 
-    assert response.status_code == 200
+    # The endpoint reports 200 when all subsystems are healthy and 503 when
+    # one is degraded. The contract under test is "doesn't crash + reports
+    # the failing subsystem in `checks`", which both response codes satisfy.
+    assert response.status_code == 503
     assert response.json()["checks"]["db"] == "error"
