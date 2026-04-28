@@ -105,20 +105,20 @@ describe('ReportScreen', () => {
   // ── Submit button guard ────────────────────────────────────────────────────
 
   it('Submit report button is disabled before a reason is selected', () => {
-    const { getByText } = render(
+    const { getByLabelText } = render(
       <ReportScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
     );
-    const btn = getByText('Submit report').parent;
-    expect(btn?.props.accessibilityState?.disabled ?? btn?.props.disabled).toBeTruthy();
+    const btn = getByLabelText('Submit report');
+    expect(btn.props.accessibilityState?.disabled ?? btn.props.disabled).toBeTruthy();
   });
 
   it('Submit report button is enabled after selecting a reason', () => {
-    const { getByText } = render(
+    const { getByLabelText, getByText } = render(
       <ReportScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
     );
     fireEvent.press(getByText('Harassment'));
-    const btn = getByText('Submit report').parent;
-    expect(btn?.props.accessibilityState?.disabled ?? btn?.props.disabled).toBeFalsy();
+    const btn = getByLabelText('Submit report');
+    expect(btn.props.accessibilityState?.disabled ?? btn.props.disabled).toBeFalsy();
   });
 
   it('does not call api.post when button is disabled', () => {

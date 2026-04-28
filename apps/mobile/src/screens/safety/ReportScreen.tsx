@@ -139,6 +139,7 @@ export function ReportScreen({ route, navigation }: ReportScreenProps) {
             onPress={handleSubmit}
             disabled={!reason || isSubmitting}
             accessibilityRole="button"
+            accessibilityLabel="Submit report"
           >
             {isSubmitting ? (
               <ActivityIndicator color={colors.textInverse} />
