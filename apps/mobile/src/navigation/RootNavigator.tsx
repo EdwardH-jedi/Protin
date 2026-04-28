@@ -76,12 +76,20 @@ export function RootNavigator() {
   const { token } = useAuthStore();
 
   useEffect(() => {
-    configureForegroundHandler();
+    try {
+      configureForegroundHandler();
+    } catch {
+      // Notification support varies in Expo Go/dev clients. Foreground
+      // handler setup must not block auth routing.
+    }
   }, []);
 
   useEffect(() => {
     if (token) {
-      registerForPushNotifications();
+      void registerForPushNotifications().catch(() => {
+        // Push registration is best-effort and auth-adjacent only because it
+        // starts after login/register. Failures must not surface as auth errors.
+      });
     }
   }, [token]);
 
