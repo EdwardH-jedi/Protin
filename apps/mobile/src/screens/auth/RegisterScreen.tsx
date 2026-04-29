@@ -46,8 +46,8 @@ export function RegisterScreen({ navigation }: Props) {
   return (
     <Screen padded scroll withKeyboard>
       <View style={styles.header}>
-        <Text style={styles.wordmark}>movemate</Text>
-        <Text style={styles.eyebrow}>Let's go</Text>
+        <Text style={styles.wordmark}>sportsgang</Text>
+        <Text style={styles.eyebrow}>Join the gang</Text>
         <Text style={styles.title}>Create your{'\n'}account</Text>
       </View>
 

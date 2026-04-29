@@ -52,7 +52,7 @@ export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
     if (!permission.granted) {
       Alert.alert(
         'Photo library access needed',
-        'MoveMate needs permission to your photo library so you can update your profile photos.'
+        'SportsGang needs permission to your photo library so you can update your profile photos.'
       );
       return;
     }
@@ -490,7 +490,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   removeButtonText: {
-    color: colors.textInverse,
+    // Hardcoded white: the removeButton background is a fixed dark dot,
+    // independent of theme `textInverse`.
+    color: '#FFFFFF',
     fontSize: 20,
     lineHeight: 22,
   },

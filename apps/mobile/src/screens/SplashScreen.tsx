@@ -19,8 +19,8 @@ import type { SplashScreenProps } from '../navigation/types';
  *                            into Main with a missing display_name)
  *   - token, Step 1 done   → Main
  *
- * The native splash (app.json backgroundColor #102A43) matches this
- * background — no visible flash on launch.
+ * The native splash (app.config.js splash.backgroundColor #C6FF3D — the
+ * SportsGang lime) matches this background — no visible flash on launch.
  */
 export function SplashScreen({ navigation }: SplashScreenProps) {
   useEffect(() => {
@@ -60,7 +60,7 @@ export function SplashScreen({ navigation }: SplashScreenProps) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.wordmark}>MOVEMATE</Text>
+      <Text style={styles.wordmark}>SPORTSGANG</Text>
     </View>
   );
 }

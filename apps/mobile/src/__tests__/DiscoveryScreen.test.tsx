@@ -99,7 +99,7 @@ describe('DiscoveryScreen', () => {
   it('shows a loading indicator while isLoading is true', () => {
     setupDiscovery({ isLoading: true, partners: [] });
     const { getByText } = render(<DiscoveryScreen />);
-    getByText('Finding partners...');
+    getByText('Finding players...');
   });
 
   // ── Error state ────────────────────────────────────────────────────────────
@@ -124,8 +124,8 @@ describe('DiscoveryScreen', () => {
   it('shows the empty-state message when partners is empty and not loading', () => {
     setupDiscovery({ partners: [] });
     const { getByText } = render(<DiscoveryScreen />);
-    getByText("You've seen everyone for now.");
-    getByText('Check back soon for new workout partners.');
+    getByText('No more gang-mates nearby.');
+    getByText('Check back soon — new players join every week.');
   });
 
   it('calls fetchMore when the Refresh button is pressed in empty state', () => {
@@ -221,7 +221,7 @@ describe('DiscoveryScreen', () => {
     });
 
     await waitFor(() => {
-      expect(queryByText("It's a match!")).not.toBeNull();
+      expect(queryByText('Linked up.')).not.toBeNull();
     });
   });
 
@@ -234,7 +234,7 @@ describe('DiscoveryScreen', () => {
       fireEvent.press(getByLabelText('Like'));
     });
 
-    expect(queryByText("It's a match!")).toBeNull();
+    expect(queryByText('Linked up.')).toBeNull();
   });
 
   // ── Action error resilience ────────────────────────────────────────────────

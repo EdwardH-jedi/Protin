@@ -1,51 +1,55 @@
 /**
- * MoveMate design tokens.
+ * SportsGang design tokens.
  *
- * Translated from references/movemate_web_export — visual direction only,
- * not the literal CSS variables (the export uses Tailwind/oklch which
- * doesn't translate to React Native).
+ * Visual direction: electric neon-lime accent on a near-black surface.
+ * Lime is the brand mark; black + dark elevation are the canvas.
  *
- * Visual direction:
- *   background  — clean white, mobile-app feel
- *   brand       — athletic blue (Tailwind blue-600), primary CTA + accent text
- *   brandDark*  — deep navy used in hero gradient on Welcome / AuthEntry
- *   accent      — slightly lighter blue, for active states
- *   text*       — neutral grey ramp (gray-900 → gray-400)
+ *   background        — near-black, the base canvas under every Screen
+ *   surface           — slightly lighter than background for cards / chrome
+ *   surfaceElevated   — one step brighter for raised content (banner gutter)
+ *   text*             — off-white ramp; tertiary still readable on dark
+ *   textInverse       — near-black, used as text color on lime brand fills
+ *   brand             — electric lime, the headline accent
+ *   brandDark*        — deeper / darker lime + pure black for hero gradients
+ *   brandSoft         — translucent lime tint, used for badges / soft fills
+ *   accent            — slightly brighter lime for hover / pressed
+ *   error / success   — tuned for legibility on dark surfaces
  *
- * Token *names* are kept stable so onboarding / profile / discovery screens
- * compile against the new values without code changes. New MoveMate-only
- * keys (brandDark, brandDarkest, brandSoft, inputBackground) are additive
- * and only consumed by the auth screens.
+ * Token *names* are kept stable so existing screens compile without touching
+ * unrelated files. The single load-bearing flip is `textInverse` (white →
+ * near-black) so that text on the lime brand fill reads correctly. The few
+ * places that need light text on a hardcoded dark surface (image overlay /
+ * remove-photo dot) override the color locally.
  */
 
 export const colors = {
   // Backgrounds
-  background: '#FFFFFF',
-  surface: '#FFFFFF',
-  surfaceElevated: '#F9FAFB',
+  background: '#0A0A0A',
+  surface: '#111114',
+  surfaceElevated: '#16161B',
 
   // Text
-  textPrimary: '#0F172A',   // slate-900 — strong on white
-  textSecondary: '#475569', // slate-600 — body copy
-  textTertiary: '#94A3B8',  // slate-400 — hints, placeholders
-  textInverse: '#FFFFFF',
+  textPrimary: '#F5F5F0',   // off-white
+  textSecondary: '#A8A8A2', // muted body
+  textTertiary: '#6E6E68',  // hints, placeholders
+  textInverse: '#0A0A0A',   // text on lime brand fills
 
-  // Brand — MoveMate blue family
-  brand: '#2563EB',         // blue-600 — primary CTAs, links
-  brandDark: '#1E3A8A',     // blue-900 — hero gradient mid
-  brandDarkest: '#172554',  // blue-950 — hero gradient base
-  brandSoft: '#DBEAFE',     // blue-100 — light tint, supporting copy on dark
-  accent: '#3B82F6',        // blue-500 — active/hover state on light surfaces
+  // Brand — electric lime family
+  brand: '#C6FF3D',         // electric lime, primary CTA + accent
+  brandDark: '#9CCC1F',     // deeper lime, pressed state
+  brandDarkest: '#000000',  // pure black, hero base
+  brandSoft: 'rgba(198,255,61,0.14)', // translucent lime tint for badges
+  accent: '#DBFF66',        // brighter lime, hover/active
 
   // UI chrome
-  border: '#E5E7EB',        // gray-200 — input + card edges
-  separator: '#F1F5F9',     // slate-100 — soft list dividers
-  overlay: 'rgba(15, 23, 42, 0.55)',
-  inputBackground: '#F3F4F6', // gray-100 — matches reference --input-background
+  border: '#26262B',
+  separator: '#1B1B20',
+  overlay: 'rgba(0, 0, 0, 0.65)',
+  inputBackground: '#15151A',
 
   // Feedback
-  error: '#DC2626',         // red-600
-  success: '#16A34A',       // green-600
+  error: '#FF5C5C',
+  success: '#5BFF8B',
 } as const;
 
 export const spacing = {

@@ -86,7 +86,10 @@ module.exports = () => {
       orientation: "portrait",
       userInterfaceStyle: "light",
       splash: {
-        backgroundColor: "#102A43",
+        // Matches `SplashScreen.tsx`'s lime background (theme `brand`).
+        // Keep these in sync — mismatch causes a visible color flash on cold
+        // launch between native splash and the in-app splash component.
+        backgroundColor: "#C6FF3D",
         resizeMode: "contain",
       },
       assetBundlePatterns: ["**/*"],
@@ -96,7 +99,7 @@ module.exports = () => {
         supportsTablet: false,
         infoPlist: {
           NSCalendarsUsageDescription:
-            "Protin uses your calendar to add confirmed workout sessions.",
+            "SportsGang uses your calendar to add confirmed workout sessions.",
           // Required because expo-notifications is declared in plugins and
           // relies on silent remote push delivery in the background.
           UIBackgroundModes: ["remote-notification"],

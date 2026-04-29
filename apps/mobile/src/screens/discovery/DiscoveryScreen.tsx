@@ -20,8 +20,8 @@ function MatchBanner({ visible }: { visible: boolean }) {
   if (!visible) return null;
   return (
     <View style={styles.matchBanner} pointerEvents="none">
-      <Text style={styles.matchBannerEyebrow}>Match</Text>
-      <Text style={styles.matchBannerText}>It's a match!</Text>
+      <Text style={styles.matchBannerEyebrow}>Linked</Text>
+      <Text style={styles.matchBannerText}>Linked up.</Text>
     </View>
   );
 }
@@ -270,7 +270,7 @@ export function DiscoveryScreen() {
       {isLoading ? (
         <View style={styles.centred}>
           <ActivityIndicator size="large" color={colors.brand} />
-          <Text style={styles.loadingText}>Finding partners...</Text>
+          <Text style={styles.loadingText}>Finding players...</Text>
         </View>
       ) : error ? (
         <View style={styles.centred}>
@@ -288,8 +288,8 @@ export function DiscoveryScreen() {
           <View style={styles.emptyIcon}>
             <Text style={styles.emptyIconText}>·</Text>
           </View>
-          <Text style={styles.emptyTitle}>You've seen everyone for now.</Text>
-          <Text style={styles.emptyBody}>Check back soon for new workout partners.</Text>
+          <Text style={styles.emptyTitle}>No more gang-mates nearby.</Text>
+          <Text style={styles.emptyBody}>Check back soon — new players join every week.</Text>
           <Pressable
             style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
             onPress={fetchMore}
@@ -441,7 +441,9 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.5,
-    color: colors.textInverse,
+    // Hardcoded white: the hero darken overlay is the same on every card so
+    // light text is the contract here, independent of theme `textInverse`.
+    color: '#FFFFFF',
   },
   heroSuburb: {
     ...typography.bodyLarge,
@@ -608,7 +610,7 @@ const styles = StyleSheet.create({
   },
   matchBannerEyebrow: {
     ...typography.label,
-    color: colors.brandSoft,
+    color: colors.textInverse,
     marginBottom: spacing.xs,
   },
   matchBannerText: {

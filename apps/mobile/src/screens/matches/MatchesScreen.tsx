@@ -147,7 +147,7 @@ export function MatchesScreen() {
         <View style={styles.centred}>
           <Text style={styles.emptyTitle}>No matches yet</Text>
           <Text style={styles.emptyBody}>
-            Like someone and see if they like you back.{'\n'}Mutual likes become matches.
+            Tap players you'd train with.{'\n'}When they tap back, they show up here.
           </Text>
         </View>
       ) : (

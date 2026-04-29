@@ -108,7 +108,7 @@ export function LoginScreen({ navigation }: Props) {
   return (
     <Screen padded scroll withKeyboard>
       <View style={styles.header}>
-        <Text style={styles.wordmark}>movemate</Text>
+        <Text style={styles.wordmark}>sportsgang</Text>
         <Text style={styles.eyebrow}>Welcome back</Text>
         <Text style={styles.title}>Log in</Text>
       </View>

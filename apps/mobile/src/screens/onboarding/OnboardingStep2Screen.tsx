@@ -42,7 +42,7 @@ export function OnboardingStep2Screen({ navigation }: Props) {
     if (!permission.granted) {
       Alert.alert(
         'Photo library access needed',
-        'MoveMate needs permission to your photo library so you can add profile photos.'
+        'SportsGang needs permission to your photo library so you can add profile photos.'
       );
       return;
     }
@@ -342,7 +342,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   removeButtonText: {
-    color: colors.textInverse,
+    // Hardcoded white: the removeButton background is a fixed dark dot
+    // (rgba 15,23,42,0.65), independent of theme `textInverse`.
+    color: '#FFFFFF',
     fontSize: 20,
     lineHeight: 22,
   },

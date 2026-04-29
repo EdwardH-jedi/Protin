@@ -4,16 +4,15 @@ import { colors, radii, spacing, typography } from '../../theme';
 import type { AuthEntryScreenProps } from '../../navigation/types';
 
 /**
- * MoveMate Welcome / Auth entry.
+ * SportsGang Welcome / Auth entry.
  *
- * Visual direction translated from references/movemate_web_export
- * WelcomeScreen.tsx:
- *  - deep-navy hero block as the dominant surface
+ * Neon-lime accent on a near-black hero:
+ *  - black/dark hero block dominates the screen
  *  - lowercase wordmark sits on the hero
- *  - white pill primary CTA + ghost CTA stack at the bottom of the hero
+ *  - lime pill primary CTA + outlined ghost CTA stack at the bottom
  *
- * Translated entirely with React Native primitives — no Tailwind /
- * Radix / DOM tags from the web export.
+ * Built entirely with React Native primitives — no gradient library, just
+ * two layered fills approximating a top→bottom darken.
  */
 export function AuthEntryScreen({ navigation }: AuthEntryScreenProps) {
   return (
@@ -26,15 +25,15 @@ export function AuthEntryScreen({ navigation }: AuthEntryScreenProps) {
 
         <View style={styles.heroContent}>
           <View style={styles.brandBlock}>
-            <Text style={styles.wordmark}>movemate</Text>
-            <Text style={styles.eyebrow}>Gym & Golf · Sydney</Text>
+            <Text style={styles.wordmark}>sportsgang</Text>
+            <Text style={styles.eyebrow}>Sydney · Find your gang</Text>
           </View>
 
           <View style={styles.headlineBlock}>
             <Text style={styles.headline}>Find your</Text>
-            <Text style={styles.headline}>workout partner.</Text>
+            <Text style={styles.headline}>sports gang.</Text>
             <Text style={styles.tagline}>
-              Match by sport, level, and schedule. Train together, not just talk.
+              No solo grind. Find your crew, challenge nearby gangs, rank together.
             </Text>
           </View>
 
@@ -106,11 +105,11 @@ const styles = StyleSheet.create({
     fontSize: 44,
     fontWeight: '700',
     letterSpacing: -1.5,
-    color: colors.textInverse,
+    color: colors.brand,
   },
   eyebrow: {
     ...typography.label,
-    color: colors.brandSoft,
+    color: colors.textSecondary,
   },
   headlineBlock: {
     alignItems: 'center',
@@ -122,12 +121,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 46,
     letterSpacing: -1.5,
-    color: colors.textInverse,
+    color: colors.textPrimary,
     textAlign: 'center',
   },
   tagline: {
     ...typography.bodyLarge,
-    color: colors.brandSoft,
+    color: colors.textSecondary,
     textAlign: 'center',
     paddingTop: spacing.sm,
   },
@@ -135,7 +134,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   ctaPrimary: {
-    backgroundColor: colors.textInverse,
+    backgroundColor: colors.brand,
     borderRadius: radii.pill,
     paddingVertical: spacing.md,
     alignItems: 'center',
@@ -143,16 +142,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ctaPrimaryPressed: {
-    backgroundColor: colors.brandSoft,
+    backgroundColor: colors.brandDark,
   },
   ctaPrimaryText: {
     ...typography.button,
-    color: colors.brand,
+    color: colors.textInverse,
     fontSize: 17,
   },
   ctaGhost: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderColor: 'rgba(198,255,61,0.35)',
     borderRadius: radii.pill,
     paddingVertical: spacing.md,
     alignItems: 'center',
@@ -160,10 +159,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ctaGhostPressed: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(198,255,61,0.08)',
   },
   ctaGhostText: {
     ...typography.button,
-    color: colors.textInverse,
+    color: colors.brand,
   },
 });
