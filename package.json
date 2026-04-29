@@ -15,5 +15,8 @@
     "mobile:android": "npm run android --workspace @protin/mobile",
     "mobile:ios": "npm run ios --workspace @protin/mobile",
     "mobile:web": "npm run web --workspace @protin/mobile"
+  },
+  "devDependencies": {
+    "@expo/config-plugins": "~54.0.4"
   }
 }
