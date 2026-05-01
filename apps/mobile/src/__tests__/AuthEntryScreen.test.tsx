@@ -50,14 +50,14 @@ describe('AuthEntryScreen', () => {
       <AuthEntryScreen navigation={makeNavigation() as any} route={{} as any} />
     );
     getByText('Find your');
-    getByText('sports gang.');
+    getByText('sports partner.');
   });
 
   it('renders the sport / city eyebrow', () => {
     const { getByText } = render(
       <AuthEntryScreen navigation={makeNavigation() as any} route={{} as any} />
     );
-    getByText('Sydney · Find your gang');
+    getByText('Sydney · Find sports partners');
   });
 
   it('renders Get started and Log in buttons', () => {

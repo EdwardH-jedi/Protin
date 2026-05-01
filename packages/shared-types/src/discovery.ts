@@ -43,7 +43,12 @@ export interface PartnerCard {
   displayName: string;
   suburb?: string;
   bioExcerpt?: string;    // truncated at 160 chars by the API
+  bio?: string;           // full bio for the partner detail preview
   avatarUrl?: string;
+  // Ordered list of all profile photos. Empty when the user has not
+  // uploaded any. avatar_url mirrors photoUrls[0] when set, but consumers
+  // should prefer photoUrls for the detail/gallery view.
+  photoUrls?: string[];
   age?: number;           // derived from birthYear on the server
   sportProfiles: Array<{
     sport: Sport;

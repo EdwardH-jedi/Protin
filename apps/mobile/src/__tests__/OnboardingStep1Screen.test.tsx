@@ -270,17 +270,22 @@ describe('OnboardingStep1Screen', () => {
   //      token whose lineHeight was larger than the fontSize (Android cuts
   //      descenders in single-line TextInput when lineHeight > fontSize).
   //   2. iOS Password Autofill carry-over: after RegisterScreen's
-  //      textContentType="newPassword" field, iOS put the next text input
-  //      on OnboardingStep1 into Strong Password context — yellow background,
-  //      keystrokes captured by autofill before reaching React state, so
-  //      typing "Jordan" left displayName='' and Continue showed
-  //      "Please enter a display name". A previous fix set
-  //      textContentType="none" thinking that disabled autofill; on iOS
-  //      "none" means "use heuristics" and is exactly what let the carry-over
-  //      win. The fix is textContentType="nickname" — an unambiguous
-  //      non-credential semantic that breaks the carry-over.
+  //      textContentType="newPassword" field, iOS keeps a credential-save
+  //      overlay alive across the navigation.replace and the next focused
+  //      TextInput on OnboardingStep1 ends up in Strong Password context —
+  //      yellow background, keystrokes captured by autofill before reaching
+  //      React state, "Please enter a display name" fires on Continue. A
+  //      previous fix set textContentType="nickname"; that still let the
+  //      carry-over win on real devices. Current fix is two-pronged:
+  //      (a) RegisterScreen.handleRegister calls Keyboard.dismiss() before
+  //          navigation.replace to sever the system-level overlay at the
+  //          navigation boundary, and
+  //      (b) this displayName declares textContentType="name" + autoComplete
+  //          ="name" — the strongest non-credential semantic on iOS — so
+  //          even if the overlay survives, this field is unambiguously
+  //          NOT the credential's username slot.
   //   3. Android system autofill writing to the native input without firing
-  //      onChangeText — covered by autoComplete="off" + importantForAutofill="no".
+  //      onChangeText — covered by autoComplete="name" + importantForAutofill="no".
   describe('display name input rendering (regression)', () => {
     function getDisplayNameInput(utils: ReturnType<typeof render>) {
       return utils.getByPlaceholderText("How you'll appear to others");
@@ -317,13 +322,47 @@ describe('OnboardingStep1Screen', () => {
       );
     });
 
-    it('disables Android system autofill so typed text stays in React state', () => {
+    it('declares a non-credential autofill hint and keeps importantForAutofill="no" so Android cannot write to the native input without firing onChangeText', () => {
       const utils = render(
         <OnboardingStep1Screen navigation={makeNavigation() as any} route={{} as any} />
       );
       const input = getDisplayNameInput(utils);
-      expect(input.props.autoComplete).toBe('off');
+      // Allowed values: any non-credential autofill hint, OR the explicit
+      // off-switch. Forbidden: anything that maps to a credential field.
+      expect(['name', 'username', 'off']).toContain(input.props.autoComplete);
+      expect(['name', 'username']).not.toContain('password');
+      expect(input.props.autoComplete).not.toBe('password');
+      expect(input.props.autoComplete).not.toBe('current-password');
+      expect(input.props.autoComplete).not.toBe('new-password');
+      // importantForAutofill="no" guarantees Android system autofill cannot
+      // write to the native view bypassing onChangeText, regardless of the
+      // autoComplete hint. This is the load-bearing assertion for that bug.
       expect(input.props.importantForAutofill).toBe('no');
+    });
+
+    it('sanitizes Korean / non-English keystrokes out of the controlled value', async () => {
+      mockUpsertProfile.mockResolvedValue(undefined);
+      const utils = render(
+        <OnboardingStep1Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      // Simulate the user typing a mixed CJK + Latin string. The sanitizer
+      // strips disallowed code points before the value reaches React state,
+      // so the controlled value shown back to the user is Latin-only and
+      // the upsertProfile payload submits the same Latin-only string.
+      fireEvent.changeText(
+        utils.getByPlaceholderText("How you'll appear to others"),
+        '김민수Jordan'
+      );
+      fireEvent.press(utils.getByLabelText('Birth year'));
+      fireEvent.press(utils.getAllByText('1990')[0]);
+      fireEvent.press(utils.getByLabelText('Sydney suburb'));
+      fireEvent.press(utils.getAllByText('Newtown')[0]);
+      fireEvent.press(utils.getByText('Continue'));
+      await waitFor(() => {
+        expect(mockUpsertProfile).toHaveBeenCalledWith(
+          expect.objectContaining({ displayName: 'Jordan' })
+        );
+      });
     });
 
     // State-payload contract test: this is the structural assertion that

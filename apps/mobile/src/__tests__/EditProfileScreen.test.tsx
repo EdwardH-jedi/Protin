@@ -314,6 +314,75 @@ describe('EditProfileScreen', () => {
     fireEvent.press(utils.getByLabelText('Cancel'));
     expect(nav.goBack).toHaveBeenCalled();
   });
+
+  // ── Display name input rendering bug regression ────────────────────────────
+  // Mirrors the contracts pinned in OnboardingStep1Screen.test.tsx. The
+  // EditProfile flow lacked these defenses and reproduced the same on-device
+  // regressions: '@'/descender clip from a TextInput lineHeight, and an iOS
+  // Strong Password Autofill yellow box that captured keystrokes before they
+  // reached React state. These tests pin the contract that defeats both.
+  describe('display name input rendering (regression)', () => {
+    function getDisplayNameInput(utils: ReturnType<typeof render>) {
+      return utils.getByLabelText('Display name');
+    }
+
+    it('does not set a TextInput lineHeight that would clip descenders', () => {
+      const utils = render(
+        <EditProfileScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const input = getDisplayNameInput(utils);
+      const style = Array.isArray(input.props.style)
+        ? Object.assign({}, ...input.props.style)
+        : input.props.style;
+      expect(style.lineHeight).toBeUndefined();
+      const { colors: themeColors } = require('../theme');
+      expect(style.color).toBe(themeColors.textPrimary);
+    });
+
+    it('declares an iOS non-credential content type so Strong Password Autofill cannot capture the field', () => {
+      const utils = render(
+        <EditProfileScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const input = getDisplayNameInput(utils);
+      expect(input.props.textContentType).not.toBe('none');
+      expect(['nickname', 'username', 'givenName', 'name']).toContain(
+        input.props.textContentType
+      );
+    });
+
+    it('declares a non-credential autofill hint and keeps importantForAutofill="no" so Android cannot write to the native input without firing onChangeText', () => {
+      const utils = render(
+        <EditProfileScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const input = getDisplayNameInput(utils);
+      expect(['name', 'username', 'off']).toContain(input.props.autoComplete);
+      expect(input.props.autoComplete).not.toBe('password');
+      expect(input.props.autoComplete).not.toBe('current-password');
+      expect(input.props.autoComplete).not.toBe('new-password');
+      expect(input.props.importantForAutofill).toBe('no');
+    });
+
+    it('sanitizes Korean / non-English keystrokes out of the controlled value before submit', async () => {
+      mockUpsertProfile.mockResolvedValue(undefined);
+      mockFetchProfile.mockResolvedValue(undefined);
+      const nav = makeNavigation();
+      const utils = render(
+        <EditProfileScreen navigation={nav as any} route={{} as any} />
+      );
+      // The Edit Profile flow pre-populates with the existing profile's
+      // displayName ("Jordan Lee"). Simulate the user typing a mixed CJK +
+      // Latin replacement; the sanitizer must strip the CJK characters
+      // before they reach React state, so the upsertProfile payload only
+      // contains the Latin portion.
+      fireEvent.changeText(getDisplayNameInput(utils), '김민수Jordan');
+      fireEvent.press(utils.getByLabelText('Save profile'));
+      await waitFor(() => {
+        expect(mockUpsertProfile).toHaveBeenCalledWith(
+          expect.objectContaining({ displayName: 'Jordan' })
+        );
+      });
+    });
+  });
 });
 
 // silence the act warnings

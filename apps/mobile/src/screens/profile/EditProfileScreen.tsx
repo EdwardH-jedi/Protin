@@ -15,6 +15,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { Screen } from '../../components/Screen';
 import { Select } from '../../components/Select';
 import { SYDNEY_SUBURB_OPTIONS } from '../../data/sydneySuburbs';
+import {
+  DISPLAY_NAME_HELPER_TEXT,
+  sanitizeDisplayName,
+} from '../../lib/displayName';
 import { useProfileStore } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { EditProfileScreenProps } from '../../navigation/types';
@@ -162,13 +166,28 @@ export function EditProfileScreen({ navigation }: EditProfileScreenProps) {
               <TextInput
                 style={styles.input}
                 value={displayName}
-                onChangeText={setDisplayName}
+                onChangeText={(text) =>
+                  setDisplayName(sanitizeDisplayName(text))
+                }
                 placeholder="How you'll appear to others"
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="words"
                 autoCorrect={false}
+                spellCheck={false}
+                // Mirror OnboardingStep1's displayName defenses. iOS
+                // Password Autofill paints the field yellow and captures
+                // keystrokes if a credential-save overlay is still alive
+                // when this input mounts. `textContentType="name"` is the
+                // strongest non-credential iOS semantic and breaks the
+                // association. Android side: matching `autoComplete="name"`
+                // + `importantForAutofill="no"` so no autofill source can
+                // write to the native input without firing onChangeText.
+                textContentType="name"
+                autoComplete="name"
+                importantForAutofill="no"
                 accessibilityLabel="Display name"
               />
+              <Text style={styles.helperText}>{DISPLAY_NAME_HELPER_TEXT}</Text>
             </View>
 
             <View style={styles.field}>
@@ -398,7 +417,11 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    ...typography.bodyLarge,
+    // Explicit fontSize/fontWeight only — spreading bodyLarge brings
+    // lineHeight 26 which clips descenders on a single-line TextInput
+    // on Android. Mirrors OnboardingStep1 / RegisterScreen.
+    fontSize: typography.bodyLarge.fontSize,
+    fontWeight: typography.bodyLarge.fontWeight,
     color: colors.textPrimary,
     backgroundColor: colors.inputBackground,
   },

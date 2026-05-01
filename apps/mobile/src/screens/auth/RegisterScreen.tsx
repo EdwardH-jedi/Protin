@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   Pressable,
   StyleSheet,
   Text,
@@ -34,6 +35,17 @@ export function RegisterScreen({ navigation }: Props) {
       setError('Password must be at least 8 characters.');
       return;
     }
+    // Dismiss the keyboard SYNCHRONOUSLY — before the network round-trip.
+    // iOS Strong Password Autofill anchors its yellow "save credential"
+    // overlay to the keyboard. While `await register()` runs (50–2000ms
+    // of network), the keyboard is still up and the overlay is still
+    // attached. iOS commits the credential and tears down the overlay
+    // when it sees the keyboard dismiss + form-submission signal — so
+    // dismiss FIRST, then await, then navigate. Dismissing after the
+    // await (the previous attempt) lets the overlay survive until the
+    // next screen mounts, where iOS re-attaches it to the displayName
+    // field — yellowing it and capturing keystrokes.
+    Keyboard.dismiss();
     try {
       await register(email.trim(), password);
       // New users always complete onboarding first
@@ -47,7 +59,7 @@ export function RegisterScreen({ navigation }: Props) {
     <Screen padded scroll withKeyboard>
       <View style={styles.header}>
         <Text style={styles.wordmark}>sportsgang</Text>
-        <Text style={styles.eyebrow}>Join the gang</Text>
+        <Text style={styles.eyebrow}>Find sports partners</Text>
         <Text style={styles.title}>Create your{'\n'}account</Text>
       </View>
 
@@ -77,8 +89,24 @@ export function RegisterScreen({ navigation }: Props) {
             placeholder="Min. 8 characters"
             placeholderTextColor={colors.textTertiary}
             secureTextEntry
-            textContentType="newPassword"
-            autoComplete="new-password"
+            // V1 trade-off: opt this field fully out of iOS Strong
+            // Password / Password Autofill. The previous attempt
+            // (textContentType="newPassword") engaged iOS Strong Password
+            // and the resulting autofill overlay carried into the next
+            // screen, painting the OnboardingStep1 displayName field
+            // yellow and capturing keystrokes. We accept the trade-off
+            // that iOS will not auto-save this credential to the
+            // keychain — Login still works fine for manual or autofilled
+            // existing passwords (those properties are unchanged). The
+            // five "off" signals below are belt-and-braces; iOS honours
+            // textContentType="none" + autoComplete="off" together as
+            // the strongest opt-out for a secureTextEntry field.
+            autoCapitalize="none"
+            autoCorrect={false}
+            spellCheck={false}
+            textContentType="none"
+            autoComplete="off"
+            importantForAutofill="no"
           />
         </View>
 

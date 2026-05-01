@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.match import DiscoveryAction, Match
 from app.models.profile import SportProfile, UserProfile
@@ -56,12 +57,19 @@ def _build_partner_card(
 ) -> PartnerCardResponse:
     age = _CURRENT_YEAR - profile.birth_year if profile.birth_year else None
     bio_excerpt = profile.bio[:160] if profile.bio else None
+    # `profile.photos` is selectin-loaded by the feed query below and ordered
+    # by position (relationship default). The avatar_url already mirrors the
+    # 0th photo for users who have uploaded; photo_urls carries the full set
+    # for the V1 detail preview UI.
+    photo_urls = [p.photo_url for p in (profile.photos or [])]
     return PartnerCardResponse(
         user_id=user.id,
         display_name=profile.display_name,
         suburb=profile.suburb,
         bio_excerpt=bio_excerpt,
+        bio=profile.bio,
         avatar_url=profile.avatar_url,
+        photo_urls=photo_urls,
         age=age,
         sport_profiles=[
             SportProfileSummary(
@@ -122,6 +130,9 @@ async def get_discovery_feed(
             SportProfile,
             and_(SportProfile.user_id == User.id, SportProfile.sport == sport),
         )
+        # Load each candidate profile's photos in the same round-trip so the
+        # V1 detail-preview UI renders without a follow-up request per card.
+        .options(selectinload(UserProfile.photos))
         .where(base_filter)
         .order_by(User.created_at.desc())
         .limit(_SCORE_POOL)

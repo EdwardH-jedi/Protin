@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   Platform,
   Pressable,
   StyleSheet,
@@ -62,6 +63,14 @@ export function LoginScreen({ navigation }: Props) {
       setError('Please enter your email and password.');
       return;
     }
+    // Dismiss the keyboard SYNCHRONOUSLY — before the network round-trip.
+    // iOS Password Autofill anchors its yellow overlay to the keyboard;
+    // dismissing after `await login()` (the previous attempt) lets the
+    // overlay survive the network call and re-attach to the next screen
+    // when navigation.replace mounts it. Dismiss first, await second,
+    // navigate third — that order severs the overlay before iOS can
+    // carry it forward.
+    Keyboard.dismiss();
     try {
       await login(email.trim(), password);
       await routeAfterAuth();
@@ -72,6 +81,12 @@ export function LoginScreen({ navigation }: Props) {
 
   async function handleAppleSignIn() {
     setError(null);
+    // Same rationale as handleLogin: dismiss before the system Apple sheet
+    // opens. Apple Sign-In doesn't use the standard keyboard, but if the
+    // user had focused the email/password fields first, the keyboard is up
+    // and any pending Strong-Password overlay needs to be torn down before
+    // the auth flow takes over the screen.
+    Keyboard.dismiss();
     try {
       const nonce = generateNonce();
       const credential = await AppleAuthentication.signInAsync({
@@ -139,8 +154,18 @@ export function LoginScreen({ navigation }: Props) {
             placeholder="Your password"
             placeholderTextColor={colors.textTertiary}
             secureTextEntry
+            // Same defenses as RegisterScreen: prevent iOS title-casing
+            // / autocorrect from silently mutating the typed password
+            // before it lands in React state.
+            autoCapitalize="none"
+            autoCorrect={false}
             textContentType="password"
-            autoComplete="password"
+            // `current-password` is the AHA-spec value for sign-in flows
+            // and is the React Native canonical token for retrieving an
+            // existing credential. The previous `password` value worked
+            // but is the spec's "any-password" alias — `current-password`
+            // is unambiguous and matches `new-password` on Register.
+            autoComplete="current-password"
           />
         </View>
 
@@ -233,7 +258,13 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    ...typography.bodyLarge,
+    // Use explicit fontSize/fontWeight from the bodyLarge token but omit
+    // lineHeight: setting lineHeight on a single-line TextInput clips
+    // descenders (g, y, p — and the '@' glyph in email addresses) on
+    // Android. The email field is the visible symptom; the workaround
+    // mirrors RegisterScreen / OnboardingStep1.
+    fontSize: typography.bodyLarge.fontSize,
+    fontWeight: typography.bodyLarge.fontWeight,
     color: colors.textPrimary,
     backgroundColor: colors.inputBackground,
   },

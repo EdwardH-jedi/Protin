@@ -11,6 +11,10 @@ import {
 import { Screen } from '../../components/Screen';
 import { Select, type SelectOption } from '../../components/Select';
 import { SYDNEY_SUBURB_OPTIONS } from '../../data/sydneySuburbs';
+import {
+  DISPLAY_NAME_HELPER_TEXT,
+  sanitizeDisplayName,
+} from '../../lib/displayName';
 import { useProfileStore } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -102,28 +106,40 @@ export function OnboardingStep1Screen({ navigation }: Props) {
           <TextInput
             style={styles.input}
             value={displayName}
-            onChangeText={setDisplayName}
+            onChangeText={(text) => setDisplayName(sanitizeDisplayName(text))}
             placeholder="How you'll appear to others"
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="words"
             autoCorrect={false}
+            spellCheck={false}
             returnKeyType="next"
-            // iOS-specific: declare this is a nickname/display-name field, NOT
-            // a credential field. The previous version used "none", but on iOS
-            // "none" means "no declared type → use heuristics". After the
-            // RegisterScreen's newPassword field, iOS heuristics decide the
-            // next text input is part of the same credential flow and engage
-            // Strong Password Autofill — which paints the field background
-            // yellow and captures keystrokes before they reach React, so
-            // typed text never appears and the "Please enter a display name"
-            // error fires on Continue. "nickname" is the unambiguous iOS
-            // hint for a display-name field and breaks that association.
-            textContentType="nickname"
-            // Android-side belt-and-braces: keep system autofill off so the
-            // OS cannot inject a value without firing onChangeText.
-            autoComplete="off"
+            // iOS-specific: declare this is the user's name, NOT a
+            // credential field. After the RegisterScreen newPassword
+            // field, iOS Strong Password / Password Autofill keeps a
+            // "save credential" overlay alive across the screen swap and
+            // associates the next focused TextInput as the username slot —
+            // painting it yellow and capturing keystrokes before they
+            // reach React state. `textContentType="name"` is the
+            // strongest non-credential semantic on iOS and breaks the
+            // association on real devices where the previous `nickname`
+            // value still let the carry-over win. Paired with the
+            // `Keyboard.dismiss()` in RegisterScreen.handleRegister which
+            // severs the carry-over at the navigation boundary.
+            textContentType="name"
+            // Android: declare a non-credential autofill hint matching the
+            // iOS semantic. `importantForAutofill="no"` is kept so any
+            // future Android-side autofill regression can never write to
+            // the native input without firing onChangeText.
+            autoComplete="name"
             importantForAutofill="no"
+            // Explicit accessibilityLabel removes the last bit of
+            // ambiguity for iOS heuristics. Without it, iOS's autofill
+            // engine weights field position more heavily — and "first
+            // TextInput on the screen after a credential flow" is exactly
+            // the position iOS treats as the credential's username slot.
+            accessibilityLabel="Display name"
           />
+          <Text style={styles.hint}>{DISPLAY_NAME_HELPER_TEXT}</Text>
         </View>
 
         <View style={styles.field}>

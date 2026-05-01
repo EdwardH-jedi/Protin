@@ -1,13 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { api } from '../lib/api';
+import { api, BASE_URL } from '../lib/api';
+
+// Discovery card photos are served as relative paths (`/media/...`) by the
+// API. RN's <Image> needs absolute URIs, so we expand them at the data
+// boundary here — every consumer of useDiscovery gets ready-to-render URLs.
+function absolutizeMediaUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  if (/^https?:\/\//i.test(url)) return url;
+  const path = url.startsWith('/') ? url : `/${url}`;
+  return `${BASE_URL}${path}`;
+}
 
 export interface PartnerCard {
   userId: string;
   displayName: string;
   suburb?: string;
   bioExcerpt?: string;
+  bio?: string;
   avatarUrl?: string;
+  photoUrls?: string[];
   age?: number;
   sportProfiles: Array<{
     sport: string;
@@ -55,7 +67,22 @@ export function useDiscovery(): UseDiscoveryReturn {
           `Unexpected response shape from /discovery — got: ${JSON.stringify(data)}`
         );
       }
-      setPartners(data.items);
+      const normalized = data.items.map((item) => {
+        // Only overwrite media URL fields when the item actually carries
+        // them. Spreading `avatarUrl: undefined` would add an explicit
+        // undefined property and break callers that compare items via
+        // structural equality (incl. existing useDiscovery tests).
+        const out: PartnerCard = { ...item };
+        const absoluteAvatar = absolutizeMediaUrl(item.avatarUrl);
+        if (absoluteAvatar !== undefined) out.avatarUrl = absoluteAvatar;
+        if (item.photoUrls !== undefined) {
+          out.photoUrls = item.photoUrls
+            .map(absolutizeMediaUrl)
+            .filter((u): u is string => typeof u === 'string');
+        }
+        return out;
+      });
+      setPartners(normalized);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load partners.');
     } finally {

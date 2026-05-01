@@ -10,8 +10,8 @@
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 
-import { DiscoveryScreen } from '../screens/discovery/DiscoveryScreen';
-import type { UseDiscoveryReturn } from '../hooks/useDiscovery';
+import { DiscoveryScreen, partnerKey } from '../screens/discovery/DiscoveryScreen';
+import type { PartnerCard, UseDiscoveryReturn } from '../hooks/useDiscovery';
 
 // ─── Mock useDiscovery ────────────────────────────────────────────────────────
 
@@ -78,7 +78,7 @@ function setupDiscovery(overrides: Partial<UseDiscoveryReturn> = {}) {
   useDiscovery.mockReturnValue({ ...defaultDiscovery, ...overrides });
 }
 
-const samplePartner = {
+const samplePartner: PartnerCard = {
   userId: 'user-1',
   displayName: 'Alex Smith',
   suburb: 'Surry Hills',
@@ -124,7 +124,7 @@ describe('DiscoveryScreen', () => {
   it('shows the empty-state message when partners is empty and not loading', () => {
     setupDiscovery({ partners: [] });
     const { getByText } = render(<DiscoveryScreen />);
-    getByText('No more gang-mates nearby.');
+    getByText('No more players nearby.');
     getByText('Check back soon — new players join every week.');
   });
 
@@ -152,6 +152,115 @@ describe('DiscoveryScreen', () => {
     getByLabelText('Like');
     getByLabelText('Pass');
     getByLabelText('Save');
+  });
+
+  // ── Sport context visibility (V1 QA fix) ───────────────────────────────────
+  // Real-device QA: two testers liked each other but for different sports
+  // (golf vs running). Backend correctly created no match because match
+  // creation is sport-scoped. The mobile UI didn't make the sport-scoping
+  // visible enough. These tests pin the three smallest copy/UI levers
+  // that fix the confusion.
+  describe('sport-specific match rule visibility', () => {
+    it('renders the sport-specific match-rule helper line', () => {
+      setupDiscovery({ partners: [] });
+      const { getByText } = render(<DiscoveryScreen />);
+      getByText(
+        "Likes are sport-specific — you'll match when both players like each other for the same sport."
+      );
+    });
+
+    it('renders a sport-aware header title for the current sport', () => {
+      setupDiscovery({ sport: 'gym', partners: [] });
+      const { getByText, rerender } = render(<DiscoveryScreen />);
+      getByText('Gym partners');
+      // Switch to golf — header tracks the current sport.
+      setupDiscovery({ sport: 'golf', partners: [] });
+      rerender(<DiscoveryScreen />);
+      getByText('Golf partners');
+    });
+
+    it('renders a V1-safe "Connect" CTA on the partner card', () => {
+      // Visible label is sport-agnostic ("Connect"). Sport context is
+      // carried by the screen header + helper line, not by the button.
+      setupDiscovery({ sport: 'gym', partners: [samplePartner] });
+      const { getByText, queryByText, rerender } = render(<DiscoveryScreen />);
+      getByText('Connect');
+      // Old "Like for Gym" copy must not reappear under any sport.
+      expect(queryByText(/^Like for/)).toBeNull();
+      setupDiscovery({ sport: 'tennis', partners: [samplePartner] });
+      rerender(<DiscoveryScreen />);
+      getByText('Connect');
+      expect(queryByText(/^Like for/)).toBeNull();
+    });
+
+    it('keeps the "Like" accessibilityLabel so screen readers and existing tests still resolve', () => {
+      setupDiscovery({ sport: 'gym', partners: [samplePartner] });
+      const { getByLabelText } = render(<DiscoveryScreen />);
+      // Same Pressable, sport-agnostic accessibility hint.
+      getByLabelText('Like');
+    });
+  });
+
+  // ── Partner detail preview (V1 photos/bio visibility) ─────────────────────
+  // Real-device QA: viewers couldn't see uploaded photos or full bios on
+  // discovery cards. Backend now ships `photoUrls` and full `bio`; the card
+  // surfaces a "View details" button that opens a modal showing the
+  // gallery + bio with safe placeholders when fields are missing.
+  describe('partner detail preview', () => {
+    function withPartner(overrides: Partial<typeof samplePartner> = {}) {
+      return { ...samplePartner, ...overrides };
+    }
+
+    it('exposes a View details affordance on each partner card', () => {
+      setupDiscovery({ partners: [samplePartner] });
+      const { getByLabelText } = render(<DiscoveryScreen />);
+      getByLabelText('View details');
+    });
+
+    it('renders the partner gallery and full bio when provided', async () => {
+      const partner = withPartner({
+        bio: 'Looking for a steady gym partner three mornings a week.',
+        photoUrls: ['https://api/media/u/00.jpg', 'https://api/media/u/01.jpg'],
+      });
+      setupDiscovery({ partners: [partner] });
+      const utils = render(<DiscoveryScreen />);
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('View details'));
+      });
+      utils.getByText('Looking for a steady gym partner three mornings a week.');
+      utils.getByLabelText('Alex Smith photo 1');
+      utils.getByLabelText('Alex Smith photo 2');
+    });
+
+    it('falls back to a friendly placeholder when there are no photos and no bio', async () => {
+      const partner = withPartner({ bio: undefined, photoUrls: [] });
+      setupDiscovery({ partners: [partner] });
+      const utils = render(<DiscoveryScreen />);
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('View details'));
+      });
+      utils.getByText('No photos yet');
+      utils.getByText("This player hasn't added a bio yet.");
+    });
+
+    it('closes the preview when Close is pressed', async () => {
+      const partner = withPartner({
+        bio: 'Active morning crew.',
+        photoUrls: ['https://api/media/u/00.jpg'],
+      });
+      setupDiscovery({ partners: [partner] });
+      const utils = render(<DiscoveryScreen />);
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('View details'));
+      });
+      utils.getByText('Active morning crew.');
+      await act(async () => {
+        fireEvent.press(utils.getByLabelText('Close profile preview'));
+      });
+      // The Modal is still mounted but with `visible={false}` — content
+      // should no longer be reachable via getByText.
+      expect(utils.queryByText('Active morning crew.')).toBeNull();
+    });
   });
 
   // ── Sport toggle ───────────────────────────────────────────────────────────
@@ -251,12 +360,55 @@ describe('DiscoveryScreen', () => {
     ).resolves.not.toThrow();
   });
 
+  // ── FlatList key uniqueness regression ────────────────────────────────────
+  // Real-device QA fired "Encountered two children with the same key:
+  // .$<UUID>" during discovery. The previous keyExtractor used `item.userId`
+  // alone, so any duplicate userId in a single fetch (server bug ceiling)
+  // collided. The fixed key is `${userId}-${sport}-${index}` — userId for
+  // stability, sport to future-proof a cross-sport feed, index as the
+  // tiebreaker that makes collisions structurally impossible. Tests target
+  // the exported helper directly so we don't depend on the RN test
+  // renderer's flaky console.error reporting.
+  describe('partnerKey', () => {
+    function p(userId: string): PartnerCard {
+      return { userId, displayName: 'x', sportProfiles: [] };
+    }
+
+    it('produces unique keys when the same userId appears twice in one sport-fetch', () => {
+      // The bug as observed on-device: server returns the same partner
+      // twice. Without the index tiebreaker the FlatList collides.
+      expect(partnerKey(p('user-1'), 0, 'gym')).not.toBe(
+        partnerKey(p('user-1'), 1, 'gym')
+      );
+    });
+
+    it('produces different keys for the same userId across different sports', () => {
+      // Future-proof for a cross-sport feed.
+      expect(partnerKey(p('user-1'), 0, 'gym')).not.toBe(
+        partnerKey(p('user-1'), 0, 'golf')
+      );
+    });
+
+    it('produces different keys for different userIds', () => {
+      expect(partnerKey(p('user-1'), 0, 'gym')).not.toBe(
+        partnerKey(p('user-2'), 0, 'gym')
+      );
+    });
+
+    it('keeps userId as the leading segment so the key starts with a stable identity', () => {
+      expect(partnerKey(p('user-1'), 0, 'gym')).toMatch(/^user-1-/);
+    });
+  });
+
   // ── Header ─────────────────────────────────────────────────────────────────
 
-  it('renders the Discover header and Sydney eyebrow', () => {
-    setupDiscovery({ partners: [] });
+  it('renders a sport-aware discovery header and the Sydney eyebrow', () => {
+    setupDiscovery({ sport: 'gym', partners: [] });
     const { getByText } = render(<DiscoveryScreen />);
-    getByText('Discover');
+    // Header title tracks the current sport so the user always sees which
+    // feed they're in. The previous static "Discover" copy was the proximate
+    // cause of the QA confusion (likes for different sports → no match).
+    getByText('Gym partners');
     getByText('Sydney');
   });
 });

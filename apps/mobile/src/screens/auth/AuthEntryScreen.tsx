@@ -26,14 +26,14 @@ export function AuthEntryScreen({ navigation }: AuthEntryScreenProps) {
         <View style={styles.heroContent}>
           <View style={styles.brandBlock}>
             <Text style={styles.wordmark}>sportsgang</Text>
-            <Text style={styles.eyebrow}>Sydney · Find your gang</Text>
+            <Text style={styles.eyebrow}>Sydney · Find sports partners</Text>
           </View>
 
           <View style={styles.headlineBlock}>
             <Text style={styles.headline}>Find your</Text>
-            <Text style={styles.headline}>sports gang.</Text>
+            <Text style={styles.headline}>sports partner.</Text>
             <Text style={styles.tagline}>
-              No solo grind. Find your crew, challenge nearby gangs, rank together.
+              No solo grind. Match, chat, and book your next session.
             </Text>
           </View>
 

@@ -323,4 +323,50 @@ describe('LoginScreen', () => {
       expect(queryByText(/Apple Sign-in failed/)).toBeNull();
     });
   });
+
+  // ── Email input rendering regression ───────────────────────────────────────
+  // Spreading typography.bodyLarge into a single-line TextInput style pulls
+  // in `lineHeight: 26`, which clips descenders and the '@' glyph on Android
+  // — making typed email addresses look truncated. Pin the contract.
+  describe('email input rendering (regression)', () => {
+    it('does not set a TextInput lineHeight that would clip "@"/descenders on Android', () => {
+      const { getByPlaceholderText } = render(
+        <LoginScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const input = getByPlaceholderText('you@example.com');
+      const style = Array.isArray(input.props.style)
+        ? Object.assign({}, ...input.props.style)
+        : input.props.style;
+      expect(style.lineHeight).toBeUndefined();
+    });
+  });
+
+  // ── iOS Password Autofill contract ────────────────────────────────────────
+  // Sign-in flows must use `current-password` so iOS retrieves an existing
+  // keychain credential cleanly. autoCapitalize/autoCorrect off prevents
+  // iOS from silently mutating typed characters before login submits.
+  describe('password input autofill contract', () => {
+    function getPasswordInput(utils: ReturnType<typeof render>) {
+      return utils.getByPlaceholderText('Your password');
+    }
+
+    it('declares the existing-credential content type', () => {
+      const utils = render(
+        <LoginScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const input = getPasswordInput(utils);
+      expect(input.props.textContentType).toBe('password');
+      expect(input.props.autoComplete).toBe('current-password');
+      expect(input.props.secureTextEntry).toBe(true);
+    });
+
+    it('disables capitalisation and autocorrect so iOS cannot mutate typed characters', () => {
+      const utils = render(
+        <LoginScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const input = getPasswordInput(utils);
+      expect(input.props.autoCapitalize).toBe('none');
+      expect(input.props.autoCorrect).toBe(false);
+    });
+  });
 });

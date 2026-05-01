@@ -34,12 +34,12 @@ jest.mock('../components/Screen', () => {
 
 jest.mock('../theme', () => ({
   colors: {
-    accent: '#000', brand: '#000', border: '#ccc', surface: '#fff',
-    surfaceElevated: '#f5f5f5', background: '#fafafa', separator: '#e0e0e0',
-    textPrimary: '#000', textSecondary: '#555', textTertiary: '#888',
-    textInverse: '#fff', success: '#0f0', error: '#f00',
+    accent: '#000', brand: '#000', brandSoft: '#222', border: '#ccc',
+    surface: '#fff', surfaceElevated: '#f5f5f5', background: '#fafafa',
+    separator: '#e0e0e0', textPrimary: '#000', textSecondary: '#555',
+    textTertiary: '#888', textInverse: '#fff', success: '#0f0', error: '#f00',
   },
-  radii: { sm: 4, md: 8, lg: 12, full: 9999 },
+  radii: { sm: 4, md: 8, lg: 12, pill: 9999, full: 9999 },
   spacing: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 40, xxxl: 48 },
   typography: {
     h1: {}, h2: {}, h3: {}, body: {}, bodySmall: {}, bodyLarge: {}, label: {}, button: {},
@@ -124,28 +124,6 @@ describe('OnboardingStep3Screen', () => {
     expect(getByRole('checkbox', { name: 'Any' }).props.accessibilityState.checked).toBe(true);
   });
 
-  // ── Validation ─────────────────────────────────────────────────────────────
-
-  it('shows error for an invalid age range (min > max)', async () => {
-    const { getByText, getByPlaceholderText } = render(
-      <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
-    );
-    fireEvent.changeText(getByPlaceholderText('18'), '50');
-    fireEvent.changeText(getByPlaceholderText('65'), '30');
-    fireEvent.press(getByText('Continue'));
-    await waitFor(() => getByText('Please enter a valid age range (18–65).'));
-    expect(mockUpsertIdentityPreferences).not.toHaveBeenCalled();
-  });
-
-  it('shows error when min age is below 18', async () => {
-    const { getByText, getByPlaceholderText } = render(
-      <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
-    );
-    fireEvent.changeText(getByPlaceholderText('18'), '16');
-    fireEvent.press(getByText('Continue'));
-    await waitFor(() => getByText('Please enter a valid age range (18–65).'));
-  });
-
   // ── Successful submit ──────────────────────────────────────────────────────
 
   it('calls upsertIdentityPreferences with correct defaults', async () => {
@@ -188,5 +166,203 @@ describe('OnboardingStep3Screen', () => {
     fireEvent.press(getByText('Continue'));
     await waitFor(() => getByText('Network error'));
     expect(nav.navigate).not.toHaveBeenCalled();
+  });
+
+  // ── Age range selector (keyboard-free, replaces TextInputs) ───────────────
+  // Real-device QA: iOS number-pad has no Done/Return key, so age TextInputs
+  // were unusable. Replaced with a stepper-based selector that never opens
+  // the keyboard. These tests pin the keyboard-free contract and clamp logic.
+  describe('age range selector', () => {
+    it('does not render any TextInput in the partner age range section', () => {
+      const { UNSAFE_queryAllByType } = render(
+        <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const { TextInput } = require('react-native');
+      // No numeric input fields anywhere on this screen — the selector is
+      // entirely Pressable-driven.
+      expect(UNSAFE_queryAllByType(TextInput)).toHaveLength(0);
+    });
+
+    it('increments min age via the + control and submits the new value', async () => {
+      mockUpsertIdentityPreferences.mockResolvedValue(undefined);
+      const { getByLabelText, getByText } = render(
+        <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      fireEvent.press(getByLabelText('Increase minimum age'));
+      fireEvent.press(getByLabelText('Increase minimum age'));
+      fireEvent.press(getByText('Continue'));
+      await waitFor(() => {
+        expect(mockUpsertIdentityPreferences).toHaveBeenCalledWith(
+          expect.objectContaining({ ageRangeMin: 20, ageRangeMax: 65 })
+        );
+      });
+    });
+
+    it('decrements max age via the − control and submits the new value', async () => {
+      mockUpsertIdentityPreferences.mockResolvedValue(undefined);
+      const { getByLabelText, getByText } = render(
+        <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      fireEvent.press(getByLabelText('Decrease maximum age'));
+      fireEvent.press(getByLabelText('Decrease maximum age'));
+      fireEvent.press(getByLabelText('Decrease maximum age'));
+      fireEvent.press(getByText('Continue'));
+      await waitFor(() => {
+        expect(mockUpsertIdentityPreferences).toHaveBeenCalledWith(
+          expect.objectContaining({ ageRangeMin: 18, ageRangeMax: 62 })
+        );
+      });
+    });
+
+    it('disables min − at the floor (18) on first render', () => {
+      const { getByLabelText } = render(
+        <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const minMinus = getByLabelText('Decrease minimum age');
+      expect(minMinus.props.accessibilityState.disabled).toBe(true);
+    });
+
+    it('renders 80 as the upper scale label (limit is 18–80)', () => {
+      const { getByText } = render(
+        <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      // The selector renders both edge labels; 80 confirms maxLimit propagated.
+      getByText('80');
+    });
+
+    it('max + is enabled at default (65) and disables only at the ceiling (80)', async () => {
+      mockUpsertIdentityPreferences.mockResolvedValue(undefined);
+      const { getByLabelText, getByText } = render(
+        <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const maxPlus = getByLabelText('Increase maximum age');
+      // Default max is 65 — well below the new ceiling, so + is live.
+      expect(maxPlus.props.accessibilityState.disabled).toBe(false);
+      // 15 presses lifts max from 65 to 80, the new ceiling.
+      for (let i = 0; i < 15; i += 1) fireEvent.press(maxPlus);
+      expect(getByLabelText('Increase maximum age').props.accessibilityState.disabled).toBe(true);
+      fireEvent.press(getByText('Continue'));
+      await waitFor(() => {
+        expect(mockUpsertIdentityPreferences).toHaveBeenCalledWith(
+          expect.objectContaining({ ageRangeMin: 18, ageRangeMax: 80 })
+        );
+      });
+    });
+
+    it('cannot push min above max — pressing min + when min equals max is blocked', async () => {
+      mockUpsertIdentityPreferences.mockResolvedValue(undefined);
+      const { getByLabelText, getByText } = render(
+        <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      // Drive max all the way down to 18 (47 presses from 65).
+      const dec = getByLabelText('Decrease maximum age');
+      for (let i = 0; i < 47; i += 1) fireEvent.press(dec);
+      // Now min = max = 18. Pressing min + should be a no-op (disabled).
+      const minPlus = getByLabelText('Increase minimum age');
+      expect(minPlus.props.accessibilityState.disabled).toBe(true);
+      fireEvent.press(minPlus);
+      fireEvent.press(getByText('Continue'));
+      await waitFor(() => {
+        expect(mockUpsertIdentityPreferences).toHaveBeenCalledWith(
+          expect.objectContaining({ ageRangeMin: 18, ageRangeMax: 18 })
+        );
+      });
+    });
+
+    it('cannot push max below min — pressing max − when max equals min is blocked', () => {
+      const { getByLabelText } = render(
+        <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      // Drive min all the way up to 65 (47 presses from 18).
+      const inc = getByLabelText('Increase minimum age');
+      for (let i = 0; i < 47; i += 1) fireEvent.press(inc);
+      const maxMinus = getByLabelText('Decrease maximum age');
+      expect(maxMinus.props.accessibilityState.disabled).toBe(true);
+    });
+
+    // ── Touchable bar (tap + drag) ─────────────────────────────────────────
+    // The bar wrapper claims the touch responder so iPhone users can set the
+    // range without keyboard or stepper. These tests pin the existence of
+    // the responder hooks and the x→age math at the boundaries.
+
+    it('exposes the bar as a touch responder with termination protection', () => {
+      const { getByLabelText } = render(
+        <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const bar = getByLabelText('Age range bar');
+      expect(typeof bar.props.onStartShouldSetResponder).toBe('function');
+      expect(typeof bar.props.onResponderGrant).toBe('function');
+      expect(typeof bar.props.onResponderMove).toBe('function');
+      // Parent <Screen scroll> will request termination on vertical drift —
+      // the bar must refuse so a drag isn't hijacked mid-gesture.
+      expect(bar.props.onResponderTerminationRequest()).toBe(false);
+      expect(bar.props.onStartShouldSetResponder()).toBe(true);
+    });
+
+    it('tap near the left edge moves the min handle (nearest-handle rule)', async () => {
+      mockUpsertIdentityPreferences.mockResolvedValue(undefined);
+      const { getByLabelText, getByText } = render(
+        <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const bar = getByLabelText('Age range bar');
+      // bar width 100 makes x→age trivial: range = 80 - 18 = 62, so age =
+      // round(18 + x/100 * 62). x=10 → 24. min thumb is at x=0 (closer than
+      // max thumb at ~75.8), so the min handle picks up the tap.
+      fireEvent(bar, 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 100, height: 56 } },
+      });
+      fireEvent(bar, 'responderGrant', { nativeEvent: { locationX: 10 } });
+      fireEvent(bar, 'responderRelease', { nativeEvent: { locationX: 10 } });
+      fireEvent.press(getByText('Continue'));
+      await waitFor(() => {
+        expect(mockUpsertIdentityPreferences).toHaveBeenCalledWith(
+          expect.objectContaining({ ageRangeMin: 24, ageRangeMax: 65 })
+        );
+      });
+    });
+
+    it('drag on the bar updates the same handle continuously and clamps at the ceiling', async () => {
+      mockUpsertIdentityPreferences.mockResolvedValue(undefined);
+      const { getByLabelText, getByText } = render(
+        <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const bar = getByLabelText('Age range bar');
+      fireEvent(bar, 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 100, height: 56 } },
+      });
+      // Grant near max thumb (x≈75.8) → max handle picked. Drag past the
+      // right edge (x=200) — xToAge clamps to barWidth, so age clamps to 80.
+      fireEvent(bar, 'responderGrant', { nativeEvent: { locationX: 80 } });
+      fireEvent(bar, 'responderMove', { nativeEvent: { locationX: 200 } });
+      fireEvent(bar, 'responderRelease', { nativeEvent: { locationX: 200 } });
+      fireEvent.press(getByText('Continue'));
+      await waitFor(() => {
+        expect(mockUpsertIdentityPreferences).toHaveBeenCalledWith(
+          expect.objectContaining({ ageRangeMin: 18, ageRangeMax: 80 })
+        );
+      });
+    });
+
+    it('drag on the min handle cannot cross the max value', async () => {
+      mockUpsertIdentityPreferences.mockResolvedValue(undefined);
+      const { getByLabelText, getByText } = render(
+        <OnboardingStep3Screen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const bar = getByLabelText('Age range bar');
+      fireEvent(bar, 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 100, height: 56 } },
+      });
+      // Grab min (x=0 closer than max x≈75.8 for a tap at x=5), then drag
+      // far right (x=300). Min must not exceed default max (65).
+      fireEvent(bar, 'responderGrant', { nativeEvent: { locationX: 5 } });
+      fireEvent(bar, 'responderMove', { nativeEvent: { locationX: 300 } });
+      fireEvent(bar, 'responderRelease', { nativeEvent: { locationX: 300 } });
+      fireEvent.press(getByText('Continue'));
+      await waitFor(() => {
+        expect(mockUpsertIdentityPreferences).toHaveBeenCalledWith(
+          expect.objectContaining({ ageRangeMin: 65, ageRangeMax: 65 })
+        );
+      });
+    });
   });
 });

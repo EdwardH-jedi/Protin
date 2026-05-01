@@ -152,6 +152,49 @@ async def test_discovery_returns_users_with_matching_sport_profile(
     assert partner_id in user_ids
 
 
+async def test_discovery_card_carries_full_bio_and_photo_urls(
+    client: AsyncClient,
+) -> None:
+    """V1 partner detail preview needs full bio and the ordered photo list.
+
+    bio_excerpt is the 160-char card preview; bio is the full text. photo_urls
+    is the ordered set of all uploaded photos (avatar_url is photoUrls[0]).
+    Both are read by the mobile detail-preview modal.
+    """
+    token_viewer = await _register(client, "disc_detail_viewer@example.com")
+    token_partner = await _register(client, "disc_detail_partner@example.com")
+
+    long_bio = "Looking for a steady gym partner. " * 8  # > 160 chars
+    await client.put(
+        "/users/me/profile",
+        json={"display_name": "Gym Partner", "suburb": "Bondi", "bio": long_bio},
+        headers=_auth(token_partner),
+    )
+    await client.post(
+        "/users/me/sport-profiles",
+        json={"sport": "gym", "level": "intermediate"},
+        headers=_auth(token_partner),
+    )
+
+    r = await client.get("/discovery?sport=gym", headers=_auth(token_viewer))
+    assert r.status_code == 200
+    items = r.json()["items"]
+    me_partner = await client.get("/auth/me", headers=_auth(token_partner))
+    partner_id = me_partner.json()["id"]
+    card = next(item for item in items if item["user_id"] == partner_id)
+
+    # Schema contract: both fields are present for the partner detail preview.
+    assert "bio" in card
+    assert "photo_urls" in card
+    # Full bio round-trips, even though excerpt is truncated.
+    assert card["bio"] == long_bio.strip() or card["bio"] == long_bio
+    # bio_excerpt is the 160-char preview the card uses.
+    assert card["bio_excerpt"] is not None
+    assert len(card["bio_excerpt"]) <= 160
+    # photo_urls is always a list (empty when the user hasn't uploaded).
+    assert isinstance(card["photo_urls"], list)
+
+
 async def test_record_action_requires_auth(client: AsyncClient) -> None:
     r = await client.post(
         "/discovery/actions",

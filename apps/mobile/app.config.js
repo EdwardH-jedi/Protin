@@ -80,7 +80,7 @@ module.exports = () => {
 
   return {
     expo: {
-      name: "Protin",
+      name: "SportsGang",
       slug: "protin",
       version: "1.0.0",
       orientation: "portrait",

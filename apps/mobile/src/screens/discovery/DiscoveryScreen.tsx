@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -13,6 +15,28 @@ import { Screen } from '../../components/Screen';
 import { useDiscovery, PartnerCard } from '../../hooks/useDiscovery';
 import { SPORT_LABELS, sportLabel } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
+
+/**
+ * FlatList key for a partner card.
+ *
+ * The discovery feed is fetched per-sport, but real-device QA observed
+ * "Encountered two children with the same key" warnings keyed by a UUID
+ * — i.e. the same `userId` appeared more than once in a single fetch.
+ * The minimum-collision-resistant key is `${userId}-${sport}-${index}`:
+ *   - `userId` keeps the key stable for a given partner across renders
+ *     when the list shape doesn't change (the common case),
+ *   - `sport` future-proofs against a cross-sport feed,
+ *   - `index` is the tiebreaker for the rare case where the server hands
+ *     back duplicate userIds within a single sport-fetch (server bug
+ *     ceiling — the client should not crash on it).
+ *
+ * Exported so the contract can be unit-tested directly. Render-time
+ * assertions on console.error from the RN test renderer are flaky;
+ * asserting the function output for known inputs is unambiguous.
+ */
+export function partnerKey(item: PartnerCard, index: number, sport: string): string {
+  return `${item.userId}-${sport}-${index}`;
+}
 
 // ─── Match banner ─────────────────────────────────────────────────────────────
 
@@ -91,17 +115,21 @@ function SportBadge({ sport, level }: { sport: string; level: string }) {
 
 interface PartnerCardProps {
   partner: PartnerCard;
+  sport: string;
   onLike: () => void;
   onPass: () => void;
   onSave: () => void;
+  onViewDetails: () => void;
   actionInFlight: boolean;
 }
 
 function PartnerCardView({
   partner,
+  sport,
   onLike,
   onPass,
   onSave,
+  onViewDetails,
   actionInFlight,
 }: PartnerCardProps) {
   return (
@@ -116,8 +144,14 @@ function PartnerCardView({
       <View style={styles.cardBody}>
         {partner.sportProfiles.length > 0 ? (
           <View style={styles.sportBadges}>
-            {partner.sportProfiles.map((sp) => (
-              <SportBadge key={sp.sport} sport={sp.sport} level={sp.level} />
+            {/* Index suffix defends against a partner record that has
+                duplicate sport entries (legacy data or a server bug). */}
+            {partner.sportProfiles.map((sp, idx) => (
+              <SportBadge
+                key={`${sp.sport}-${idx}`}
+                sport={sp.sport}
+                level={sp.level}
+              />
             ))}
           </View>
         ) : null}
@@ -127,6 +161,19 @@ function PartnerCardView({
             {partner.bioExcerpt}
           </Text>
         ) : null}
+
+        {/* Surface a tap target so the user can see full bio + photo
+            gallery without committing to a like/pass. The accessibility
+            label is sport-agnostic so screen readers don't repeat the
+            sport context already announced by the card header. */}
+        <Pressable
+          onPress={onViewDetails}
+          accessibilityRole="button"
+          accessibilityLabel="View details"
+          style={({ pressed }) => [styles.viewDetails, pressed && styles.pressed]}
+        >
+          <Text style={styles.viewDetailsText}>View details</Text>
+        </Pressable>
 
         <View style={styles.cardActions}>
           <Pressable
@@ -166,9 +213,14 @@ function PartnerCardView({
             onPress={onLike}
             disabled={actionInFlight}
             accessibilityRole="button"
+            // accessibilityLabel stays "Like" so existing test selectors
+            // and screen-reader contracts keep working unchanged. The
+            // visible label is "Connect" — same action, V1-safe wording
+            // (no dating/gang language). Sport context lives in the
+            // header title and the helper line above the cards.
             accessibilityLabel="Like"
           >
-            <Text style={styles.actionLikeText}>Like</Text>
+            <Text style={styles.actionLikeText}>Connect</Text>
           </Pressable>
         </View>
       </View>
@@ -184,6 +236,7 @@ export function DiscoveryScreen() {
 
   const [matchVisible, setMatchVisible] = useState(false);
   const [actingOn, setActingOn] = useState<string | null>(null);
+  const [previewPartner, setPreviewPartner] = useState<PartnerCard | null>(null);
 
   function showMatchBanner() {
     setMatchVisible(true);
@@ -212,22 +265,27 @@ export function DiscoveryScreen() {
     ({ item }: { item: PartnerCard }) => (
       <PartnerCardView
         partner={item}
+        sport={sport}
         onLike={() => handleAction(item.userId, 'like')}
         onPass={() => handleAction(item.userId, 'pass')}
         onSave={() => handleAction(item.userId, 'save')}
+        onViewDetails={() => setPreviewPartner(item)}
         actionInFlight={actingOn === item.userId}
       />
     ),
-    [actingOn, handleAction]
+    [actingOn, handleAction, sport]
   );
 
   return (
     <Screen padded={false}>
-      {/* Header */}
+      {/* Header — title is sport-aware so the user always sees which sport
+          this feed and these likes are tied to. Real-device QA showed two
+          users could like each other for *different* sports and get no
+          match, because the sport context wasn't visible enough. */}
       <View style={styles.header}>
         <View>
           <Text style={styles.eyebrow}>Sydney</Text>
-          <Text style={styles.headerTitle}>Discover</Text>
+          <Text style={styles.headerTitle}>{sportLabel(sport)} partners</Text>
         </View>
         <Pressable
           style={styles.filterButton}
@@ -266,6 +324,14 @@ export function DiscoveryScreen() {
         ))}
       </View>
 
+      {/* Sport-specific match rule. This line is the smallest possible UI
+          fix for the QA confusion: testers liked each other for different
+          sports and expected a match. The rule is now visible in the same
+          glance as the sport tabs. */}
+      <Text style={styles.matchRuleHint}>
+        Likes are sport-specific — you'll match when both players like each other for the same sport.
+      </Text>
+
       {/* Content */}
       {isLoading ? (
         <View style={styles.centred}>
@@ -288,7 +354,7 @@ export function DiscoveryScreen() {
           <View style={styles.emptyIcon}>
             <Text style={styles.emptyIconText}>·</Text>
           </View>
-          <Text style={styles.emptyTitle}>No more gang-mates nearby.</Text>
+          <Text style={styles.emptyTitle}>No more players nearby.</Text>
           <Text style={styles.emptyBody}>Check back soon — new players join every week.</Text>
           <Pressable
             style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
@@ -300,7 +366,7 @@ export function DiscoveryScreen() {
       ) : (
         <FlatList
           data={partners}
-          keyExtractor={(item) => item.userId}
+          keyExtractor={(item, index) => partnerKey(item, index, sport)}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
@@ -308,7 +374,114 @@ export function DiscoveryScreen() {
       )}
 
       <MatchBanner visible={matchVisible} />
+
+      <PartnerPreviewModal
+        partner={previewPartner}
+        onClose={() => setPreviewPartner(null)}
+      />
     </Screen>
+  );
+}
+
+// ─── Partner preview modal ────────────────────────────────────────────────────
+
+interface PartnerPreviewModalProps {
+  partner: PartnerCard | null;
+  onClose: () => void;
+}
+
+function PartnerPreviewModal({ partner, onClose }: PartnerPreviewModalProps) {
+  const visible = partner !== null;
+  // Render nothing structurally when there's no partner — `visible` controls
+  // the Modal animation. We still need a `partner` reference for the body
+  // when visible; the early return below keeps null-safety simple.
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalRoot}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Profile</Text>
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close profile preview"
+              style={({ pressed }) => [styles.modalClose, pressed && styles.pressed]}
+            >
+              <Text style={styles.modalCloseText}>Close</Text>
+            </Pressable>
+          </View>
+
+          {partner ? (
+            <ScrollView
+              contentContainerStyle={styles.modalScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Photo gallery — horizontal carousel of all uploaded
+                  photos. Falls back to a brand-tinted placeholder when
+                  the partner hasn't uploaded any. */}
+              {partner.photoUrls && partner.photoUrls.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.gallery}
+                  contentContainerStyle={styles.galleryContent}
+                >
+                  {partner.photoUrls.map((uri, idx) => (
+                    <Image
+                      key={`${uri}-${idx}`}
+                      source={{ uri }}
+                      style={styles.galleryPhoto}
+                      resizeMode="cover"
+                      accessibilityLabel={`${partner.displayName} photo ${idx + 1}`}
+                    />
+                  ))}
+                </ScrollView>
+              ) : (
+                <View style={styles.galleryPlaceholder}>
+                  <Text style={styles.galleryPlaceholderText}>
+                    No photos yet
+                  </Text>
+                </View>
+              )}
+
+              <Text style={styles.previewName}>
+                {partner.displayName}
+                {partner.age ? `, ${partner.age}` : ''}
+              </Text>
+              {partner.suburb ? (
+                <Text style={styles.previewSuburb}>{partner.suburb}</Text>
+              ) : null}
+
+              {partner.sportProfiles.length > 0 ? (
+                <View style={styles.previewBadges}>
+                  {partner.sportProfiles.map((sp, idx) => (
+                    <SportBadge
+                      key={`${sp.sport}-${idx}`}
+                      sport={sp.sport}
+                      level={sp.level}
+                    />
+                  ))}
+                </View>
+              ) : null}
+
+              <Text style={styles.previewSectionTitle}>About</Text>
+              {partner.bio && partner.bio.trim().length > 0 ? (
+                <Text style={styles.previewBio}>{partner.bio}</Text>
+              ) : (
+                <Text style={styles.previewBioEmpty}>
+                  This player hasn't added a bio yet.
+                </Text>
+              )}
+            </ScrollView>
+          ) : null}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -351,6 +524,14 @@ const styles = StyleSheet.create({
   sportToggle: {
     flexDirection: 'row',
     gap: spacing.xs,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  // Sport-specific match-rule hint shown directly under the sport tabs.
+  // Tertiary text colour so it reads as helper copy, not validation error.
+  matchRuleHint: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
   },
@@ -616,5 +797,112 @@ const styles = StyleSheet.create({
   matchBannerText: {
     ...typography.h2,
     color: colors.textInverse,
+  },
+
+  // View details row + preview modal
+  viewDetails: {
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  viewDetailsText: {
+    ...typography.bodySmall,
+    color: colors.brand,
+    fontWeight: '600',
+  },
+  modalRoot: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    maxHeight: '88%',
+    paddingTop: spacing.md,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.separator,
+  },
+  modalTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+  },
+  modalClose: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  modalCloseText: {
+    ...typography.button,
+    color: colors.brand,
+  },
+  modalScroll: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  gallery: {
+    marginBottom: spacing.lg,
+  },
+  galleryContent: {
+    gap: spacing.sm,
+    paddingRight: spacing.sm,
+  },
+  galleryPhoto: {
+    width: 220,
+    height: 280,
+    borderRadius: radii.lg,
+    backgroundColor: colors.inputBackground,
+  },
+  galleryPlaceholder: {
+    height: 200,
+    borderRadius: radii.lg,
+    backgroundColor: colors.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  galleryPlaceholderText: {
+    ...typography.body,
+    color: colors.brand,
+    fontWeight: '600',
+  },
+  previewName: {
+    ...typography.h2,
+    color: colors.textPrimary,
+  },
+  previewSuburb: {
+    ...typography.bodyLarge,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  previewBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+  },
+  previewSectionTitle: {
+    ...typography.label,
+    color: colors.textTertiary,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xs,
+  },
+  previewBio: {
+    ...typography.bodyLarge,
+    color: colors.textPrimary,
+    lineHeight: 24,
+  },
+  previewBioEmpty: {
+    ...typography.body,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
   },
 });

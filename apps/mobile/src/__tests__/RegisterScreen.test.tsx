@@ -190,4 +190,49 @@ describe('RegisterScreen', () => {
       : input.props.style;
     expect(style.lineHeight).toBeUndefined();
   });
+
+  // ── iOS Strong Password autofill opt-out contract ────────────────────────
+  // V1 ships with iOS Strong Password / Password Autofill DISABLED on the
+  // Register password field. Earlier attempts engaged Strong Password
+  // (textContentType="newPassword"), and the resulting overlay carried
+  // into OnboardingStep1 — yellowing the displayName field and capturing
+  // its keystrokes on real iPhones. Pinning the opt-out shape here is the
+  // only structural guard against accidental regression to "newPassword".
+  describe('password input autofill opt-out', () => {
+    function getPasswordInput(utils: ReturnType<typeof render>) {
+      return utils.getByPlaceholderText('Min. 8 characters');
+    }
+
+    it('disables iOS Password Autofill (textContentType=none, autoComplete=off)', () => {
+      const utils = render(
+        <RegisterScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const input = getPasswordInput(utils);
+      expect(input.props.textContentType).toBe('none');
+      expect(input.props.autoComplete).toBe('off');
+      // Must NOT engage Strong Password: any *Password content type
+      // re-introduces the carry-over overlay on real devices.
+      expect(input.props.textContentType).not.toBe('newPassword');
+      expect(input.props.textContentType).not.toBe('password');
+    });
+
+    it('disables Android system autofill so the OS cannot inject the field', () => {
+      const utils = render(
+        <RegisterScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const input = getPasswordInput(utils);
+      expect(input.props.importantForAutofill).toBe('no');
+    });
+
+    it('keeps secureTextEntry on and disables capitalisation, autocorrect, and spellcheck', () => {
+      const utils = render(
+        <RegisterScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      const input = getPasswordInput(utils);
+      expect(input.props.secureTextEntry).toBe(true);
+      expect(input.props.autoCapitalize).toBe('none');
+      expect(input.props.autoCorrect).toBe(false);
+      expect(input.props.spellCheck).toBe(false);
+    });
+  });
 });
