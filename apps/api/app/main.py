@@ -105,8 +105,11 @@ from app.routers import (  # noqa: E402  # noqa: E402
     google_calendar,
     matches,
     notifications,
+    rank,
     safety,
+    tournaments,
     users,
+    venues,
 )
 
 app.include_router(auth.router)
@@ -120,6 +123,9 @@ app.include_router(google_calendar.booking_sync_router)
 app.include_router(notifications.router)
 app.include_router(notifications.internal_router)
 app.include_router(safety.router)
+app.include_router(venues.router)
+app.include_router(rank.router)
+app.include_router(tournaments.router)
 
 # Serve uploaded profile photos from local disk in dev. Production replaces
 # this with cloud object storage; the URL prefix stays the same.
