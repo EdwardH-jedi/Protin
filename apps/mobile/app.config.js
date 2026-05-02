@@ -138,6 +138,12 @@ module.exports = () => {
         googleRedirectUri:
           process.env.EXPO_PUBLIC_GOOGLE_REDIRECT_URI ??
           "http://localhost:8000/users/me/google-calendar/callback",
+        // EAS project link. Required for `eas build` because dynamic
+        // configs cannot be auto-written by `eas init` — the project ID
+        // must live in this file directly.
+        eas: {
+          projectId: "b36f95b3-3757-4f7e-ab29-08da31cbb00f",
+        },
       },
     },
   };
