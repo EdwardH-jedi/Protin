@@ -12,7 +12,10 @@ import * as WebBrowser from 'expo-web-browser';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
+import { RankSummaryCard } from '../../components/RankSummaryCard';
 import { Screen } from '../../components/Screen';
+import { useRankSummary } from '../../hooks/useRankSummary';
+import { useTournamentsAvailable } from '../../hooks/useTournaments';
 import { api } from '../../lib/api';
 import { openLegal, PRIVACY_URL, TERMS_URL } from '../../lib/legal';
 import { useAuthStore } from '../../stores/auth';
@@ -23,6 +26,8 @@ import type { RootStackParamList } from '../../navigation/types';
 export function ProfileScreen() {
   const { logout } = useAuthStore();
   const { profile, sportProfiles, fetchProfile } = useProfileStore();
+  const { summary: rankSummary, isLoading: rankLoading } = useRankSummary();
+  const { available: tournamentsAvailable } = useTournamentsAvailable();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -229,6 +234,25 @@ export function ProfileScreen() {
                   ))}
                 </View>
               </View>
+            ) : null}
+
+            <RankSummaryCard summary={rankSummary} isLoading={rankLoading} />
+
+            {tournamentsAvailable ? (
+              <Pressable
+                onPress={() => navigation.navigate('Tournaments')}
+                accessibilityRole="button"
+                accessibilityLabel="Browse tournaments"
+                style={({ pressed }) => [styles.tournamentsEntry, pressed && styles.pressed]}
+              >
+                <View style={styles.tournamentsEntryText}>
+                  <Text style={styles.tournamentsEntryTitle}>Tournaments</Text>
+                  <Text style={styles.tournamentsEntryBody}>
+                    Open competitions you can join across Sydney.
+                  </Text>
+                </View>
+                <Text style={styles.tournamentsEntryChevron}>{'›'}</Text>
+              </Pressable>
             ) : null}
           </View>
         ) : null}
@@ -572,6 +596,37 @@ const styles = StyleSheet.create({
   legalRowText: {
     ...typography.body,
     color: colors.textPrimary,
+  },
+
+  // Tournaments entry
+  tournamentsEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.brand,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
+  },
+  tournamentsEntryText: {
+    flex: 1,
+    gap: 2,
+  },
+  tournamentsEntryTitle: {
+    ...typography.h3,
+    fontSize: 17,
+    color: colors.textPrimary,
+  },
+  tournamentsEntryBody: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  tournamentsEntryChevron: {
+    fontSize: 28,
+    color: colors.brand,
+    fontWeight: '300',
   },
 
   // Account actions

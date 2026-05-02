@@ -11,8 +11,10 @@ import {
   View,
 } from 'react-native';
 
+import { RankBadge } from '../../components/RankBadge';
 import { Screen } from '../../components/Screen';
 import { useDiscovery, PartnerCard } from '../../hooks/useDiscovery';
+import { useRankSummary } from '../../hooks/useRankSummary';
 import { SPORT_LABELS, sportLabel } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
 
@@ -392,6 +394,13 @@ interface PartnerPreviewModalProps {
 
 function PartnerPreviewModal({ partner, onClose }: PartnerPreviewModalProps) {
   const visible = partner !== null;
+  // Fetch the partner's public rank summary lazily — only while the modal
+  // is visible AND we have a userId. The hook treats 404 as no-data so a
+  // brand-new player simply renders no badge (no fake "Rookie 0" pill).
+  const { summary: rankSummary } = useRankSummary({
+    userId: partner?.userId ?? null,
+    enabled: visible,
+  });
   // Render nothing structurally when there's no partner — `visible` controls
   // the Modal animation. We still need a `partner` reference for the body
   // when visible; the early return below keeps null-safety simple.
@@ -468,6 +477,8 @@ function PartnerPreviewModal({ partner, onClose }: PartnerPreviewModalProps) {
                   ))}
                 </View>
               ) : null}
+
+              <RankBadge summary={rankSummary} />
 
               <Text style={styles.previewSectionTitle}>About</Text>
               {partner.bio && partner.bio.trim().length > 0 ? (

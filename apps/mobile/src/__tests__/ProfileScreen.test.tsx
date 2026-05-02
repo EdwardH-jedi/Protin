@@ -69,6 +69,35 @@ jest.mock('../stores/profile', () => ({
   },
 }));
 
+// ─── Mock useRankSummary hook ─────────────────────────────────────────────────
+// The hook is unit-tested via RankSummaryCard; the ProfileScreen tests only
+// need to assert what the screen does with each summary state.
+
+let mockRankSummary:
+  | { honor: number; sports: { sport: string; rankPoints: number; tier: string; sessionsCompleted: number }[] }
+  | null = null;
+let mockRankLoading = false;
+
+jest.mock('../hooks/useRankSummary', () => ({
+  useRankSummary: () => ({
+    summary: mockRankSummary,
+    isLoading: mockRankLoading,
+    error: null,
+    refresh: jest.fn(),
+  }),
+}));
+
+// ─── Mock useTournamentsAvailable hook ────────────────────────────────────────
+// The real hook does a one-time GET /tournaments?limit=1 probe. Without a
+// dedicated mock, the trailing setState from that probe fires after the
+// test body has finished its synchronous run and emits a React act() warning.
+// The ProfileScreen tests don't care about tournaments availability — keep
+// the stub simple and synchronous.
+
+jest.mock('../hooks/useTournaments', () => ({
+  useTournamentsAvailable: () => ({ available: true, isReady: true }),
+}));
+
 // ─── Mock expo-web-browser ────────────────────────────────────────────────────
 
 const mockOpenAuthSession = jest.fn();
@@ -92,6 +121,9 @@ jest.mock('../theme', () => ({
   colors: {
     accent: '#000',
     brand: '#000',
+    brandDark: '#222',
+    brandDarkest: '#000',
+    brandSoft: '#222',
     border: '#ccc',
     surface: '#fff',
     surfaceElevated: '#f5f5f5',
@@ -101,10 +133,11 @@ jest.mock('../theme', () => ({
     textSecondary: '#555',
     textTertiary: '#888',
     textInverse: '#fff',
+    inputBackground: '#eee',
     success: '#0f0',
     error: '#f00',
   },
-  radii: { sm: 4, md: 8, lg: 12, full: 9999 },
+  radii: { sm: 4, md: 8, lg: 12, pill: 9999, full: 9999 },
   spacing: {
     xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 40, xxxl: 48,
   },
@@ -120,6 +153,8 @@ describe('ProfileScreen', () => {
     jest.clearAllMocks();
     mockProfile = null;
     mockSportProfiles = [];
+    mockRankSummary = null;
+    mockRankLoading = false;
     // Default: fetchProfile resolves immediately, gcal not connected
     mockFetchProfile.mockResolvedValue(undefined);
     mockApiGet.mockResolvedValue({ connected: false });
@@ -352,6 +387,9 @@ describe('ProfileScreen', () => {
       expect(logoutOrder).toBeLessThan(resetOrder);
     });
 
+    // (Rank summary integration tests are at the bottom of the describe block.)
+    // ── placeholder for collocation marker ─────────────────────────────────
+
     it('shows a failure alert and does not log out or reset nav when delete rejects', async () => {
       mockApiDelete.mockRejectedValue(new Error('500 server error'));
       const { getByLabelText } = render(<ProfileScreen />);
@@ -378,6 +416,55 @@ describe('ProfileScreen', () => {
       // Second alert call is the failure message
       expect(alertSpy).toHaveBeenCalledTimes(2);
       expect(alertSpy.mock.calls[1][0]).toBe('Delete failed');
+    });
+  });
+
+  // ── Sports reputation (rank/honor) integration ─────────────────────────────
+
+  describe('rank summary section', () => {
+    it('renders the section title once a profile exists', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      mockRankSummary = null;
+      const { getByText } = render(<ProfileScreen />);
+      await waitFor(() => getByText('Sports reputation'));
+    });
+
+    it('renders honor + tier rows when a real summary is present', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      mockRankSummary = {
+        honor: 105,
+        sports: [
+          { sport: 'tennis', rankPoints: 10, tier: 'Bronze', sessionsCompleted: 2 },
+        ],
+      };
+      const { getByText } = render(<ProfileScreen />);
+      await waitFor(() => {
+        getByText('105');
+        getByText('Tennis');
+        getByText('Bronze');
+      });
+    });
+
+    it('handles a missing summary gracefully — empty state, no fake numbers', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      mockRankSummary = null;
+      const { getByText, queryByText } = render(<ProfileScreen />);
+      await waitFor(() => getByText('No reputation yet'));
+      // Critical: a brand-new user must NOT see invented values that imply
+      // they have a tier/rank. The empty state must be the only thing.
+      expect(queryByText('Rookie')).toBeNull();
+      expect(queryByText('Bronze')).toBeNull();
+      expect(queryByText('100')).toBeNull();
+      expect(queryByText('/200')).toBeNull();
+    });
+
+    it('does not render the section when no profile exists', async () => {
+      mockProfile = null;
+      const { queryByText, getByText } = render(<ProfileScreen />);
+      await waitFor(() => getByText('Profile not set up'));
+      // The reputation card lives in the same cardStack as the profile
+      // cards — both should be hidden when there's no profile yet.
+      expect(queryByText('Sports reputation')).toBeNull();
     });
   });
 });

@@ -115,3 +115,23 @@ export type {
   BlockResponse,
   BlockListResponse,
 } from './safety';
+
+export type {
+  Venue,
+  NearbyVenuesResponse,
+  NearbyVenuesQuery,
+} from './venue';
+
+export type {
+  RankTier,
+  SportRankSummary,
+  RankSummary,
+} from './rank';
+
+export type {
+  TournamentStatus,
+  TournamentSummary,
+  TournamentParticipantSummary,
+  TournamentDetail,
+  TournamentListResponse,
+} from './tournament';

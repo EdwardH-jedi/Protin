@@ -34,6 +34,22 @@ jest.mock('../hooks/useDiscovery', () => ({
   // re-export the PartnerCard type as a value (not needed at runtime)
 }));
 
+// ─── Mock useRankSummary hook ────────────────────────────────────────────────
+// The real hook does an api.get on mount; in PartnerPreviewModal it then
+// fires setState after the test body completes (and sometimes after the
+// preview has been closed), producing React act() warnings. The discovery
+// tests don't assert anything about the rank badge — return a static empty
+// summary so the modal renders without firing late state updates.
+
+jest.mock('../hooks/useRankSummary', () => ({
+  useRankSummary: () => ({
+    summary: null,
+    isLoading: false,
+    error: null,
+    refresh: jest.fn(),
+  }),
+}));
+
 // ─── Mock Screen component ────────────────────────────────────────────────────
 
 jest.mock('../components/Screen', () => {
