@@ -19,6 +19,8 @@ import { ChatScreen } from '../screens/chat/ChatScreen';
 import { BookingComposerScreen } from '../screens/bookings/BookingComposerScreen';
 import { BookingDetailScreen } from '../screens/bookings/BookingDetailScreen';
 import { ReportScreen } from '../screens/safety/ReportScreen';
+import { TournamentsScreen } from '../screens/tournaments/TournamentsScreen';
+import { TournamentDetailScreen } from '../screens/tournaments/TournamentDetailScreen';
 
 import { registerForPushNotifications, configureForegroundHandler } from '../lib/notifications';
 import { useAuthStore } from '../stores/auth';
@@ -163,6 +165,16 @@ export function RootNavigator() {
           name="Report"
           component={ReportScreen}
           options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="Tournaments"
+          component={TournamentsScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="TournamentDetail"
+          component={TournamentDetailScreen}
+          options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
