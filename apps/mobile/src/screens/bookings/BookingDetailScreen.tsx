@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,11 +13,21 @@ import {
 import { Screen } from '../../components/Screen';
 import { api } from '../../lib/api';
 import { addBookingToCalendar } from '../../lib/calendar';
+import { locationForBooking } from '../../lib/venueLocation';
 import { useAuthStore } from '../../stores/auth';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { BookingDetailScreenProps } from '../../navigation/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
+interface BookingVenue {
+  id: string;
+  name: string;
+  area?: string;
+  address?: string;
+  bookingUrl?: string;
+  isBookable: boolean;
+}
 
 interface BookingDetail {
   id: string;
@@ -36,6 +47,7 @@ interface BookingDetail {
     displayName: string;
     suburb?: string;
   };
+  venue?: BookingVenue | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -112,13 +124,41 @@ export function BookingDetailScreen({ route, navigation }: BookingDetailScreenPr
     [bookingId]
   );
 
+  // No-show is the only transition the FSM lets either party trigger, so we
+  // apply a small symmetric honor penalty to the caller as an anti-abuse
+  // mitigation. Surfacing that in a confirmation prevents users from being
+  // surprised when their honor drops after marking someone else.
+  const handleNoShow = useCallback(() => {
+    Alert.alert(
+      'Record a no-show?',
+      'Only do this for genuine no-shows. Your honor takes a small dip too — this keeps the system fair if both sides are being honest.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Record no-show',
+          style: 'destructive',
+          onPress: () => performTransition('no-show'),
+        },
+      ]
+    );
+  }, [performTransition]);
+
   const handleAddToCalendar = useCallback(async () => {
     if (!booking) return;
+    // Defensive fallback: if a typed location is missing but the booking
+    // was made against a venue, surface the venue in the calendar event.
+    // The composer also computes this on the way out, so most bookings
+    // already have a non-empty location string by the time they reach
+    // here — this layer catches any older row written before the fix.
+    const calendarLocation = locationForBooking({
+      location: booking.location,
+      venue: booking.venue ?? null,
+    });
     const added = await addBookingToCalendar({
       title: `${booking.sport === 'gym' ? 'Gym' : 'Golf'} with ${booking.partner.displayName}`,
       startDate: new Date(booking.startsAt),
       endDate: new Date(booking.endsAt),
-      location: booking.location,
+      location: calendarLocation || undefined,
       notes: booking.notes,
     });
     if (added) {
@@ -186,7 +226,27 @@ export function BookingDetailScreen({ route, navigation }: BookingDetailScreenPr
           />
           <DetailRow label="Starts" value={formatDateTime(booking.startsAt)} />
           <DetailRow label="Ends" value={formatDateTime(booking.endsAt)} />
-          {booking.location ? (
+          {booking.venue ? (
+            <>
+              <DetailRow label="Court" value={booking.venue.name} />
+              {booking.venue.area || booking.venue.address ? (
+                <DetailRow
+                  label="Where"
+                  value={booking.venue.address ?? booking.venue.area ?? ''}
+                />
+              ) : null}
+              {booking.venue.isBookable && booking.venue.bookingUrl ? (
+                <Pressable
+                  onPress={() => booking.venue?.bookingUrl && Linking.openURL(booking.venue.bookingUrl)}
+                  accessibilityRole="link"
+                  accessibilityLabel="Open court booking"
+                  style={({ pressed }) => [styles.bookingLink, pressed && styles.pressed]}
+                >
+                  <Text style={styles.bookingLinkText}>Open court booking</Text>
+                </Pressable>
+              ) : null}
+            </>
+          ) : booking.location ? (
             <DetailRow label="Location" value={booking.location} />
           ) : null}
           {booking.notes ? (
@@ -253,7 +313,7 @@ export function BookingDetailScreen({ route, navigation }: BookingDetailScreenPr
                 <ActionButton
                   label="Record no-show"
                   variant="ghost"
-                  onPress={() => performTransition('no-show')}
+                  onPress={handleNoShow}
                 />
                 <ActionButton
                   label="Cancel"
@@ -386,6 +446,14 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     flex: 2,
     textAlign: 'right',
+  },
+  bookingLink: {
+    paddingVertical: spacing.sm,
+    alignItems: 'flex-end',
+  },
+  bookingLinkText: {
+    ...typography.button,
+    color: colors.brand,
   },
   calendarButton: {
     borderWidth: 1,

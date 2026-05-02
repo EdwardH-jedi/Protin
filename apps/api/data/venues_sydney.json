@@ -1,0 +1,123 @@
+[
+  {
+    "name": "Bondi Beach Run Loop",
+    "sport_tags": ["running"],
+    "area": "Bondi Beach",
+    "address": "Bondi Beach Promenade, Bondi Beach NSW 2026",
+    "latitude": -33.8908,
+    "longitude": 151.2743,
+    "is_bookable": false,
+    "notes": "Coastal walk to Bronte. Free, no booking."
+  },
+  {
+    "name": "Centennial Park Running Track",
+    "sport_tags": ["running"],
+    "area": "Centennial Park",
+    "address": "Grand Drive, Centennial Park NSW 2021",
+    "latitude": -33.8995,
+    "longitude": 151.2333,
+    "is_bookable": false,
+    "notes": "3.6 km loop. Free, public."
+  },
+  {
+    "name": "Anytime Fitness Surry Hills",
+    "sport_tags": ["gym"],
+    "area": "Surry Hills",
+    "address": "428 Crown St, Surry Hills NSW 2010",
+    "latitude": -33.8856,
+    "longitude": 151.2128,
+    "is_bookable": false,
+    "notes": "24/7 access. Membership required."
+  },
+  {
+    "name": "Fitness First Bondi Junction",
+    "sport_tags": ["gym"],
+    "area": "Bondi Junction",
+    "address": "Westfield Bondi Junction, 500 Oxford St, Bondi Junction NSW 2022",
+    "latitude": -33.8919,
+    "longitude": 151.2502,
+    "is_bookable": false,
+    "notes": "Day-pass available at reception."
+  },
+  {
+    "name": "PCYC Marrickville",
+    "sport_tags": ["gym"],
+    "area": "Marrickville",
+    "address": "531 Illawarra Rd, Marrickville NSW 2204",
+    "latitude": -33.9123,
+    "longitude": 151.1545,
+    "is_bookable": false
+  },
+  {
+    "name": "Moore Park Tennis Centre",
+    "sport_tags": ["tennis"],
+    "area": "Moore Park",
+    "address": "Anzac Parade, Moore Park NSW 2021",
+    "latitude": -33.9006,
+    "longitude": 151.2245,
+    "booking_url": "https://www.mooreparktennis.com.au/",
+    "is_bookable": true,
+    "notes": "Hard courts, lights for evening play."
+  },
+  {
+    "name": "Rushcutters Bay Tennis",
+    "sport_tags": ["tennis"],
+    "area": "Rushcutters Bay",
+    "address": "Rushcutters Bay Park, Sydney NSW 2011",
+    "latitude": -33.8742,
+    "longitude": 151.2295,
+    "booking_url": "https://www.rushcuttersbaytennis.com.au/",
+    "is_bookable": true
+  },
+  {
+    "name": "Parramatta Park Tennis Courts",
+    "sport_tags": ["tennis"],
+    "area": "Parramatta",
+    "address": "Pitt St, Parramatta NSW 2150",
+    "latitude": -33.8085,
+    "longitude": 151.0006,
+    "is_bookable": false,
+    "notes": "Public courts, first-come-first-served."
+  },
+  {
+    "name": "Moore Park Golf Course",
+    "sport_tags": ["golf"],
+    "area": "Moore Park",
+    "address": "Cleveland St & Anzac Parade, Moore Park NSW 2021",
+    "latitude": -33.9034,
+    "longitude": 151.2207,
+    "booking_url": "https://www.mooreparkgolf.com.au/",
+    "is_bookable": true,
+    "notes": "18-hole public course. Driving range on site."
+  },
+  {
+    "name": "Bondi Golf & Diggers Club",
+    "sport_tags": ["golf"],
+    "area": "North Bondi",
+    "address": "5 Military Rd, North Bondi NSW 2026",
+    "latitude": -33.8845,
+    "longitude": 151.2761,
+    "booking_url": "https://bondigolf.com.au/",
+    "is_bookable": true
+  },
+  {
+    "name": "Strathfield Golf Club",
+    "sport_tags": ["golf"],
+    "area": "Strathfield",
+    "address": "52 Weeroona Rd, Strathfield NSW 2135",
+    "latitude": -33.8761,
+    "longitude": 151.0935,
+    "booking_url": "https://www.strathfieldgolf.com.au/",
+    "is_bookable": true
+  },
+  {
+    "name": "ELS Hall Park Multi-Sport",
+    "sport_tags": ["tennis", "running"],
+    "area": "North Ryde",
+    "address": "1A Kent Rd, North Ryde NSW 2113",
+    "latitude": -33.7873,
+    "longitude": 151.1245,
+    "is_bookable": false,
+    "notes": "Public tennis courts and a 2 km running track."
+  }
+]

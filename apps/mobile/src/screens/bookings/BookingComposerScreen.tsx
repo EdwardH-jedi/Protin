@@ -13,8 +13,11 @@ import {
 
 import { Screen } from '../../components/Screen';
 import { api } from '../../lib/api';
+import { formatVenueLocation } from '../../lib/venueLocation';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { BookingComposerScreenProps } from '../../navigation/types';
+import type { Sport, Venue } from '@protin/shared-types';
+import { NearbyCourtsModal } from './NearbyCourtsModal';
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
@@ -25,6 +28,8 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
   const [startTime, setStartTime] = useState(''); // HH:MM
   const [endTime, setEndTime] = useState('');     // HH:MM
   const [location, setLocation] = useState('');
+  const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
+  const [isVenuePickerOpen, setIsVenuePickerOpen] = useState(false);
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,12 +48,24 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
       const startsAt = `${date}T${startTime}:00`;
       const endsAt = `${date}T${endTime}:00`;
 
+      // Fallback chain for the persisted location string:
+      //   1. typed text (manually entered always wins)
+      //   2. venue-derived "Name — Address" (so calendar events have a
+      //      meaningful place, even if the consumer never reads venue_id)
+      //   3. undefined
+      // Mirrors apps/mobile/src/lib/venueLocation.ts and
+      // _booking_to_event in app/services/google_calendar.py.
+      const trimmedTyped = location.trim();
+      const venueDerived = selectedVenue ? formatVenueLocation(selectedVenue) : '';
+      const payloadLocation = trimmedTyped || venueDerived || undefined;
+
       const booking = await api.post<{ id: string }>('/bookings', {
         matchId,
         sport,
         startsAt,
         endsAt,
-        location: location.trim() || undefined,
+        location: payloadLocation,
+        venueId: selectedVenue?.id,
         notes: notes.trim() || undefined,
       });
 
@@ -122,15 +139,46 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
             />
           </Field>
 
-          <Field label="Location (optional)">
-            <TextInput
-              style={styles.input}
-              value={location}
-              onChangeText={setLocation}
-              placeholder="e.g. Bondi gym"
-              placeholderTextColor={colors.textTertiary}
-              maxLength={200}
-            />
+          <Field label="Court / venue (optional)">
+            {selectedVenue ? (
+              <View style={styles.selectedVenueRow}>
+                <View style={styles.selectedVenueText}>
+                  <Text style={styles.selectedVenueName} numberOfLines={1}>
+                    {selectedVenue.name}
+                  </Text>
+                  {selectedVenue.area ? (
+                    <Text style={styles.selectedVenueArea}>{selectedVenue.area}</Text>
+                  ) : null}
+                </View>
+                <Pressable
+                  onPress={() => setSelectedVenue(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear selected court"
+                  style={({ pressed }) => [styles.clearVenue, pressed && styles.pressed]}
+                >
+                  <Text style={styles.clearVenueText}>Change</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <Pressable
+                  onPress={() => setIsVenuePickerOpen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose a court or venue"
+                  style={({ pressed }) => [styles.findCourtButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.findCourtText}>Choose a court or venue</Text>
+                </Pressable>
+                <TextInput
+                  style={[styles.input, styles.locationFallback]}
+                  value={location}
+                  onChangeText={setLocation}
+                  placeholder="Or type a location, e.g. Bondi gym"
+                  placeholderTextColor={colors.textTertiary}
+                  maxLength={200}
+                />
+              </>
+            )}
           </Field>
 
           <Field label="Notes (optional)">
@@ -168,6 +216,17 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <NearbyCourtsModal
+        isOpen={isVenuePickerOpen}
+        sport={sport as Sport}
+        onSelect={(venue) => {
+          setSelectedVenue(venue);
+          // Drop any freeform location text once a structured venue is chosen.
+          setLocation('');
+        }}
+        onClose={() => setIsVenuePickerOpen(false)}
+      />
     </Screen>
   );
 }
@@ -235,6 +294,52 @@ const styles = StyleSheet.create({
   inputMultiline: {
     minHeight: 88,
     textAlignVertical: 'top',
+  },
+  findCourtButton: {
+    borderWidth: 1,
+    borderColor: colors.brand,
+    borderRadius: radii.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    backgroundColor: colors.brandSoft,
+  },
+  findCourtText: {
+    ...typography.button,
+    color: colors.brand,
+  },
+  locationFallback: {
+    marginTop: spacing.sm,
+  },
+  selectedVenueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.brand,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.brandSoft,
+  },
+  selectedVenueText: {
+    flex: 1,
+    gap: 2,
+  },
+  selectedVenueName: {
+    ...typography.bodyLarge,
+    color: colors.textPrimary,
+  },
+  selectedVenueArea: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  clearVenue: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  clearVenueText: {
+    ...typography.button,
+    color: colors.brand,
   },
   errorText: {
     ...typography.body,

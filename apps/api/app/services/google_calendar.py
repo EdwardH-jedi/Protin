@@ -218,13 +218,36 @@ async def _ensure_fresh_token(token: GoogleCalendarToken) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _booking_to_event(booking: Booking, partner_name: str) -> dict:
+def _resolve_event_location(booking: Booking, venue: object | None) -> str:
+    """
+    Apply the location fallback chain Codex flagged:
+      1. typed location on the booking (wins over venue)
+      2. venue.name — venue.address|venue.area
+      3. just venue.name
+      4. ""
+    Mirrors apps/mobile/src/lib/venueLocation.ts so calendar events render
+    consistently whether the location was set by the composer or filled
+    in here defensively.
+    """
+    typed = (booking.location or "").strip()
+    if typed:
+        return typed
+    if venue is None:
+        return ""
+    detail = (getattr(venue, "address", None) or getattr(venue, "area", None) or "").strip()
+    name = getattr(venue, "name", "")
+    if not name:
+        return ""
+    return f"{name} — {detail}" if detail else name
+
+
+def _booking_to_event(booking: Booking, partner_name: str, venue: object | None = None) -> dict:
     sport_label = "Gym" if booking.sport == "gym" else "Golf"
     summary = f"{sport_label} session with {partner_name}"
     description = booking.notes or ""
     return {
         "summary": summary,
-        "location": booking.location or "",
+        "location": _resolve_event_location(booking, venue),
         "description": description,
         "start": {
             "dateTime": booking.starts_at.isoformat(),
@@ -281,7 +304,17 @@ async def sync_booking(
     ).scalar_one_or_none()
     partner_name = partner_profile.display_name if partner_profile else "your partner"
 
-    event_body = _booking_to_event(booking, partner_name)
+    # Resolve the venue (if any) so a venue-only booking still ships a
+    # meaningful location field to Google Calendar. Cheap one-row read.
+    venue = None
+    if booking.venue_id is not None:
+        from app.models.venue import Venue
+
+        venue = (
+            await db.execute(select(Venue).where(Venue.id == booking.venue_id))
+        ).scalar_one_or_none()
+
+    event_body = _booking_to_event(booking, partner_name, venue=venue)
     headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
     calendar_id = token_rec.calendar_id
 

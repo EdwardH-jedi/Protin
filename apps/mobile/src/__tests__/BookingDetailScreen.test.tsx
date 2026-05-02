@@ -303,6 +303,44 @@ describe('BookingDetailScreen', () => {
     expect(Alert.alert).toHaveBeenCalledWith('Added', 'Session added to your calendar.');
   });
 
+  it('uses the venue as the calendar location when typed location is blank (Codex Blocker 3)', async () => {
+    mockAddBookingToCalendar.mockResolvedValue(true);
+    jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    // Booking with no typed location but a venue attached — the screen
+    // must fall back to "<venue.name> — <venue.address|area>" so the
+    // calendar event ships a meaningful location.
+    mockApiGet.mockResolvedValue(
+      makeBooking({
+        status: 'confirmed',
+        location: null,
+        venue: {
+          id: 'v1',
+          name: 'Tennis Court Alpha',
+          area: 'Bondi',
+          address: '1 Beach Rd, Bondi NSW',
+          isBookable: false,
+        },
+      })
+    );
+
+    const { getByText } = render(
+      <BookingDetailScreen
+        route={makeRoute() as any}
+        navigation={makeNavigation() as any}
+      />
+    );
+    await waitFor(() => getByText('Add to Calendar'));
+    await act(async () => {
+      fireEvent.press(getByText('Add to Calendar'));
+    });
+
+    expect(mockAddBookingToCalendar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        location: 'Tennis Court Alpha — 1 Beach Rd, Bondi NSW',
+      })
+    );
+  });
+
   it('shows a permission alert when calendar access is denied', async () => {
     mockAddBookingToCalendar.mockResolvedValue(false);
     jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());

@@ -9,9 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking
 from app.models.match import Match
+from app.models.venue import Venue
 from app.schemas.bookings import BookingListResponse, BookingResponse, CreateBookingRequest
 from app.services import notifications as notif_service
+from app.services import rank as rank_service
 from app.services.matches import _build_partner_card
+from app.services.venues import _to_response as _venue_to_response
 
 # ---------------------------------------------------------------------------
 # Status machine
@@ -73,6 +76,13 @@ async def _assert_booking_participant(booking: Booking, user_id: UUID) -> None:
 async def _to_response(db: AsyncSession, booking: Booking, current_user_id: UUID) -> BookingResponse:
     other_id = booking.partner_id if booking.proposer_id == current_user_id else booking.proposer_id
     partner = await _build_partner_card(db, other_id, booking.sport)
+    venue_payload = None
+    if booking.venue_id is not None:
+        venue = (
+            await db.execute(select(Venue).where(Venue.id == booking.venue_id))
+        ).scalar_one_or_none()
+        if venue is not None:
+            venue_payload = _venue_to_response(venue, distance_km=None)
     return BookingResponse(
         id=booking.id,
         match_id=booking.match_id,
@@ -87,6 +97,7 @@ async def _to_response(db: AsyncSession, booking: Booking, current_user_id: UUID
         created_at=booking.created_at,
         updated_at=booking.updated_at,
         partner=partner,
+        venue=venue_payload,
     )
 
 
@@ -124,6 +135,22 @@ async def create_booking(
             detail="starts_at cannot be more than 1 hour in the past",
         )
 
+    venue_id_to_persist = None
+    if req.venue_id is not None:
+        venue = (
+            await db.execute(select(Venue).where(Venue.id == req.venue_id))
+        ).scalar_one_or_none()
+        if venue is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Venue not found"
+            )
+        if req.sport not in (venue.sport_tags or []):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Selected venue does not support this sport",
+            )
+        venue_id_to_persist = venue.id
+
     booking = Booking(
         match_id=req.match_id,
         proposer_id=current_user_id,
@@ -132,6 +159,7 @@ async def create_booking(
         starts_at=req.starts_at,
         ends_at=req.ends_at,
         location=req.location,
+        venue_id=venue_id_to_persist,
         notes=req.notes,
         status="proposed",
     )
@@ -192,7 +220,15 @@ async def transition_booking(
     b = await _get_booking_or_404(db, booking_id)
     await _assert_booking_participant(b, current_user_id)
     _check_transition(b, new_status, current_user_id)
+    previous_status = b.status
     b.status = new_status
+
+    # Sports Reputation hook: emit rank/honor events. Same DB session, no
+    # commit here — the booking commit at the bottom of the function flushes
+    # both the booking mutation and the new ledger rows atomically.
+    await rank_service.record_booking_transition(
+        db, b, previous_status, new_status, current_user_id
+    )
 
     # Determine who to notify and what type of notification to send
     other_id = b.partner_id if b.proposer_id == current_user_id else b.proposer_id

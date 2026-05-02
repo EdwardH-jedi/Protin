@@ -18,6 +18,7 @@
 import type { ISODateString, UUID } from './common';
 import type { PartnerCard } from './discovery';
 import type { Sport } from './sport-profile';
+import type { Venue } from './venue';
 
 // ---------------------------------------------------------------------------
 // Status
@@ -76,6 +77,8 @@ export interface CreateBookingRequest {
   startsAt: ISODateString;
   endsAt: ISODateString;
   location?: string;
+  /** Optional reference to a venue from the Nearby Courts catalog. */
+  venueId?: UUID;
   notes?: string;
 }
 
@@ -105,6 +108,8 @@ export interface BookingListFilter {
 export interface BookingDetail extends Booking {
   /** The other participant (partner card from the match). */
   partner: PartnerCard;
+  /** Structured venue when one was attached at proposal time. */
+  venue?: Venue | null;
 }
 
 export interface BookingListResponse {

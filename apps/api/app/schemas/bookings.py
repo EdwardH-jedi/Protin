@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.schemas.discovery import PartnerCardResponse
+from app.schemas.venues import VenueResponse
 
 
 class CreateBookingRequest(BaseModel):
@@ -15,6 +16,10 @@ class CreateBookingRequest(BaseModel):
     starts_at: datetime
     ends_at: datetime
     location: str | None = Field(default=None, max_length=200)
+    # Optional reference to a Nearby Courts catalog entry. When provided,
+    # the API resolves the venue and includes it in the response. The
+    # freeform `location` string is preserved alongside.
+    venue_id: UUID | None = None
     notes: str | None = Field(default=None, max_length=500)
 
 
@@ -32,6 +37,7 @@ class BookingResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     partner: PartnerCardResponse
+    venue: VenueResponse | None = None
 
     model_config = {"from_attributes": True}
 

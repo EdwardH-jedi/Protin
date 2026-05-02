@@ -38,6 +38,7 @@ jest.mock('../theme', () => ({
   colors: {
     accent: '#000',
     brand: '#000',
+    brandSoft: '#222',
     border: '#ccc',
     surface: '#fff',
     surfaceElevated: '#f5f5f5',
@@ -50,7 +51,7 @@ jest.mock('../theme', () => ({
     success: '#0f0',
     error: '#f00',
   },
-  radii: { sm: 4, md: 8, lg: 12, full: 9999 },
+  radii: { sm: 4, md: 8, lg: 12, pill: 9999, full: 9999 },
   spacing: {
     xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 40, xxxl: 48,
   },
@@ -58,6 +59,41 @@ jest.mock('../theme', () => ({
     h2: {}, h3: {}, body: {}, bodySmall: {}, bodyLarge: {}, label: {}, button: {},
   },
 }));
+
+// ─── Mock NearbyCourtsModal ──────────────────────────────────────────────────
+// The modal is unit-tested in its own file; here we stub it so the composer
+// tests stay focused on form / submission behavior. The stub exposes a tiny
+// "pick a venue" button when `isOpen` so the integration path is testable.
+
+jest.mock('../screens/bookings/NearbyCourtsModal', () => {
+  const { Pressable, Text } = require('react-native');
+  return {
+    NearbyCourtsModal: ({ isOpen, onSelect, onClose }: any) =>
+      isOpen
+        ? (
+          <Pressable
+            accessibilityLabel="mock-pick-venue"
+            onPress={() => {
+              onSelect({
+                id: 'venue-1',
+                name: 'Tennis Court Alpha',
+                sportTags: ['tennis'],
+                area: 'Bondi',
+                latitude: 0,
+                longitude: 0,
+                isBookable: false,
+                createdAt: '2026-01-01T00:00:00Z',
+                updatedAt: '2026-01-01T00:00:00Z',
+              });
+              onClose();
+            }}
+          >
+            <Text>pick mock venue</Text>
+          </Pressable>
+        )
+        : null,
+  };
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -109,7 +145,8 @@ describe('BookingComposerScreen', () => {
     expect(getByPlaceholderText('2026-04-15')).toBeTruthy();
     expect(getByPlaceholderText('09:00')).toBeTruthy();
     expect(getByPlaceholderText('10:00')).toBeTruthy();
-    expect(getByPlaceholderText('e.g. Bondi gym')).toBeTruthy();
+    // Court / venue field shows a "Find a court" CTA + a freeform fallback.
+    expect(getByPlaceholderText('Or type a location, e.g. Bondi gym')).toBeTruthy();
     expect(getByPlaceholderText('Anything your partner should know…')).toBeTruthy();
   });
 
@@ -142,7 +179,7 @@ describe('BookingComposerScreen', () => {
 
   // ── Successful submission ──────────────────────────────────────────────────
 
-  it('calls api.post with the correct payload', async () => {
+  it('calls api.post with the correct payload (freeform location, no venue)', async () => {
     mockApiPost.mockResolvedValue({ id: 'new-booking-id' });
     const navigation = makeNavigation();
     const { getByPlaceholderText, getByLabelText } = render(
@@ -150,7 +187,10 @@ describe('BookingComposerScreen', () => {
     );
 
     fillRequiredFields(getByPlaceholderText);
-    fireEvent.changeText(getByPlaceholderText('e.g. Bondi gym'), 'City Gym');
+    fireEvent.changeText(
+      getByPlaceholderText('Or type a location, e.g. Bondi gym'),
+      'City Gym'
+    );
     fireEvent.changeText(getByPlaceholderText('Anything your partner should know…'), 'Bring towel');
 
     await act(async () => {
@@ -163,6 +203,7 @@ describe('BookingComposerScreen', () => {
       startsAt: '2026-06-01T09:00:00',
       endsAt: '2026-06-01T10:00:00',
       location: 'City Gym',
+      venueId: undefined,
       notes: 'Bring towel',
     });
   });
@@ -275,6 +316,75 @@ describe('BookingComposerScreen', () => {
     );
     fireEvent.press(getByLabelText('Back'));
     expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  // ── Venue picker integration ───────────────────────────────────────────────
+  // The NearbyCourtsModal is mocked in this file so these tests focus on
+  // the composer's state + payload behavior. The modal stub immediately picks
+  // a known venue when its "mock-pick-venue" Pressable is fired.
+
+  describe('venue picker', () => {
+    it('shows the Find a court CTA when no venue is selected', () => {
+      const { getByLabelText } = render(
+        <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      expect(getByLabelText('Choose a court or venue')).toBeTruthy();
+    });
+
+    it('selecting a venue replaces the freeform input with a chip', async () => {
+      const { getByLabelText, getByText, queryByPlaceholderText } = render(
+        <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      // Open the (mocked) modal, then pick the stub venue.
+      fireEvent.press(getByLabelText('Choose a court or venue'));
+      await act(async () => {
+        fireEvent.press(getByLabelText('mock-pick-venue'));
+      });
+      // Freeform input is gone; selected venue chip is visible.
+      expect(queryByPlaceholderText('Or type a location, e.g. Bondi gym')).toBeNull();
+      expect(getByText('Tennis Court Alpha')).toBeTruthy();
+      expect(getByLabelText('Clear selected court')).toBeTruthy();
+    });
+
+    it('sends venueId AND a venue-derived location when a venue is picked (Codex Blocker 3)', async () => {
+      mockApiPost.mockResolvedValue({ id: 'booking-with-venue' });
+      const { getByLabelText, getByPlaceholderText } = render(
+        <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      fillRequiredFields(getByPlaceholderText);
+      fireEvent.press(getByLabelText('Choose a court or venue'));
+      await act(async () => {
+        fireEvent.press(getByLabelText('mock-pick-venue'));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText('Send proposal'));
+      });
+      // The mock venue has area "Bondi" and no address, so the derived
+      // string is "<name> — <area>". Persisting this on the booking
+      // means the calendar event has a meaningful location field.
+      expect(mockApiPost).toHaveBeenCalledWith(
+        '/bookings',
+        expect.objectContaining({
+          venueId: 'venue-1',
+          location: 'Tennis Court Alpha — Bondi',
+        })
+      );
+    });
+
+    it('Change clears the selected venue back to the freeform field', async () => {
+      const { getByLabelText, getByPlaceholderText, queryByPlaceholderText } = render(
+        <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      fireEvent.press(getByLabelText('Choose a court or venue'));
+      await act(async () => {
+        fireEvent.press(getByLabelText('mock-pick-venue'));
+      });
+      // Now clear the selection.
+      fireEvent.press(getByLabelText('Clear selected court'));
+      // Freeform input is back.
+      expect(getByPlaceholderText('Or type a location, e.g. Bondi gym')).toBeTruthy();
+      expect(queryByPlaceholderText).toBeTruthy();
+    });
   });
 
   // ── Sport passed through ───────────────────────────────────────────────────
