@@ -12,9 +12,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen } from '../../components/Screen';
 import { api, BASE_URL } from '../../lib/api';
+import { dedupeMessagesById } from '../../lib/messages';
 import { useAuthStore } from '../../stores/auth';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { ChatScreenProps } from '../../navigation/types';
@@ -41,6 +43,7 @@ interface MessageListResponse {
 export function ChatScreen({ route, navigation }: ChatScreenProps) {
   const { matchId, partnerName, partnerId: routePartnerId, sport } = route.params;
   const { user, token } = useAuthStore();
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -116,7 +119,13 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
       const data = await api.get<MessageListResponse>(
         `/matches/${matchId}/messages?limit=100`
       );
-      setMessages(data.items);
+      // Merge instead of replace: a WS-received message could have landed in
+      // state while this fetch was in-flight (slow network, partner sent
+      // mid-load). dedupeMessagesById keeps the FIRST occurrence so the
+      // canonical history from data.items wins on overlap, and any tail-end
+      // WS messages survive at the end. Defensive against duplicate rows in
+      // the response too.
+      setMessages((prev) => dedupeMessagesById([...data.items, ...prev]));
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Failed to load messages.');
     } finally {
@@ -138,10 +147,10 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
     ws.onmessage = (event) => {
       try {
         const incoming = JSON.parse(event.data as string) as Message;
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === incoming.id)) return prev;
-          return [...prev, incoming];
-        });
+        // Use the shared dedupe helper so this path matches sendMessage and
+        // fetchMessages — a single source of truth means a race between the
+        // POST response and a WS echo of the same id can never duplicate.
+        setMessages((prev) => dedupeMessagesById([...prev, incoming]));
         setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
       } catch {
         // ignore malformed frames
@@ -157,12 +166,27 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
   const sendMessage = useCallback(async () => {
     const body = draft.trim();
     if (!body || isSending) return;
+    // Clear optimistically so the user can keep typing while the request flies.
     setDraft('');
     setIsSending(true);
     try {
       const msg = await api.post<Message>(`/matches/${matchId}/messages`, { body });
-      setMessages((prev) => [...prev, msg]);
+      // Dedupe-on-append: the WebSocket may have already broadcast this same
+      // id back to us before the POST response resolved. Without this, both
+      // paths would each push the message and React would warn:
+      //   "Encountered two children with the same key: <id>"
+      setMessages((prev) => dedupeMessagesById([...prev, msg]));
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+    } catch (err) {
+      // Send failed — restore the draft so the user doesn't lose their typing,
+      // and surface the failure via Alert so they know to retry. Without this,
+      // a flaky network silently swallows the message and the textbox just
+      // becomes empty, which feels broken on real devices.
+      setDraft(body);
+      Alert.alert(
+        'Could not send',
+        err instanceof Error ? err.message : 'Please try again.'
+      );
     } finally {
       setIsSending(false);
     }
@@ -170,107 +194,162 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
 
   return (
     <Screen padded={false}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable
-          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-          onPress={() => navigation.goBack()}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <Text style={styles.backText}>{'←'}</Text>
-        </Pressable>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerName} numberOfLines={1}>
-            {partnerName}
-          </Text>
-        </View>
-        <View style={styles.headerActions}>
+      {/* The whole chat body is wrapped in a single KeyboardAvoidingView so
+          the header, planning banner, message list and composer all shift
+          together when the keyboard appears. iOS uses `padding` (extra bottom
+          padding equal to the keyboard height); Android uses `height` (the
+          KAV shrinks itself by the keyboard height). The previous structure
+          wrapped only the list+input, which left the input hidden under the
+          keyboard whenever the offset didn't perfectly match the header
+          stack height. */}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        {/* Header */}
+        <View style={styles.header}>
           <Pressable
-            style={({ pressed }) => [styles.bookButton, pressed && styles.pressed]}
-            onPress={() =>
-              navigation.navigate('BookingComposer', { matchId, sport })
-            }
+            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+            onPress={() => navigation.goBack()}
             accessibilityRole="button"
-            accessibilityLabel="Propose a session"
+            accessibilityLabel="Back"
           >
-            <Text style={styles.bookButtonText}>+ Session</Text>
+            <Text style={styles.backText}>{'←'}</Text>
           </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.overflowButton, pressed && styles.pressed]}
-            onPress={openSafetyMenu}
-            accessibilityRole="button"
-            accessibilityLabel="More options"
-          >
-            <Text style={styles.overflowText}>⋯</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {isLoading ? (
-        <View style={styles.centred}>
-          <ActivityIndicator size="large" color={colors.accent} />
-        </View>
-      ) : fetchError ? (
-        <View style={styles.centred}>
-          <Text style={styles.errorText}>{fetchError}</Text>
-          <Pressable style={styles.retryButton} onPress={fetchMessages}>
-            <Text style={styles.retryText}>Try again</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={0}
-        >
-          <FlatList
-            ref={listRef}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <MessageBubble message={item} isOwn={item.senderId === user?.id} />
-            )}
-            contentContainerStyle={styles.messageList}
-            showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-            ListEmptyComponent={
-              <View style={styles.emptyWrap}>
-                <Text style={styles.emptyText}>
-                  Say hello to {partnerName} to get things started.
-                </Text>
-              </View>
-            }
-          />
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.input}
-              value={draft}
-              onChangeText={setDraft}
-              placeholder="Message…"
-              placeholderTextColor={colors.textTertiary}
-              multiline
-              maxLength={1000}
-              returnKeyType="send"
-              onSubmitEditing={sendMessage}
-              blurOnSubmit={false}
-            />
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerName} numberOfLines={1}>
+              {partnerName}
+            </Text>
+          </View>
+          <View style={styles.headerActions}>
             <Pressable
-              style={({ pressed }) => [
-                styles.sendButton,
-                (!draft.trim() || isSending) && styles.sendButtonDisabled,
-                pressed && styles.pressed,
-              ]}
-              onPress={sendMessage}
-              disabled={!draft.trim() || isSending}
+              style={({ pressed }) => [styles.bookButton, pressed && styles.pressed]}
+              onPress={() =>
+                navigation.navigate('BookingComposer', { matchId, sport })
+              }
               accessibilityRole="button"
-              accessibilityLabel="Send"
+              accessibilityLabel="Propose a session"
             >
-              <Text style={styles.sendButtonText}>Send</Text>
+              <Text style={styles.bookButtonText}>+ Session</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.overflowButton, pressed && styles.pressed]}
+              onPress={openSafetyMenu}
+              accessibilityRole="button"
+              accessibilityLabel="More options"
+            >
+              <Text style={styles.overflowText}>⋯</Text>
             </Pressable>
           </View>
-        </KeyboardAvoidingView>
-      )}
+        </View>
+
+        {/* Session-planning banner — always visible above messages so the
+            venue/booking flow is one tap from anywhere in the chat. The small
+            "+ Session" header pill remains for users who already know what
+            they're doing; this card is the discoverable entry. */}
+        <View style={styles.planBanner}>
+          <View style={styles.planBannerText}>
+            <Text style={styles.planBannerTitle}>Plan a session</Text>
+            <Text style={styles.planBannerSubtitle}>
+              Find a court and propose a time.
+            </Text>
+          </View>
+          <Pressable
+            onPress={() =>
+              navigation.navigate('BookingComposer', {
+                matchId,
+                sport,
+                openCourtPicker: true,
+              })
+            }
+            accessibilityRole="button"
+            accessibilityLabel="Find a court"
+            style={({ pressed }) => [styles.findCourtCta, pressed && styles.pressed]}
+          >
+            <Text style={styles.findCourtCtaText}>Find a court</Text>
+          </Pressable>
+        </View>
+
+        {isLoading ? (
+          <View style={styles.centred}>
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
+        ) : fetchError ? (
+          <View style={styles.centred}>
+            <Text style={styles.errorText}>{fetchError}</Text>
+            <Pressable style={styles.retryButton} onPress={fetchMessages}>
+              <Text style={styles.retryText}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.flex}>
+            <FlatList
+              ref={listRef}
+              data={messages}
+              // Message.id is required by the server contract and the local
+              // type — duplicates are eliminated upstream via dedupeMessagesById,
+              // so the stable id alone is the right key. No idx fallback needed.
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <MessageBubble message={item} isOwn={item.senderId === user?.id} />
+              )}
+              contentContainerStyle={styles.messageList}
+              showsVerticalScrollIndicator={false}
+              onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              ListEmptyComponent={
+                <View style={styles.emptyWrap}>
+                  <Text style={styles.emptyText}>
+                    Say hello to {partnerName} to get things started.
+                  </Text>
+                </View>
+              }
+            />
+            <View
+              style={[
+                styles.inputRow,
+                // Respect the bottom safe-area inset so the composer never
+                // crashes into the iPhone home indicator. KAV adds
+                // keyboard-height padding above this when the keyboard is
+                // up, so this inset is the resting state pad only.
+                { paddingBottom: spacing.sm + insets.bottom },
+              ]}
+            >
+              <TextInput
+                style={styles.input}
+                value={draft}
+                onChangeText={setDraft}
+                placeholder="Message…"
+                placeholderTextColor={colors.textTertiary}
+                multiline
+                maxLength={1000}
+                returnKeyType="send"
+                onSubmitEditing={sendMessage}
+                blurOnSubmit={false}
+                // Anchor multi-line text to the top edge — without this, Android
+                // vertically centers the caret as the input grows, which makes
+                // the first line appear to "jump" while typing.
+                textAlignVertical="top"
+              />
+              <Pressable
+                style={({ pressed }) => [
+                  styles.sendButton,
+                  (!draft.trim() || isSending) && styles.sendButtonDisabled,
+                  pressed && styles.pressed,
+                ]}
+                onPress={sendMessage}
+                disabled={!draft.trim() || isSending}
+                accessibilityRole="button"
+                accessibilityLabel="Send"
+              >
+                <Text style={styles.sendButtonText}>Send</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+      </KeyboardAvoidingView>
     </Screen>
   );
 }
@@ -339,6 +418,40 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     letterSpacing: 2,
   },
+  planBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.separator,
+  },
+  planBannerText: {
+    flex: 1,
+    gap: 2,
+  },
+  planBannerTitle: {
+    ...typography.label,
+    color: colors.textPrimary,
+    letterSpacing: 0.6,
+  },
+  planBannerSubtitle: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  findCourtCta: {
+    backgroundColor: colors.brand,
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  findCourtCtaText: {
+    ...typography.button,
+    color: colors.textInverse,
+    fontSize: 14,
+  },
   centred: {
     flex: 1,
     justifyContent: 'center',
@@ -347,7 +460,11 @@ const styles = StyleSheet.create({
   messageList: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    // Larger bottom pad so the last bubble keeps clear of the composer's
+    // top border AND the keyboard edge when the input grows multi-line.
+    // Slightly bumped from spacing.md so a fresh send doesn't visually
+    // crash into the input on real devices.
+    paddingBottom: spacing.lg,
     gap: spacing.xs,
   },
   emptyWrap: {
@@ -401,21 +518,36 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    ...typography.body,
+    ...typography.bodyLarge,
     color: colors.textPrimary,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    maxHeight: 120,
+    // 12 px vertical padding on each side keeps a single line of bodyLarge
+    // (lineHeight 26) clearly inside the box without clipping the caret or
+    // descenders. Combined with minHeight 48, an empty composer is a
+    // comfortable resting target above the iOS HIG threshold.
+    paddingVertical: 12,
+    // Real-device QA: at the previous 44 px the typed text felt clipped on
+    // an iPhone with the keyboard open. 48 gives the caret + first line
+    // clear breathing room. maxHeight 132 lets the input grow to ~5 lines
+    // before scrolling internally so the user can review what they're
+    // typing without the keyboard ever covering the composer.
+    minHeight: 48,
+    maxHeight: 132,
   },
   sendButton: {
     backgroundColor: colors.brand,
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    // Match the input's resting minHeight so a single-line composer reads
+    // as one unified row. With alignItems: 'flex-end' on the parent, the
+    // Send button stays bottom-aligned when the input grows multi-line.
+    minHeight: 48,
+    justifyContent: 'center',
   },
   sendButtonDisabled: {
     backgroundColor: colors.border,
