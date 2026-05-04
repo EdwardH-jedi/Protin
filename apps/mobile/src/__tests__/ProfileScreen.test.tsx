@@ -232,6 +232,16 @@ describe('ProfileScreen', () => {
     expect(queryByText('Disconnect')).toBeNull();
   });
 
+  // ── Legal & support links ────────────────────────────────────────────────
+
+  it('renders Privacy Policy, Terms of Service, and Support links', async () => {
+    const { getByLabelText } = render(<ProfileScreen />);
+    await waitFor(() => getByLabelText('Log out'));
+    getByLabelText('Privacy Policy');
+    getByLabelText('Terms of Service');
+    getByLabelText('Support');
+  });
+
   // ── Edit profile ───────────────────────────────────────────────────────────
 
   it('renders an Edit profile button when profile is loaded', async () => {

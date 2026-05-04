@@ -15,7 +15,7 @@ import { RankSummaryCard } from '../../components/RankSummaryCard';
 import { Screen } from '../../components/Screen';
 import { useRankSummary } from '../../hooks/useRankSummary';
 import { api } from '../../lib/api';
-import { openLegal, PRIVACY_URL, TERMS_URL } from '../../lib/legal';
+import { openLegal, PRIVACY_URL, SUPPORT_URL, TERMS_URL } from '../../lib/legal';
 import { useAuthStore } from '../../stores/auth';
 import { sportLabel, useProfileStore } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -208,6 +208,14 @@ export function ProfileScreen() {
                 accessibilityLabel="Terms of Service"
               >
                 <Text style={styles.legalRowText}>Terms of Service</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.legalRow, pressed && styles.pressed]}
+                onPress={() => openLegal(SUPPORT_URL, 'Support')}
+                accessibilityRole="link"
+                accessibilityLabel="Support"
+              >
+                <Text style={styles.legalRowText}>Support</Text>
               </Pressable>
             </View>
           </View>
