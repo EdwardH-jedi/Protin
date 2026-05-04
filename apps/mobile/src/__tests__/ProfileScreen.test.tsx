@@ -393,6 +393,62 @@ describe('ProfileScreen', () => {
       expect(alertSpy).toHaveBeenCalledTimes(2);
       expect(alertSpy.mock.calls[1][0]).toBe('Delete failed');
     });
+
+    it('labels the destructive confirmation as "Delete account"', async () => {
+      const { getByLabelText } = render(<ProfileScreen />);
+      await waitFor(() => getByLabelText('Delete my account'));
+      fireEvent.press(getByLabelText('Delete my account'));
+
+      const buttons = alertSpy.mock.calls[0][2] as {
+        text: string;
+        style?: string;
+      }[];
+      const destructive = buttons.find((b) => b.style === 'destructive');
+      expect(destructive?.text).toBe('Delete account');
+    });
+
+    it('does not fire DELETE twice if the destructive press is invoked twice', async () => {
+      // Slow API: hold the first DELETE in flight while we attempt to fire a
+      // second confirmation. The local isDeleting guard must short-circuit
+      // the duplicate so /auth/me is only called once.
+      let resolveDelete!: (v: unknown) => void;
+      mockApiDelete.mockReturnValueOnce(
+        new Promise((res) => {
+          resolveDelete = res;
+        })
+      );
+      mockLogout.mockResolvedValue(undefined);
+
+      const { getByLabelText } = render(<ProfileScreen />);
+      await waitFor(() => getByLabelText('Delete my account'));
+      fireEvent.press(getByLabelText('Delete my account'));
+
+      const buttons = alertSpy.mock.calls[0][2] as {
+        text: string;
+        style?: string;
+        onPress?: () => void | Promise<void>;
+      }[];
+      const destructive = buttons.find((b) => b.style === 'destructive');
+
+      // Fire and DO NOT await — keeps the API in flight.
+      let firstPress: Promise<void | undefined> | undefined;
+      act(() => {
+        firstPress = destructive?.onPress?.() as Promise<void> | undefined;
+      });
+
+      // Second invocation while in-flight must be ignored.
+      await act(async () => {
+        await destructive?.onPress?.();
+      });
+
+      expect(mockApiDelete).toHaveBeenCalledTimes(1);
+
+      // Resolve the original to leave the test in a clean state.
+      await act(async () => {
+        resolveDelete(undefined);
+        await firstPress;
+      });
+    });
   });
 
   // ── Sports reputation (rank/honor) integration ─────────────────────────────

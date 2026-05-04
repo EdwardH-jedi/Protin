@@ -1,5 +1,9 @@
-import { useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { useEffect, useRef } from 'react';
+import {
+  CommonActions,
+  NavigationContainer,
+  createNavigationContainerRef,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
@@ -28,6 +32,18 @@ import type { MainTabParamList, RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
+
+// Routes that are always safe to remain on without a token. Anything else is
+// treated as authenticated stack and is force-reset to AuthEntry the moment
+// the auth token clears (logout / delete account / future 401 interceptor).
+const UNAUTH_ROUTES: ReadonlyArray<keyof RootStackParamList> = [
+  'Splash',
+  'AuthEntry',
+  'LoginScreen',
+  'RegisterScreen',
+];
+
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 function MainTabs() {
   return (
@@ -75,6 +91,11 @@ function MainTabs() {
 
 export function RootNavigator() {
   const { token } = useAuthStore();
+  // Tracks the previous token so the safety-net effect can detect a real
+  // authenticated -> unauthenticated transition (logout / delete account /
+  // forced session expiry) without firing on the very first cold-start
+  // render (where token is briefly null until SecureStore resolves).
+  const previousToken = useRef(token);
 
   useEffect(() => {
     try {
@@ -94,8 +115,28 @@ export function RootNavigator() {
     }
   }, [token]);
 
+  // Auth-state safety net: if the token was set and is now null, force the
+  // navigator back to AuthEntry unless we are already on a safe unauthenticated
+  // route. ProfileScreen does this on its happy path; this guard catches any
+  // future code path that clears the token (e.g. a global 401 interceptor) so
+  // the authenticated stack can never be left visible without a valid session.
+  useEffect(() => {
+    const wasAuthed = previousToken.current !== null;
+    const nowUnauthed = token === null;
+    previousToken.current = token;
+    if (!wasAuthed || !nowUnauthed) return;
+    if (!navigationRef.isReady()) return;
+    const current = navigationRef.getCurrentRoute()?.name as
+      | keyof RootStackParamList
+      | undefined;
+    if (current && UNAUTH_ROUTES.includes(current)) return;
+    navigationRef.dispatch(
+      CommonActions.reset({ index: 0, routes: [{ name: 'AuthEntry' }] })
+    );
+  }, [token]);
+
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         initialRouteName="Splash"
         screenOptions={{

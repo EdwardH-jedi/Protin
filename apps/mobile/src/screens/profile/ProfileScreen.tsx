@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -28,6 +28,12 @@ export function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Local guard so a double-tap or repeat confirmation cannot fire
+  // DELETE /auth/me twice. Also blocks Log out while a delete is mid-flight.
+  // A ref (not state) is required because Alert button onPress callbacks close
+  // over stale state — `.current` always reflects the latest value across
+  // consecutive invocations.
+  const isDeletingRef = useRef(false);
 
   useEffect(() => {
     fetchProfile()
@@ -41,30 +47,38 @@ export function ProfileScreen() {
       .finally(() => setIsLoading(false));
   }, [fetchProfile]);
 
-  // Reset the root stack to AuthEntry. RootNavigator is not token-gated, so
-  // after logout/delete-account the user would otherwise stay on the Profile
-  // tab. We reset the *parent* navigator (the root native-stack) because the
-  // tab navigator does not own the AuthEntry route.
+  // Reset the root stack to AuthEntry. RootNavigator's auth-state effect also
+  // forces this when `token` transitions to null, but we keep this explicit
+  // reset on the success path so navigation lands instantly without waiting
+  // on the store -> effect cycle.
   const resetToAuthEntry = useCallback(() => {
     const parent = navigation.getParent();
     (parent ?? navigation).reset({ index: 0, routes: [{ name: 'AuthEntry' }] });
   }, [navigation]);
 
   const handleLogout = useCallback(async () => {
+    if (isDeletingRef.current) return;
     await logout();
     resetToAuthEntry();
   }, [logout, resetToAuthEntry]);
 
   const handleDeleteAccount = useCallback(() => {
+    if (isDeletingRef.current) return;
     Alert.alert(
       'Delete your account?',
       'This permanently deletes your profile, matches, chat history, and bookings. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Delete account',
           style: 'destructive',
           onPress: async () => {
+            // The Alert button can fire twice if the OS retains a stale onPress
+            // over a long press. Read the ref instead of state — the React
+            // closure captures stale state, but .current always reflects the
+            // latest value across consecutive invocations.
+            if (isDeletingRef.current) return;
+            isDeletingRef.current = true;
             try {
               await api.delete('/auth/me');
               // Order matters: clear local session first (logout drops the
@@ -72,11 +86,17 @@ export function ProfileScreen() {
               // we never re-render Profile against stale state.
               await logout();
               resetToAuthEntry();
-            } catch {
+            } catch (err) {
+              // Failure must NOT logout — the account still exists on the
+              // server, the user must stay signed in to retry.
               Alert.alert(
                 'Delete failed',
-                "Couldn't delete your account. Please try again or contact support."
+                err instanceof Error
+                  ? err.message
+                  : "Couldn't delete your account. Please try again or contact support."
               );
+            } finally {
+              isDeletingRef.current = false;
             }
           },
         },

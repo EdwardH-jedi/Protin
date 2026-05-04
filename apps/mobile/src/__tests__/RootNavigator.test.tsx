@@ -16,12 +16,38 @@ jest.mock('../lib/notifications', () => ({
   registerForPushNotifications: () => mockRegisterForPushNotifications(),
 }));
 
-jest.mock('@react-navigation/native', () => ({
-  NavigationContainer: ({ children }: { children: React.ReactNode }) => {
-    const { View } = require('react-native');
-    return <View>{children}</View>;
-  },
-}));
+// The ref is defined INSIDE the factory because jest hoists jest.mock() above
+// const declarations — referencing an outer `mockNavRef` here would still be
+// in the TDZ when RootNavigator first calls createNavigationContainerRef().
+jest.mock('@react-navigation/native', () => {
+  const navRef = {
+    isReady: jest.fn(() => false),
+    getCurrentRoute: jest.fn(() => ({ name: 'Main' })),
+    dispatch: jest.fn(),
+  };
+  return {
+    NavigationContainer: ({ children }: { children: React.ReactNode }) => {
+      const { View } = require('react-native');
+      return <View>{children}</View>;
+    },
+    createNavigationContainerRef: () => navRef,
+    CommonActions: {
+      reset: (config: unknown) => ({ type: 'RESET', payload: config }),
+    },
+    __mockNavRef: navRef,
+  };
+});
+
+// Pull the same ref the mock handed to RootNavigator so tests can drive it.
+const mockNavRef = (
+  jest.requireMock('@react-navigation/native') as {
+    __mockNavRef: {
+      isReady: jest.Mock;
+      getCurrentRoute: jest.Mock;
+      dispatch: jest.Mock;
+    };
+  }
+).__mockNavRef;
 
 jest.mock('@react-navigation/native-stack', () => ({
   createNativeStackNavigator: () => ({
@@ -64,6 +90,8 @@ describe('RootNavigator auth-adjacent side effects', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseAuthStore.mockReturnValue({ token: null });
+    mockNavRef.isReady.mockReturnValue(false);
+    mockNavRef.getCurrentRoute.mockReturnValue({ name: 'Main' });
   });
 
   it('does not let notification handler setup failures block navigator render', () => {
@@ -88,5 +116,47 @@ describe('RootNavigator auth-adjacent side effects', () => {
     });
 
     expect(mockRegisterForPushNotifications).toHaveBeenCalled();
+  });
+
+  // ── Auth-state safety net (Step 4) ───────────────────────────────────────
+
+  it('forces a reset to AuthEntry when token transitions from set to null on an authenticated route', () => {
+    mockUseAuthStore.mockReturnValue({ token: 'jwt-token' });
+    mockNavRef.isReady.mockReturnValue(true);
+    mockNavRef.getCurrentRoute.mockReturnValue({ name: 'Main' });
+
+    const { rerender } = render(<RootNavigator />);
+    // No reset yet — the user is authed and on the authed stack.
+    expect(mockNavRef.dispatch).not.toHaveBeenCalled();
+
+    // Token clears (logout / delete-account / 401 interceptor).
+    mockUseAuthStore.mockReturnValue({ token: null });
+    rerender(<RootNavigator />);
+
+    expect(mockNavRef.dispatch).toHaveBeenCalledWith({
+      type: 'RESET',
+      payload: { index: 0, routes: [{ name: 'AuthEntry' }] },
+    });
+  });
+
+  it('does not reset when the user is already on a safe unauthenticated route', () => {
+    mockUseAuthStore.mockReturnValue({ token: 'jwt-token' });
+    mockNavRef.isReady.mockReturnValue(true);
+    mockNavRef.getCurrentRoute.mockReturnValue({ name: 'AuthEntry' });
+
+    const { rerender } = render(<RootNavigator />);
+    mockUseAuthStore.mockReturnValue({ token: null });
+    rerender(<RootNavigator />);
+
+    expect(mockNavRef.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('does not reset on the initial cold-start render where token is still null', () => {
+    mockUseAuthStore.mockReturnValue({ token: null });
+    mockNavRef.isReady.mockReturnValue(true);
+
+    render(<RootNavigator />);
+
+    expect(mockNavRef.dispatch).not.toHaveBeenCalled();
   });
 });
