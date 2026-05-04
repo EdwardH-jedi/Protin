@@ -43,3 +43,4 @@ runs/*
 apps/api/.venv_win/
 apps/api/media/
 references/
+apps/web/claude_design/
