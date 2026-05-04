@@ -457,7 +457,7 @@ describe('ChatScreen', () => {
     getByLabelText('Find a court');
   });
 
-  it('navigates to BookingComposer with openCourtPicker=true when Find a court is pressed', async () => {
+  it('navigates to BookingComposer when Find a court is pressed', async () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
     const navigation = makeNavigation();
     const { getByLabelText } = render(
@@ -468,7 +468,6 @@ describe('ChatScreen', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('BookingComposer', {
       matchId: 'match-1',
       sport: 'gym',
-      openCourtPicker: true,
     });
   });
 

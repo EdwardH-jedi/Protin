@@ -274,7 +274,6 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
             navigation.navigate('BookingComposer', {
               matchId,
               sport,
-              openCourtPicker: true,
             })
           }
           accessibilityRole="button"
