@@ -289,14 +289,6 @@ export function DiscoveryScreen() {
           <Text style={styles.eyebrow}>Sydney</Text>
           <Text style={styles.headerTitle}>{sportLabel(sport)} partners</Text>
         </View>
-        <Pressable
-          style={styles.filterButton}
-          accessibilityRole="button"
-          accessibilityLabel="Filter (coming soon)"
-          disabled
-        >
-          <Text style={styles.filterIcon}>Filter</Text>
-        </Pressable>
       </View>
 
       {/* Sport toggle — pill chips */}

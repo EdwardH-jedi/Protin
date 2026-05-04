@@ -12,8 +12,6 @@ import {
 
 import { Screen } from '../../components/Screen';
 import { api } from '../../lib/api';
-import { addBookingToCalendar } from '../../lib/calendar';
-import { locationForBooking } from '../../lib/venueLocation';
 import { useAuthStore } from '../../stores/auth';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { BookingDetailScreenProps } from '../../navigation/types';
@@ -143,31 +141,6 @@ export function BookingDetailScreen({ route, navigation }: BookingDetailScreenPr
     );
   }, [performTransition]);
 
-  const handleAddToCalendar = useCallback(async () => {
-    if (!booking) return;
-    // Defensive fallback: if a typed location is missing but the booking
-    // was made against a venue, surface the venue in the calendar event.
-    // The composer also computes this on the way out, so most bookings
-    // already have a non-empty location string by the time they reach
-    // here — this layer catches any older row written before the fix.
-    const calendarLocation = locationForBooking({
-      location: booking.location,
-      venue: booking.venue ?? null,
-    });
-    const added = await addBookingToCalendar({
-      title: `${booking.sport === 'gym' ? 'Gym' : 'Golf'} with ${booking.partner.displayName}`,
-      startDate: new Date(booking.startsAt),
-      endDate: new Date(booking.endsAt),
-      location: calendarLocation || undefined,
-      notes: booking.notes,
-    });
-    if (added) {
-      Alert.alert('Added', 'Session added to your calendar.');
-    } else {
-      Alert.alert('Permission denied', 'Allow calendar access in Settings to use this feature.');
-    }
-  }, [booking]);
-
   if (isLoading) {
     return (
       <Screen padded>
@@ -253,19 +226,6 @@ export function BookingDetailScreen({ route, navigation }: BookingDetailScreenPr
             <DetailRow label="Notes" value={booking.notes} />
           ) : null}
         </View>
-
-        {/* Add to Calendar — only when confirmed */}
-        {booking.status === 'confirmed' ? (
-          <View style={styles.section}>
-            <Pressable
-              style={({ pressed }) => [styles.calendarButton, pressed && styles.pressed]}
-              onPress={handleAddToCalendar}
-              accessibilityRole="button"
-            >
-              <Text style={styles.calendarButtonText}>Add to Calendar</Text>
-            </Pressable>
-          </View>
-        ) : null}
 
         {/* Action buttons — conditionally shown based on status */}
         {isActing ? (
@@ -452,17 +412,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   bookingLinkText: {
-    ...typography.button,
-    color: colors.brand,
-  },
-  calendarButton: {
-    borderWidth: 1,
-    borderColor: colors.brand,
-    borderRadius: radii.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  calendarButtonText: {
     ...typography.button,
     color: colors.brand,
   },

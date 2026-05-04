@@ -222,48 +222,14 @@ describe('ProfileScreen', () => {
     await waitFor(() => getByText('Server error'));
   });
 
-  // ── Google Calendar integration ────────────────────────────────────────────
+  // ── Calendar integration is hidden in v1 ─────────────────────────────────
 
-  it('shows "Connect Google Calendar" when gcal is not connected', async () => {
-    mockApiGet.mockResolvedValue({ connected: false });
-    const { getByText } = render(<ProfileScreen />);
-    await waitFor(() => getByText('Connect Google Calendar'));
-  });
-
-  it('shows "Disconnect" when gcal is already connected', async () => {
-    mockApiGet.mockResolvedValue({ connected: true });
-    const { getByText } = render(<ProfileScreen />);
-    await waitFor(() => getByText('Disconnect'));
-  });
-
-  it('calls api.delete and hides Disconnect after pressing it', async () => {
-    mockApiGet.mockResolvedValue({ connected: true });
-    mockApiDelete.mockResolvedValue(undefined);
-    const { getByText, queryByText } = render(<ProfileScreen />);
-    await waitFor(() => getByText('Disconnect'));
-    await act(async () => {
-      fireEvent.press(getByText('Disconnect'));
-    });
-    expect(mockApiDelete).toHaveBeenCalledWith('/users/me/google-calendar/disconnect');
-    await waitFor(() => expect(queryByText('Disconnect')).toBeNull());
-  });
-
-  it('opens the auth browser when Connect Google Calendar is pressed', async () => {
-    mockApiGet
-      .mockResolvedValueOnce({ connected: false })          // status check on mount
-      .mockResolvedValueOnce({ url: 'https://accounts.google.com/o/oauth2/auth?...' }) // auth-url
-      .mockResolvedValueOnce({ connected: false });         // status re-check after browser
-    mockOpenAuthSession.mockResolvedValue({ type: 'dismiss' });
-
-    const { getByText } = render(<ProfileScreen />);
-    await waitFor(() => getByText('Connect Google Calendar'));
-    await act(async () => {
-      fireEvent.press(getByText('Connect Google Calendar'));
-    });
-
-    expect(mockOpenAuthSession).toHaveBeenCalledWith(
-      'https://accounts.google.com/o/oauth2/auth?...'
-    );
+  it('does not expose the Google Calendar integration in v1', async () => {
+    const { queryByText, getByLabelText } = render(<ProfileScreen />);
+    await waitFor(() => getByLabelText('Log out'));
+    expect(queryByText('Integrations')).toBeNull();
+    expect(queryByText('Connect Google Calendar')).toBeNull();
+    expect(queryByText('Disconnect')).toBeNull();
   });
 
   // ── Edit profile ───────────────────────────────────────────────────────────

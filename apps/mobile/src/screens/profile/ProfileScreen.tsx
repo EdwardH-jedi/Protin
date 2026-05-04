@@ -8,14 +8,12 @@ import {
   Text,
   View,
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { RankSummaryCard } from '../../components/RankSummaryCard';
 import { Screen } from '../../components/Screen';
 import { useRankSummary } from '../../hooks/useRankSummary';
-import { useTournamentsAvailable } from '../../hooks/useTournaments';
 import { api } from '../../lib/api';
 import { openLegal, PRIVACY_URL, TERMS_URL } from '../../lib/legal';
 import { useAuthStore } from '../../stores/auth';
@@ -27,19 +25,9 @@ export function ProfileScreen() {
   const { logout } = useAuthStore();
   const { profile, sportProfiles, fetchProfile } = useProfileStore();
   const { summary: rankSummary, isLoading: rankLoading } = useRankSummary();
-  const { available: tournamentsAvailable } = useTournamentsAvailable();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [gcalConnected, setGcalConnected] = useState(false);
-  const [gcalConnecting, setGcalConnecting] = useState(false);
-  // `configured` is gated by the server having GOOGLE_CLIENT_ID set in its
-  // env. Default to true so older API builds (no `configured` in payload)
-  // keep showing the Connect button. The server stamps it false in
-  // unconfigured local/dev builds, which lets us hide the Connect button
-  // and avoid spamming /auth-url -> 503.
-  const [gcalConfigured, setGcalConfigured] = useState(true);
-  const [gcalError, setGcalError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProfile()
@@ -52,49 +40,6 @@ export function ProfileScreen() {
       })
       .finally(() => setIsLoading(false));
   }, [fetchProfile]);
-
-  useEffect(() => {
-    api
-      .get<{ connected: boolean; configured?: boolean }>('/users/me/google-calendar/status')
-      .then((data) => {
-        setGcalConnected(data.connected);
-        if (typeof data.configured === 'boolean') setGcalConfigured(data.configured);
-      })
-      .catch(() => {});
-  }, []);
-
-  const handleGoogleCalendarConnect = useCallback(async () => {
-    if (!gcalConfigured) return; // defensive: button is hidden, but never call /auth-url unconfigured
-    setGcalError(null);
-    setGcalConnecting(true);
-    try {
-      const { url } = await api.get<{ url: string }>('/users/me/google-calendar/auth-url');
-      const result = await WebBrowser.openAuthSessionAsync(url);
-      if (result.type === 'success') {
-        // Re-check status after browser closes
-        const status = await api.get<{ connected: boolean; configured?: boolean }>(
-          '/users/me/google-calendar/status'
-        );
-        setGcalConnected(status.connected);
-        if (typeof status.configured === 'boolean') setGcalConfigured(status.configured);
-      }
-    } catch (err) {
-      // Surface the failure inline rather than silently swallowing — the
-      // disabled-feature path is handled separately via `gcalConfigured`.
-      setGcalError(
-        err instanceof Error ? err.message : "Couldn't open Google Calendar sign-in."
-      );
-    } finally {
-      setGcalConnecting(false);
-    }
-  }, [gcalConfigured]);
-
-  const handleGoogleCalendarDisconnect = useCallback(async () => {
-    try {
-      await api.delete('/users/me/google-calendar/disconnect');
-      setGcalConnected(false);
-    } catch {}
-  }, []);
 
   // Reset the root stack to AuthEntry. RootNavigator is not token-gated, so
   // after logout/delete-account the user would otherwise stay on the Profile
@@ -236,72 +181,14 @@ export function ProfileScreen() {
               </View>
             ) : null}
 
-            <RankSummaryCard summary={rankSummary} isLoading={rankLoading} />
-
-            {tournamentsAvailable ? (
-              <Pressable
-                onPress={() => navigation.navigate('Tournaments')}
-                accessibilityRole="button"
-                accessibilityLabel="Browse tournaments"
-                style={({ pressed }) => [styles.tournamentsEntry, pressed && styles.pressed]}
-              >
-                <View style={styles.tournamentsEntryText}>
-                  <Text style={styles.tournamentsEntryTitle}>Tournaments</Text>
-                  <Text style={styles.tournamentsEntryBody}>
-                    Open competitions you can join across Sydney.
-                  </Text>
-                </View>
-                <Text style={styles.tournamentsEntryChevron}>{'›'}</Text>
-              </Pressable>
-            ) : null}
+            <RankSummaryCard
+              summary={rankSummary}
+              isLoading={rankLoading}
+            />
           </View>
         ) : null}
 
-        {/* Google Calendar */}
         <View style={styles.cardStack}>
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Integrations</Text>
-            {gcalConnected ? (
-              <View style={styles.integrationRow}>
-                <Text style={styles.integrationLabel}>Google Calendar</Text>
-                <Pressable
-                  style={({ pressed }) => [styles.integrationAction, pressed && styles.pressed]}
-                  onPress={handleGoogleCalendarDisconnect}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.integrationActionText}>Disconnect</Text>
-                </Pressable>
-              </View>
-            ) : !gcalConfigured ? (
-              <View style={styles.integrationDisabled}>
-                <Text style={styles.integrationDisabledTitle}>Google Calendar</Text>
-                <Text style={styles.integrationDisabledBody}>
-                  Calendar sync isn't configured for this build. It will be enabled in a future
-                  release.
-                </Text>
-              </View>
-            ) : (
-              <>
-                <Pressable
-                  style={({ pressed }) => [styles.integrationButton, pressed && styles.pressed]}
-                  onPress={handleGoogleCalendarConnect}
-                  disabled={gcalConnecting}
-                  accessibilityRole="button"
-                  accessibilityLabel="Connect Google Calendar"
-                >
-                  {gcalConnecting ? (
-                    <ActivityIndicator size="small" color={colors.textSecondary} />
-                  ) : (
-                    <Text style={styles.integrationButtonText}>Connect Google Calendar</Text>
-                  )}
-                </Pressable>
-                {gcalError ? (
-                  <Text style={styles.integrationErrorText}>{gcalError}</Text>
-                ) : null}
-              </>
-            )}
-          </View>
-
           {/* Legal */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Legal</Text>
@@ -596,37 +483,6 @@ const styles = StyleSheet.create({
   legalRowText: {
     ...typography.body,
     color: colors.textPrimary,
-  },
-
-  // Tournaments entry
-  tournamentsEntry: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.brand,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-  },
-  tournamentsEntryText: {
-    flex: 1,
-    gap: 2,
-  },
-  tournamentsEntryTitle: {
-    ...typography.h3,
-    fontSize: 17,
-    color: colors.textPrimary,
-  },
-  tournamentsEntryBody: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-  },
-  tournamentsEntryChevron: {
-    fontSize: 28,
-    color: colors.brand,
-    fontWeight: '300',
   },
 
   // Account actions

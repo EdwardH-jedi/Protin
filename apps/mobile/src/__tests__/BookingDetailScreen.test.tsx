@@ -252,115 +252,18 @@ describe('BookingDetailScreen', () => {
     });
   });
 
-  // ── Add to Calendar — only when confirmed ──────────────────────────────────
+  // ── Add to Calendar is hidden in v1 ──────────────────────────────────────
 
-  it('shows Add to Calendar button only when status is confirmed', async () => {
+  it('does not expose an Add to Calendar control in v1', async () => {
     mockApiGet.mockResolvedValue(makeBooking({ status: 'confirmed' }));
-    const { getByText } = render(
+    const { queryByText, getByText } = render(
       <BookingDetailScreen
         route={makeRoute() as any}
         navigation={makeNavigation() as any}
       />
     );
-    await waitFor(() => getByText('Add to Calendar'));
-  });
-
-  it('does not show Add to Calendar when status is proposed', async () => {
-    mockApiGet.mockResolvedValue(makeBooking({ status: 'proposed' }));
-    const { queryByText } = render(
-      <BookingDetailScreen
-        route={makeRoute() as any}
-        navigation={makeNavigation() as any}
-      />
-    );
-    await waitFor(() => queryByText('Awaiting confirmation'));
+    await waitFor(() => getByText('Confirmed'));
     expect(queryByText('Add to Calendar')).toBeNull();
-  });
-
-  it('calls addBookingToCalendar with the correct args when the button is pressed', async () => {
-    mockAddBookingToCalendar.mockResolvedValue(true);
-    jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
-    mockApiGet.mockResolvedValue(makeBooking({ status: 'confirmed' }));
-
-    const { getByText } = render(
-      <BookingDetailScreen
-        route={makeRoute() as any}
-        navigation={makeNavigation() as any}
-      />
-    );
-    await waitFor(() => getByText('Add to Calendar'));
-    await act(async () => {
-      fireEvent.press(getByText('Add to Calendar'));
-    });
-
-    expect(mockAddBookingToCalendar).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'Gym with Jordan Lee',
-        location: 'City Gym, Sydney CBD',
-        notes: 'Bring your towel.',
-      })
-    );
-    expect(Alert.alert).toHaveBeenCalledWith('Added', 'Session added to your calendar.');
-  });
-
-  it('uses the venue as the calendar location when typed location is blank (Codex Blocker 3)', async () => {
-    mockAddBookingToCalendar.mockResolvedValue(true);
-    jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
-    // Booking with no typed location but a venue attached — the screen
-    // must fall back to "<venue.name> — <venue.address|area>" so the
-    // calendar event ships a meaningful location.
-    mockApiGet.mockResolvedValue(
-      makeBooking({
-        status: 'confirmed',
-        location: null,
-        venue: {
-          id: 'v1',
-          name: 'Tennis Court Alpha',
-          area: 'Bondi',
-          address: '1 Beach Rd, Bondi NSW',
-          isBookable: false,
-        },
-      })
-    );
-
-    const { getByText } = render(
-      <BookingDetailScreen
-        route={makeRoute() as any}
-        navigation={makeNavigation() as any}
-      />
-    );
-    await waitFor(() => getByText('Add to Calendar'));
-    await act(async () => {
-      fireEvent.press(getByText('Add to Calendar'));
-    });
-
-    expect(mockAddBookingToCalendar).toHaveBeenCalledWith(
-      expect.objectContaining({
-        location: 'Tennis Court Alpha — 1 Beach Rd, Bondi NSW',
-      })
-    );
-  });
-
-  it('shows a permission alert when calendar access is denied', async () => {
-    mockAddBookingToCalendar.mockResolvedValue(false);
-    jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
-    mockApiGet.mockResolvedValue(makeBooking({ status: 'confirmed' }));
-
-    const { getByText } = render(
-      <BookingDetailScreen
-        route={makeRoute() as any}
-        navigation={makeNavigation() as any}
-      />
-    );
-    await waitFor(() => getByText('Add to Calendar'));
-    await act(async () => {
-      fireEvent.press(getByText('Add to Calendar'));
-    });
-
-    expect(Alert.alert).toHaveBeenCalledWith(
-      'Permission denied',
-      'Allow calendar access in Settings to use this feature.'
-    );
   });
 
   // ── State transitions ──────────────────────────────────────────────────────
