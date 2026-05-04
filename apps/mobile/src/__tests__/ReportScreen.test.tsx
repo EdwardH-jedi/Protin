@@ -194,7 +194,9 @@ describe('ReportScreen', () => {
     });
 
     await waitFor(() => getByText('Report submitted'));
-    expect(getByText("Thank you. We will review Alex Kim's account.")).toBeTruthy();
+    expect(
+      getByText("Thanks for helping keep SportGang safe. We'll review this user.")
+    ).toBeTruthy();
   });
 
   it('shows ActivityIndicator while submission is in-flight', async () => {

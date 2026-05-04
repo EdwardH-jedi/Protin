@@ -720,4 +720,97 @@ describe('ChatScreen', () => {
       });
     }).not.toThrow();
   });
+
+  // ── Block flow (Step 3 hardening) ──────────────────────────────────────────
+  // These run on the Android Alert.alert path so the safety menu and the
+  // confirmation prompt are both observable via the same Alert spy.
+
+  describe('Block flow', () => {
+    let alertSpy: jest.SpyInstance;
+    const RN = require('react-native') as { Platform: { OS: string } };
+    let originalOS: string;
+
+    type AlertButton = { text: string; style?: string; onPress?: () => void | Promise<void> };
+
+    beforeEach(() => {
+      mockApiGet.mockResolvedValue(emptyMessageResponse);
+      alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      originalOS = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { value: 'android', configurable: true });
+    });
+
+    afterEach(() => {
+      alertSpy.mockRestore();
+      Object.defineProperty(RN.Platform, 'OS', { value: originalOS, configurable: true });
+    });
+
+    function findButton(callIndex: number, text: string): AlertButton | undefined {
+      const buttons = alertSpy.mock.calls[callIndex]?.[2] as AlertButton[] | undefined;
+      return buttons?.find((b) => b.text === text);
+    }
+
+    async function openMenuAndPressBlock(navigation: ReturnType<typeof makeNavigation>) {
+      const utils = render(
+        <ChatScreen route={makeRoute() as any} navigation={navigation as any} />
+      );
+      await waitFor(() => utils.getByLabelText('More options'));
+      fireEvent.press(utils.getByLabelText('More options'));
+      // The first Alert is the safety menu — press its Block option.
+      const blockMenuItem = findButton(0, 'Block');
+      expect(blockMenuItem).toBeDefined();
+      await act(async () => {
+        await blockMenuItem!.onPress?.();
+      });
+      return utils;
+    }
+
+    it('asks for confirmation before blocking and uses safe copy', async () => {
+      await openMenuAndPressBlock(makeNavigation());
+      // Second Alert is the confirmation prompt.
+      expect(alertSpy.mock.calls[1][0]).toBe('Block Jordan Lee?');
+      expect(alertSpy.mock.calls[1][1]).toBe(
+        "You won't see messages or activity from this user."
+      );
+      expect(mockApiPost).not.toHaveBeenCalled();
+    });
+
+    it('calls /blocks/:id, shows a success Alert, and goes back on OK', async () => {
+      mockApiPost.mockResolvedValue({});
+      const navigation = makeNavigation();
+      await openMenuAndPressBlock(navigation);
+
+      const confirm = findButton(1, 'Block');
+      expect(confirm?.style).toBe('destructive');
+      await act(async () => {
+        await confirm?.onPress?.();
+      });
+
+      expect(mockApiPost).toHaveBeenCalledWith('/blocks/partner-456', {});
+      // Third Alert is the success confirmation.
+      expect(alertSpy.mock.calls[2][0]).toBe('User blocked');
+      expect(alertSpy.mock.calls[2][1]).toBe(
+        "You won't be matched or contacted by this user."
+      );
+
+      // Pressing OK on the success Alert returns the user to the previous screen.
+      const ok = findButton(2, 'OK');
+      ok?.onPress?.();
+      expect(navigation.goBack).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows a failure Alert and stays on the chat when block fails', async () => {
+      mockApiPost.mockRejectedValue(new Error('Network down'));
+      const navigation = makeNavigation();
+      await openMenuAndPressBlock(navigation);
+
+      await act(async () => {
+        await findButton(1, 'Block')?.onPress?.();
+      });
+
+      expect(alertSpy.mock.calls[2][0]).toBe('Could not block');
+      expect(alertSpy.mock.calls[2][1]).toBe('Network down');
+      // Failure must not navigate the user away — they stay in the chat to retry.
+      expect(navigation.goBack).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -80,6 +80,42 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
   }, []);
 
   const partnerId = useRef<string | null>(routePartnerId);
+  // Local guard: prevents the user from firing /blocks/:id twice in a row by
+  // re-opening the safety menu while a block is mid-flight. Pure UX safety;
+  // the backend is still the source of truth.
+  const [isBlocking, setIsBlocking] = useState(false);
+
+  const performBlock = useCallback(async () => {
+    if (!partnerId.current || isBlocking) return;
+    setIsBlocking(true);
+    try {
+      await api.post(`/blocks/${partnerId.current}`, {});
+      Alert.alert(
+        'User blocked',
+        "You won't be matched or contacted by this user.",
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+    } catch (err) {
+      Alert.alert(
+        'Could not block',
+        err instanceof Error ? err.message : 'Please try again.'
+      );
+    } finally {
+      setIsBlocking(false);
+    }
+  }, [isBlocking, navigation]);
+
+  const confirmBlock = useCallback(() => {
+    if (!partnerId.current || isBlocking) return;
+    Alert.alert(
+      'Block ' + partnerName + '?',
+      "You won't see messages or activity from this user.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Block', style: 'destructive', onPress: () => void performBlock() },
+      ]
+    );
+  }, [isBlocking, partnerName, performBlock]);
 
   const openSafetyMenu = useCallback(() => {
     const options = ['Report', 'Block', 'Cancel'];
@@ -95,20 +131,8 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
               reportedUserId: partnerId.current,
               reportedName: partnerName,
             });
-          } else if (idx === 1 && partnerId.current) {
-            Alert.alert('Block ' + partnerName + '?', 'They won\'t appear in your matches or discovery.', [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Block',
-                style: 'destructive',
-                onPress: async () => {
-                  try {
-                    await api.post(`/blocks/${partnerId.current}`, {});
-                  } catch {}
-                  navigation.goBack();
-                },
-              },
-            ]);
+          } else if (idx === 1) {
+            confirmBlock();
           }
         }
       );
@@ -128,18 +152,12 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
         {
           text: 'Block',
           style: 'destructive',
-          onPress: async () => {
-            if (!partnerId.current) return;
-            try {
-              await api.post(`/blocks/${partnerId.current}`, {});
-            } catch {}
-            navigation.goBack();
-          },
+          onPress: () => confirmBlock(),
         },
         { text: 'Cancel', style: 'cancel' },
       ]);
     }
-  }, [navigation, partnerName]);
+  }, [navigation, partnerName, confirmBlock]);
 
   const fetchMessages = useCallback(async () => {
     try {
