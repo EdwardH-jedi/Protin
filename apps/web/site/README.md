@@ -1,37 +1,63 @@
 # SportGang official website (static)
 
-Plain-HTML/CSS marketing surface for the SportGang mobile app.
+Plain-HTML/CSS marketing + legal surface for the SportGang mobile app.
 Lives at `apps/web/site/` so it does not collide with the existing
 Vite + React + Tailwind project at `apps/web/` (which is the older
 Protin-branded marketing site and is **not** modified by this slice).
 
 ## Files
 
-| File | Purpose |
+| Path | Purpose |
 |---|---|
-| `Home.html` | Single-page entry. The home page, end to end. |
-| `styles.css` | All styles. Color tokens, typography, motion, responsive. |
+| `Home.html` | Marketing home page — hero, app journey, problem, features, safety, CTA. |
+| `privacy/index.html` | Privacy Policy (draft). |
+| `terms/index.html` | Terms of Service (draft). |
+| `support/index.html` | Support / contact page. |
+| `styles.css` | Shared stylesheet for all four pages. |
 | `README.md` | This file. |
 
 No `assets/` folder, no images, no fonts, no JavaScript, no build step.
-Every visual is inline SVG. Open `Home.html` directly in a browser and
-the site renders.
+Every visual is inline SVG. Open the pages directly in a browser and they
+render.
+
+## Routes
+
+When the site is served (e.g. via `python -m http.server`), the canonical
+URLs are:
+
+| URL | File served |
+|---|---|
+| `/Home.html` | `Home.html` |
+| `/privacy/` | `privacy/index.html` |
+| `/terms/` | `terms/index.html` |
+| `/support/` | `support/index.html` |
+
+The mobile app's `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, and
+`EXPO_PUBLIC_SUPPORT_URL` env vars (Step 2 of the v1 mobile-hardening
+work) point at the hosted versions of these three folder-style routes.
 
 ## How to view locally
 
 Pick whichever is easiest:
 
-- **Open in a browser.** Double-click `apps/web/site/Home.html`. The page
-  uses only relative paths (`./styles.css`, anchor `#` links, and `mailto:`
-  links) so the `file://` URL works.
-- **One-line HTTP server**, if you prefer a real `http://` URL:
+- **Open `Home.html` directly in a browser.** Double-click
+  `apps/web/site/Home.html`. Inter-page links (`./privacy/`, `./terms/`,
+  `./support/`) won't auto-resolve under `file://` because browsers
+  don't auto-serve `index.html` from a directory in file mode — you'd
+  see a folder listing or 404. For full link checking, use the local
+  HTTP server below.
+- **One-line HTTP server** (recommended; matches production behavior):
   ```
   cd apps/web/site
   python -m http.server 8080
-  # then visit http://localhost:8080/Home.html
   ```
+  Then visit:
+  - `http://localhost:8080/Home.html`
+  - `http://localhost:8080/privacy/`
+  - `http://localhost:8080/terms/`
+  - `http://localhost:8080/support/`
 
-There is no build step. No npm install. No dependencies.
+There is no build step. No `npm install`. No dependencies.
 
 ## Visual design
 
@@ -114,15 +140,6 @@ Store submission** — see `docs/release/APP_STORE_METADATA.md` §1
 ("Identity and naming") for the same open question. This slice does not
 modify any mobile config.
 
-## Routes still to come
-
-The footer and header link to `/privacy`, `/terms`, and `/support`. Those
-pages **will 404 until the next slice ships them**. Outline content for
-each route is already drafted in `docs/release/LEGAL_WEBSITE_CONTENT.md`
-(Step 6A); those drafts feed the next implementation slice that produces
-the matching `Privacy.html`, `Terms.html`, and `Support.html` here in
-`apps/web/site/`.
-
 ## Placeholders that need real values before public launch
 
 - **App Store badge.** This slice ships a CSS-only "Coming soon on the App
@@ -130,10 +147,23 @@ the matching `Privacy.html`, `Terms.html`, and `Support.html` here in
   marketing badge artwork, which is copyrighted and requires Apple
   Developer Program approval. Swap in the official PNG once approved.
 - **Contact emails.** `support@example.com`, `privacy@example.com`,
-  `legal@example.com` are placeholder addresses. Replace with the real
-  operator-controlled addresses before the site goes public.
+  `legal@example.com` are placeholder addresses everywhere they appear
+  (header, footer, Privacy §12, Terms §13, Support §1, §5, §9). Replace
+  with the real operator-controlled addresses before the site goes
+  public, and update App Store Connect's "App Review Contact" form to
+  use the same `support@` address.
+- **Final domain URLs.** The hosted versions of `/privacy/`, `/terms/`,
+  `/support/` must be reachable over HTTPS at the operator's chosen
+  domain before App Store submission. Update the mobile EAS build
+  profile's `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, and
+  `EXPO_PUBLIC_SUPPORT_URL` to those final URLs at the same time.
 - **Brand spelling.** See above.
-- **Legal pages.** `/privacy`, `/terms`, `/support` not yet implemented.
+- **Legal placeholders.** Each Privacy and Terms page contains
+  `<TBD …>` placeholders for the operator name, jurisdiction, effective
+  date, retention durations, age eligibility, liability cap, and a
+  Support page response-time SLA. None of those should ship as `<TBD>`
+  to a public audience. The drafts are intentionally not "lawyer-
+  approved"; counsel review is required before public publication.
 - **App icon / screenshots.** No App Store screenshots are embedded in
   the page (Step 5 placeholder PNGs in `apps/mobile/assets/` are also
   pending real artwork). The page uses purely abstract phone mockups
