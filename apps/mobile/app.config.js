@@ -85,10 +85,15 @@ module.exports = () => {
       version: "1.0.0",
       orientation: "portrait",
       userInterfaceStyle: "light",
+      // Placeholder brand icon (lime square + dark "SG"). Final App Store
+      // artwork must replace `assets/icon.png` before public submission;
+      // documented in docs/deployment/APPLE_TESTFLIGHT_PREP.md §4.6.
+      icon: "./assets/icon.png",
       splash: {
         // Matches `SplashScreen.tsx`'s lime background (theme `brand`).
         // Keep these in sync — mismatch causes a visible color flash on cold
         // launch between native splash and the in-app splash component.
+        image: "./assets/splash.png",
         backgroundColor: "#C6FF3D",
         resizeMode: "contain",
       },

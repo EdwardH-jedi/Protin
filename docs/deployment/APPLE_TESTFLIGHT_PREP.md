@@ -84,9 +84,12 @@ Snapshot of where the seven areas stand right now, in plain present tense.
   template exists in `APP_STORE_SUBMISSION.md` section 7, but it requires a
   seeded review account that depends on `apps/api/scripts/seed_review_data.py`,
   which does not exist yet.
-- **TestFlight internal readiness** is `blocked` on all three of:
-  `apps/mobile/assets/` (referenced by `app.config.js` but absent),
-  `eas.json` placeholders, and the reviewer demo account path.
+- **TestFlight internal readiness** is `blocked` on two of: `eas.json`
+  placeholders and the reviewer demo account path. `apps/mobile/assets/`
+  now contains placeholder `icon.png`, `splash.png`, and
+  `notification-icon.png` so config evaluation no longer fails on missing
+  files. Final App Store artwork must replace these placeholders before
+  public submission.
 - **Real-device verification** is `verify on real device` across the five
   priority areas listed in `RELEASE_GATE_CHECKLIST.md` section 4. No
   real-iPhone run has been recorded.
@@ -156,7 +159,7 @@ Detailed area-by-area tables follow.
 
 | Item | Status | Evidence / what is missing | Next action |
 |---|---|---|---|
-| `apps/mobile/assets/` directory | blocked | Directory does not exist. `app.config.js` references `./assets/notification-icon.png`; `eas build` fails on missing path. App icon (1024x1024), splash image, and Android adaptive-icon foreground are also not wired | Add the required images and reference `ios.icon`, `android.adaptiveIcon`, and `splash.image` in `app.config.js`. |
+| `apps/mobile/assets/` directory | configured (placeholder) | Directory exists with placeholder `icon.png` (1024x1024), `splash.png`, and `notification-icon.png`. `app.config.js` wires `icon` + `splash.image`. Android `adaptiveIcon.foregroundImage` is intentionally not wired yet — Expo falls back to `icon` for the adaptive icon, which is acceptable for internal TestFlight | Replace placeholder PNGs with final App Store artwork (see §8) and wire `android.adaptiveIcon.foregroundImage` before public submission. |
 | Production API URL available over HTTPS | verify on real device | `eas.json` production profile points at `https://protin-api.fly.dev`; no session has probed it | Run `curl -I https://protin-api.fly.dev/health` after the next deploy and record the status code + version header. |
 | `eas build --platform ios --profile production` produces a green IPA | blocked | Missing assets + placeholders make the first build predictably fail | Land assets, fill `eas.json` identifiers, then run the build. |
 | `eas submit --platform ios --latest` | blocked | Depends on the green build + real ASC/Team IDs | Run after the build, gated by the Apple-side setup rows above. |
@@ -193,9 +196,12 @@ Apple / TestFlight gate passes.
 An internal TestFlight build is not producible today. The minimum set of
 blockers to clear, in dependency order:
 
-1. **`apps/mobile/assets/` populated.** Add `notification-icon.png` (the one
-   `app.config.js` references), plus `ios.icon`, `android.adaptiveIcon`,
-   and `splash.image`. Without this, `eas build` fails at config resolution.
+1. **`apps/mobile/assets/` populated.** Done with placeholder PNGs
+   (`icon.png` 1024x1024, `splash.png`, `notification-icon.png`) and
+   `app.config.js` now wires `icon` and `splash.image`. Final App Store
+   artwork must replace these placeholders before public submission.
+   Android `adaptiveIcon.foregroundImage` is still TODO; the fallback to
+   `icon` is acceptable for internal TestFlight.
 2. **Apple Developer Program enrollment.** Needed to create the ASC app
    record, generate signing credentials, and enable APNs on the bundle ID.
 3. **ASC app record created with `com.edh1223.protin`.** Capture the ASC
@@ -236,6 +242,38 @@ readiness. The full list lives in `RELEASE_GATE_CHECKLIST.md` section 4
 
 Until each row has a dated device run, the matching `verify on real device`
 entries in sections 4.1-4.6 above do not flip to `configured`.
+
+---
+
+## 6.1 Placeholder asset replacement before public submission
+
+`apps/mobile/assets/icon.png`, `apps/mobile/assets/splash.png`, and
+`apps/mobile/assets/notification-icon.png` are placeholder PNGs generated
+for internal config validation. They are intentionally minimal (lime
+brand background + dark "SG" wordmark) and are **not** the final
+App Store artwork. Before public submission:
+
+- Replace `assets/icon.png` with a final 1024x1024 RGB PNG (no
+  transparency, no rounded corners — Apple applies the iOS mask).
+- Replace `assets/splash.png` with the final centered splash artwork.
+  Keep the surrounding canvas the brand lime (`#C6FF3D`) so it tiles
+  seamlessly with the native splash background.
+- Replace `assets/notification-icon.png` with the final monochrome
+  notification icon (white silhouette on transparent — Android tints
+  it with the notification accent color).
+- Add `android.adaptiveIcon.foregroundImage` once the Android adaptive
+  icon foreground is finalized.
+
+No fake App Store / Apple Team ID values were introduced for this slice.
+The `eas.json` `submit.production.ios.ascAppId` and `appleTeamId`
+placeholders remain `REPLACE_WITH_*` and are documented as Apple-side
+setup in §4.2; both must be filled before `eas submit` can run.
+
+No fake Firebase credential files were introduced. `app.config.js`
+already gates `googleServicesFile` resolution behind `isStrictBuild()`
+so a missing `google-services.json` / `GoogleService-Info.plist` does
+not break local config evaluation; it only throws on
+`APP_ENV=staging|production` or `EAS_BUILD_PROFILE=preview|production`.
 
 ---
 
