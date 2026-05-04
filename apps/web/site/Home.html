@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SportGang — Find your next game.</title>
+<meta name="description" content="SportGang helps you find sports partners, chat, and plan sessions in one place. Built around the game, not the profile.">
+<meta name="theme-color" content="#0E1013">
+<meta name="color-scheme" content="dark">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="SportGang — Find your next game.">
+<meta property="og:description" content="Connect with players, chat, and plan sports sessions in one place.">
+<meta property="og:site_name" content="SportGang">
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+<!-- Atmospheric background layers (no JS, no external assets) -->
+<div class="ambient" aria-hidden="true"></div>
+<div class="court-grid" aria-hidden="true"></div>
+<div class="speed-bg" aria-hidden="true"></div>
+
+<!-- ───────────── Header ───────────── -->
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="/" aria-label="SportGang home">
+      <!-- Inline SG lockup — italic S/G in a rounded square -->
+      <svg class="lockup" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+        <rect x="2" y="2" width="60" height="60" rx="14" fill="#0E1013" stroke="#A8E61A" stroke-width="2"></rect>
+        <text x="32" y="45" font-family="Helvetica, Arial, sans-serif" font-style="italic" font-weight="900"
+              font-size="34" text-anchor="middle" letter-spacing="-2">
+          <tspan fill="#F4F5F7">S</tspan><tspan fill="#A8E61A">G</tspan>
+        </text>
+      </svg>
+      <span class="wordmark">Sport<span class="accent">Gang</span></span>
+    </a>
+
+    <nav class="nav-links" aria-label="Primary">
+      <a href="/" class="is-current">Home</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+      <a href="/support">Support</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- ───────────── Hero ───────────── -->
+  <section class="hero">
+    <div class="hero-speed" aria-hidden="true">
+      <span class="line l1"></span>
+      <span class="line l2"></span>
+      <span class="line l3"></span>
+      <span class="line l4"></span>
+    </div>
+
+    <div class="container">
+      <div class="grid">
+        <div class="hero-copy">
+          <span class="eyebrow"><span class="dot" aria-hidden="true"></span><span>SportGang · Sydney first</span></span>
+
+          <h1 class="headline">
+            Find your next <span class="accent">game.</span>
+          </h1>
+
+          <p class="subheadline">
+            Connect with players, chat, and plan sports sessions in one place.
+          </p>
+
+          <p class="supporting">
+            Built around the game, not the profile.
+          </p>
+
+          <div class="cta-row">
+            <!-- CSS-only "Coming soon on the App Store" badge.
+                 Apple's official badge artwork is intentionally not used here. -->
+            <a class="app-badge" href="#cta" aria-label="Coming soon on the App Store">
+              <svg class="badge-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M16.5 12.6c0-2.5 2.05-3.7 2.14-3.76-1.17-1.7-3-1.94-3.65-1.97-1.55-.16-3.03.91-3.82.91-.79 0-2-.89-3.3-.86-1.7.02-3.27 1-4.14 2.52-1.77 3.06-.45 7.6 1.27 10.08.85 1.22 1.85 2.59 3.16 2.55 1.27-.05 1.75-.82 3.28-.82 1.53 0 1.96.82 3.3.79 1.36-.02 2.22-1.24 3.06-2.47.97-1.41 1.36-2.79 1.38-2.86-.03-.01-2.65-1.02-2.68-4.04zm-2.51-7.4c.69-.83 1.16-2 1.03-3.16-1 .04-2.21.66-2.92 1.5-.64.74-1.2 1.92-1.05 3.05 1.11.09 2.25-.56 2.94-1.39z" fill="currentColor"/>
+              </svg>
+              <span class="badge-text">
+                <span class="badge-eyebrow">Coming soon on the</span>
+                <span class="badge-headline">App Store</span>
+              </span>
+            </a>
+          </div>
+
+          <div class="hero-meta" aria-label="Sports we support today">
+            <span>Gym</span>
+            <span>Golf</span>
+            <span>Tennis</span>
+            <span>Running</span>
+          </div>
+        </div>
+
+        <!-- Hero phone preview — FIND state -->
+        <div class="phone-stage">
+          <div class="phone" role="img" aria-label="App preview: finding sports players in the SportGang app">
+            <span class="notch" aria-hidden="true"></span>
+            <span class="scanline" aria-hidden="true"></span>
+            <div class="screen">
+              <div class="status">
+                <span class="mono">9:41</span>
+                <span class="mono">●●●</span>
+              </div>
+              <div class="screen-title">Find <span class="accent">players</span></div>
+              <div class="screen-body">
+                <div class="chip-row" aria-label="Sport filters">
+                  <span class="chip is-active">Badminton</span>
+                  <span class="chip">Tennis</span>
+                  <span class="chip">Running</span>
+                </div>
+
+                <div class="player-card">
+                  <span class="avatar" aria-hidden="true">JL</span>
+                  <span class="meta">
+                    <span class="name">Jordan L.</span>
+                    <span class="sub">Badminton · Intermediate</span>
+                  </span>
+                  <span class="pill">Match</span>
+                </div>
+                <div class="player-card">
+                  <span class="avatar" aria-hidden="true">RN</span>
+                  <span class="meta">
+                    <span class="name">Riley N.</span>
+                    <span class="sub">Tennis · Open</span>
+                  </span>
+                  <span class="pill">Match</span>
+                </div>
+                <div class="player-card">
+                  <span class="avatar" aria-hidden="true">AK</span>
+                  <span class="meta">
+                    <span class="name">Alex K.</span>
+                    <span class="sub">Running · Easy 5k</span>
+                  </span>
+                  <span class="pill">Match</span>
+                </div>
+
+                <div class="cta">Connect</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-connector" aria-hidden="true">
+    <span class="pulse left"></span>
+    <span class="pulse"></span>
+    <span class="pulse right"></span>
+  </div>
+
+  <!-- ───────────── Phone preview / app journey strip ───────────── -->
+  <section id="how" aria-labelledby="how-title">
+    <div class="container">
+      <div class="section-head">
+        <p class="section-eyebrow">The app, end to end</p>
+        <h2 id="how-title" class="section-title">From <span class="accent">find</span> to <span class="accent">play</span> — in four steps.</h2>
+        <p class="section-lede">Match with a player, message to confirm, plan the session, and stay in control of your safety. That's the whole loop.</p>
+      </div>
+
+      <div class="phone-gallery">
+        <!-- 1. FIND -->
+        <div class="phone-cell">
+          <div class="phone" role="img" aria-label="Find players screen">
+            <span class="notch" aria-hidden="true"></span>
+            <span class="scanline" aria-hidden="true"></span>
+            <div class="screen">
+              <div class="status"><span class="mono">9:41</span><span class="mono">●●●</span></div>
+              <div class="screen-title">Find <span class="accent">players</span></div>
+              <div class="screen-body">
+                <div class="chip-row">
+                  <span class="chip is-active">Badminton</span>
+                  <span class="chip">Tennis</span>
+                  <span class="chip">Running</span>
+                </div>
+                <div class="player-card">
+                  <span class="avatar" aria-hidden="true">JL</span>
+                  <span class="meta"><span class="name">Jordan L.</span><span class="sub">Intermediate</span></span>
+                  <span class="pill">Match</span>
+                </div>
+                <div class="player-card">
+                  <span class="avatar" aria-hidden="true">RN</span>
+                  <span class="meta"><span class="name">Riley N.</span><span class="sub">Open</span></span>
+                  <span class="pill">Match</span>
+                </div>
+                <div class="cta">Connect</div>
+              </div>
+            </div>
+          </div>
+          <div class="label-strip">
+            <span class="step-num">01 / Find</span>
+            <span class="step-name">Find players</span>
+          </div>
+        </div>
+
+        <!-- 2. CHAT -->
+        <div class="phone-cell">
+          <div class="phone" role="img" aria-label="Chat screen with a matched player">
+            <span class="notch" aria-hidden="true"></span>
+            <span class="scanline" aria-hidden="true"></span>
+            <div class="screen">
+              <div class="status"><span class="mono">Jordan L.</span><span class="mono">···</span></div>
+              <div class="screen-title">Chat</div>
+              <div class="screen-body">
+                <div class="chat-stack">
+                  <div class="bubble them">Want to play this weekend?</div>
+                  <div class="bubble me">Yes — let's plan a session.</div>
+                  <div class="bubble them">Saturday afternoon works.</div>
+                </div>
+                <div class="composer">
+                  <span>Message…</span>
+                  <span class="send">Send</span>
+                </div>
+                <div class="cta secondary">Plan session</div>
+              </div>
+            </div>
+          </div>
+          <div class="label-strip">
+            <span class="step-num">02 / Chat</span>
+            <span class="step-name">Chat &amp; coordinate</span>
+          </div>
+        </div>
+
+        <!-- 3. PLAN -->
+        <div class="phone-cell">
+          <div class="phone" role="img" aria-label="Plan a session screen with sport, time and court fields">
+            <span class="notch" aria-hidden="true"></span>
+            <span class="scanline" aria-hidden="true"></span>
+            <div class="screen">
+              <div class="status"><span class="mono">9:41</span><span class="mono">●●●</span></div>
+              <div class="screen-title">Plan <span class="accent">session</span></div>
+              <div class="screen-body">
+                <div class="session-card">
+                  <div class="row"><span class="label">Sport</span><span class="value">Badminton</span></div>
+                  <div class="row"><span class="label">Time</span><span class="value neon">Sat · 3:00 PM</span></div>
+                  <div class="row"><span class="label">Court</span><span class="value">To be confirmed</span></div>
+                </div>
+                <div class="cta">Find a court</div>
+              </div>
+            </div>
+          </div>
+          <div class="label-strip">
+            <span class="step-num">03 / Plan</span>
+            <span class="step-name">Plan sessions</span>
+          </div>
+        </div>
+
+        <!-- 4. SAFETY -->
+        <div class="phone-cell">
+          <div class="phone" role="img" aria-label="Safety controls: report, block, and account deletion">
+            <span class="notch" aria-hidden="true"></span>
+            <span class="scanline" aria-hidden="true"></span>
+            <div class="screen">
+              <div class="status"><span class="mono">9:41</span><span class="mono">●●●</span></div>
+              <div class="screen-title">Safety</div>
+              <div class="screen-body">
+                <div class="safety-list">
+                  <div class="safety-row">
+                    <span class="icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v16M4 4h13l-2 4 2 4H4"/></svg>
+                    </span>
+                    <span class="label">Report user</span>
+                    <span class="chev" aria-hidden="true">›</span>
+                  </div>
+                  <div class="safety-row">
+                    <span class="icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>
+                    </span>
+                    <span class="label">Block user</span>
+                    <span class="chev" aria-hidden="true">›</span>
+                  </div>
+                  <div class="safety-row">
+                    <span class="icon danger" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+                    </span>
+                    <span class="label">Delete account</span>
+                    <span class="chev" aria-hidden="true">›</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="label-strip">
+            <span class="step-num">04 / Safety</span>
+            <span class="step-name">Stay safe</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-connector" aria-hidden="true">
+    <span class="pulse left"></span>
+    <span class="pulse"></span>
+    <span class="pulse right"></span>
+  </div>
+
+  <!-- ───────────── App journey cards ───────────── -->
+  <section aria-labelledby="journey-title">
+    <div class="container">
+      <div class="section-head">
+        <p class="section-eyebrow">What the app does</p>
+        <h2 id="journey-title" class="section-title">Built around the <span class="accent">game</span>, not the profile.</h2>
+      </div>
+
+      <div class="journey-grid">
+        <div class="journey-card">
+          <span class="card-sweep" aria-hidden="true"></span>
+          <span class="num">01</span>
+          <h3 class="name">Find players</h3>
+          <p class="desc">Two-sided matching with players who picked the same sport, level, and city as you.</p>
+        </div>
+        <div class="journey-card">
+          <span class="card-sweep" aria-hidden="true"></span>
+          <span class="num">02</span>
+          <h3 class="name">Chat &amp; coordinate</h3>
+          <p class="desc">One-to-one chat, only with players you matched with. No group rooms, no broadcast.</p>
+        </div>
+        <div class="journey-card">
+          <span class="card-sweep" aria-hidden="true"></span>
+          <span class="num">03</span>
+          <h3 class="name">Plan sessions</h3>
+          <p class="desc">Agree on a sport, a time, and a court. Keep the plan in the chat where you already are.</p>
+        </div>
+        <div class="journey-card">
+          <span class="card-sweep" aria-hidden="true"></span>
+          <span class="num">04</span>
+          <h3 class="name">Stay safe</h3>
+          <p class="desc">Report, block, or delete your account from inside the app. Real controls, not buried.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-connector" aria-hidden="true">
+    <span class="pulse left"></span>
+    <span class="pulse"></span>
+    <span class="pulse right"></span>
+  </div>
+
+  <!-- ───────────── Problem ───────────── -->
+  <section aria-labelledby="problem-title">
+    <div class="container">
+      <div class="problem-grid">
+        <div class="problem-copy">
+          <p class="section-eyebrow">The problem</p>
+          <h2 id="problem-title">Playing sports shouldn't depend on who replies in the <span class="accent">group chat.</span></h2>
+          <ul class="pain-list">
+            <li><span class="x" aria-hidden="true">×</span><span>Friends are busy.</span></li>
+            <li><span class="x" aria-hidden="true">×</span><span>Group chats are messy.</span></li>
+            <li><span class="x" aria-hidden="true">×</span><span>Finding the right level can be awkward.</span></li>
+          </ul>
+        </div>
+
+        <!-- Abstract court-line illustration. No people. -->
+        <div class="problem-art" aria-hidden="true">
+          <svg viewBox="0 0 460 460" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="lineGlow" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#A8E61A" stop-opacity="0.65"/>
+                <stop offset="100%" stop-color="#A8E61A" stop-opacity="0.05"/>
+              </linearGradient>
+              <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#A8E61A" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#A8E61A" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+
+            <rect x="0" y="0" width="460" height="460" rx="28" fill="#14171C"/>
+            <rect x="0.5" y="0.5" width="459" height="459" rx="28" fill="none" stroke="rgba(255,255,255,0.08)"/>
+
+            <!-- Court outline -->
+            <rect x="60" y="80" width="340" height="300" fill="none" stroke="url(#lineGlow)" stroke-width="2"/>
+            <line x1="60" y1="230" x2="400" y2="230" stroke="rgba(168,230,26,0.45)" stroke-width="1.5" stroke-dasharray="6 6"/>
+            <line x1="230" y1="80" x2="230" y2="380" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+
+            <!-- Service boxes -->
+            <rect x="60" y="160" width="340" height="140" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+            <line x1="120" y1="160" x2="120" y2="300" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+            <line x1="340" y1="160" x2="340" y2="300" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+
+            <!-- Center glow -->
+            <circle cx="230" cy="230" r="80" fill="url(#centerGlow)"/>
+            <circle cx="230" cy="230" r="6" fill="#A8E61A"/>
+
+            <!-- Trajectory arc -->
+            <path d="M 90 350 Q 230 100 380 350" stroke="rgba(168,230,26,0.65)" stroke-width="1.5" fill="none" stroke-dasharray="4 6"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-connector" aria-hidden="true">
+    <span class="pulse left"></span>
+    <span class="pulse"></span>
+    <span class="pulse right"></span>
+  </div>
+
+  <!-- ───────────── Features ───────────── -->
+  <section aria-labelledby="features-title">
+    <div class="container">
+      <div class="section-head">
+        <p class="section-eyebrow">What you get on day one</p>
+        <h2 id="features-title" class="section-title">Four tools, <span class="accent">one focus.</span></h2>
+        <p class="section-lede">Everything you need to go from "I want to play" to "see you on Saturday." Nothing you don't.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <span class="card-sweep" aria-hidden="true"></span>
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          </span>
+          <h3>Find players by sport</h3>
+          <p>Pick a sport — gym, golf, tennis, running — and see partners at your level in your city.</p>
+        </div>
+
+        <div class="feature-card">
+          <span class="card-sweep" aria-hidden="true"></span>
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3.5-7.1L21 4l-1 4.5"/></svg>
+          </span>
+          <h3>Message matched players</h3>
+          <p>One-to-one chat with the players you matched with. Confirm a time, agree on a court, show up.</p>
+        </div>
+
+        <div class="feature-card">
+          <span class="card-sweep" aria-hidden="true"></span>
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          </span>
+          <h3>Plan the session</h3>
+          <p>Lock in the basics — sport, time, court — without leaving the chat. No bouncing between apps.</p>
+        </div>
+
+        <div class="feature-card">
+          <span class="card-sweep" aria-hidden="true"></span>
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 4 6v6c0 4.5 3.4 8.5 8 9 4.6-.5 8-4.5 8-9V6l-8-3z"/></svg>
+          </span>
+          <h3>Stay in control with safety tools</h3>
+          <p>Report, block, and account deletion are first-class controls — wired in the app, not buried.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-connector" aria-hidden="true">
+    <span class="pulse left"></span>
+    <span class="pulse"></span>
+    <span class="pulse right"></span>
+  </div>
+
+  <!-- ───────────── Safety ───────────── -->
+  <section class="safety-section" aria-labelledby="safety-title">
+    <div class="safety-drift" aria-hidden="true">
+      <span class="line s1"></span>
+      <span class="line s2"></span>
+    </div>
+
+    <div class="container">
+      <div class="section-head">
+        <p class="section-eyebrow">Safety</p>
+        <h2 id="safety-title" class="section-title">Built for safer <span class="accent">sports connections.</span></h2>
+        <p class="section-lede">Three controls, every account, every chat. No upgrade required.</p>
+      </div>
+
+      <div class="safety-grid">
+        <div class="safety-card">
+          <div class="head">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v16M4 4h13l-2 4 2 4H4"/></svg>
+            </span>
+            Report users
+          </div>
+          <p>Flag inappropriate behavior so it can be reviewed.</p>
+        </div>
+
+        <div class="safety-card">
+          <div class="head">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>
+            </span>
+            Block users
+          </div>
+          <p>Control who can contact you. A blocked player can't match or message you again.</p>
+        </div>
+
+        <div class="safety-card">
+          <div class="head">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+            </span>
+            Delete your account
+          </div>
+          <p>Request account deletion directly from the app. Permanent, with a clear confirmation step.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-connector" aria-hidden="true">
+    <span class="pulse left"></span>
+    <span class="pulse"></span>
+    <span class="pulse right"></span>
+  </div>
+
+  <!-- ───────────── CTA strip ───────────── -->
+  <section id="cta">
+    <div class="container">
+      <div class="cta-strip">
+        <div>
+          <h2>Find your next <span class="accent">game.</span></h2>
+          <p>Connect with players, chat, and plan sports sessions in one place.</p>
+        </div>
+        <div class="badge-area">
+          <a class="app-badge" href="#cta" aria-label="Coming soon on the App Store">
+            <svg class="badge-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M16.5 12.6c0-2.5 2.05-3.7 2.14-3.76-1.17-1.7-3-1.94-3.65-1.97-1.55-.16-3.03.91-3.82.91-.79 0-2-.89-3.3-.86-1.7.02-3.27 1-4.14 2.52-1.77 3.06-.45 7.6 1.27 10.08.85 1.22 1.85 2.59 3.16 2.55 1.27-.05 1.75-.82 3.28-.82 1.53 0 1.96.82 3.3.79 1.36-.02 2.22-1.24 3.06-2.47.97-1.41 1.36-2.79 1.38-2.86-.03-.01-2.65-1.02-2.68-4.04zm-2.51-7.4c.69-.83 1.16-2 1.03-3.16-1 .04-2.21.66-2.92 1.5-.64.74-1.2 1.92-1.05 3.05 1.11.09 2.25-.56 2.94-1.39z" fill="currentColor"/>
+            </svg>
+            <span class="badge-text">
+              <span class="badge-eyebrow">Coming soon on the</span>
+              <span class="badge-headline">App Store</span>
+            </span>
+          </a>
+          <span class="small">iOS first. Android to follow.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ───────────── Footer ───────────── -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="/" aria-label="SportGang home">
+          <svg class="lockup" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+            <rect x="2" y="2" width="60" height="60" rx="14" fill="#0E1013" stroke="#A8E61A" stroke-width="2"></rect>
+            <text x="32" y="45" font-family="Helvetica, Arial, sans-serif" font-style="italic" font-weight="900"
+                  font-size="34" text-anchor="middle" letter-spacing="-2">
+              <tspan fill="#F4F5F7">S</tspan><tspan fill="#A8E61A">G</tspan>
+            </text>
+          </svg>
+          <span class="wordmark">Sport<span class="accent">Gang</span></span>
+        </a>
+        <p class="tagline">Built around the game, not the profile.</p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Site</h4>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="/privacy">Privacy</a></li>
+          <li><a href="/terms">Terms</a></li>
+          <li><a href="/support">Support</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Contact</h4>
+        <ul>
+          <li><a href="mailto:support@example.com">support@example.com</a></li>
+          <li><a href="mailto:privacy@example.com">privacy@example.com</a></li>
+          <li><a href="mailto:legal@example.com">legal@example.com</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Sports today</h4>
+        <ul>
+          <li>Gym</li>
+          <li>Golf</li>
+          <li>Tennis</li>
+          <li>Running</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <span>© <span id="y">2026</span> SportGang</span>
+      <span>Sydney, Australia</span>
+      <span>v1 · pre-launch</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
