@@ -219,6 +219,54 @@ describe('ChatScreen', () => {
     });
   });
 
+  it('aligns own messages right and partner messages left even when auth user is null', async () => {
+    // Real-device regression: useAuthStore sets `user: null` right after
+    // login/register (only initialize() on cold-start populates it). When that
+    // happened, every message rendered with the partner ("other") style and
+    // outgoing messages appeared on the LEFT. The fix derives ownership from
+    // routeParams.partnerId so a 1:1 chat can identify "own" without auth user.
+    const authMock = require('../stores/auth') as { useAuthStore: () => unknown };
+    const original = authMock.useAuthStore;
+    authMock.useAuthStore = () => ({ user: null, token: 'test-jwt-token' });
+    try {
+      mockApiGet.mockResolvedValue({
+        items: sampleMessages,
+        total: 2,
+        limit: 100,
+        offset: 0,
+      });
+      const { findByText, UNSAFE_getAllByType } = render(
+        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+
+      // Both bubbles render.
+      const partnerText = await findByText('Hey! Want to train tomorrow?');
+      const ownText = await findByText('Absolutely, sounds great!');
+
+      // The bubble container is the parent View of the Text node — assert its
+      // alignSelf via the resolved style. The partner bubble must be flex-start
+      // (left); the own bubble must be flex-end (right). This is the contract
+      // the screenshot bug violated.
+      const { StyleSheet, View } = require('react-native');
+      const pickAlignSelf = (textNode: any): string | undefined => {
+        // Find the closest enclosing View (the bubble) and read its style.
+        // testing-library nodes expose .parent which is the rendered React fiber.
+        const allViews = UNSAFE_getAllByType(View);
+        const bubble = allViews.find((v: any) =>
+          v.props.children &&
+          (Array.isArray(v.props.children) ? v.props.children : [v.props.children])
+            .some((c: any) => c === textNode || (c && c.props && c.props.children === textNode.props.children))
+        );
+        return bubble ? StyleSheet.flatten(bubble.props.style).alignSelf : undefined;
+      };
+
+      expect(pickAlignSelf(partnerText)).toBe('flex-start');
+      expect(pickAlignSelf(ownText)).toBe('flex-end');
+    } finally {
+      authMock.useAuthStore = original;
+    }
+  });
+
   // ── Error state ────────────────────────────────────────────────────────────
 
   it('shows an error message and a retry button when fetch fails', async () => {
@@ -465,26 +513,64 @@ describe('ChatScreen', () => {
 
   // ── Keyboard layout (real-device fix) ──────────────────────────────────────
 
-  it('renders the composer + send + Find a court inside a single KeyboardAvoidingView', async () => {
+  it('renders a visible normal-flow composer + Send before the keyboard opens (iOS)', async () => {
+    // Regression pin: the previous iOS-only "composer lives only inside
+    // InputAccessoryView" structure was structurally broken — InputAccessoryView
+    // is shown only AFTER a linked TextInput is focused, but tapping a TextInput
+    // requires it to be visible, so the chat had no focusable input on cold
+    // open. The repair restores a single normal-flow composer rendered for
+    // both platforms. These assertions guard against re-introducing the bug.
     mockApiGet.mockResolvedValue(emptyMessageResponse);
     const { getByPlaceholderText, getByLabelText, UNSAFE_queryAllByType } = render(
       <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
     );
     await waitFor(() => getByPlaceholderText('Message…'));
 
-    // The fix wraps the entire chat body — header, planning banner, message
-    // list and composer — in a single KAV so iOS padding / Android height
-    // shifts everything together.
-    const { KeyboardAvoidingView } = require('react-native');
-    const kavs = UNSAFE_queryAllByType(KeyboardAvoidingView);
-    expect(kavs.length).toBe(1);
+    // 1) The composer TextInput is visible / non-hidden / editable.
+    const input = getByPlaceholderText('Message…');
+    expect(input).toBeTruthy();
+    expect(input.props.editable).not.toBe(false);
+    expect(input.props.multiline).toBe(true);
 
-    // Composer + send + Find a court are all reachable in the same render —
-    // i.e., the keyboard fix must not have hidden any of them.
-    expect(getByPlaceholderText('Message…')).toBeTruthy();
+    // 2) The Send button is visible alongside the input.
     expect(getByLabelText('Send')).toBeTruthy();
+
+    // 3) The TextInput must NOT carry an inputAccessoryViewID — the broken
+    //    structure self-linked the only TextInput to an accessory it lived in.
+    expect(input.props.inputAccessoryViewID).toBeUndefined();
+
+    // 4) No InputAccessoryView is mounted at all — composer is a normal
+    //    flow child, not an iOS accessory wrapper.
+    const RN = require('react-native');
+    expect(UNSAFE_queryAllByType(RN.InputAccessoryView).length).toBe(0);
+
+    // 5) Plan-session / Find-a-court / + Session affordances are still reachable.
     expect(getByLabelText('Find a court')).toBeTruthy();
     expect(getByLabelText('Propose a session')).toBeTruthy();
+  });
+
+  it('Android path: composer is rendered normally (no InputAccessoryView, no inputAccessoryViewID)', async () => {
+    // Override the default Platform.OS to exercise the Android branch and
+    // confirm the visible-composer guarantee holds there too.
+    const RN = require('react-native');
+    const originalOS = RN.Platform.OS;
+    Object.defineProperty(RN.Platform, 'OS', { value: 'android', configurable: true });
+    try {
+      mockApiGet.mockResolvedValue(emptyMessageResponse);
+      const { getByPlaceholderText, getByLabelText, UNSAFE_queryAllByType } = render(
+        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      await waitFor(() => getByPlaceholderText('Message…'));
+
+      expect(UNSAFE_queryAllByType(RN.InputAccessoryView).length).toBe(0);
+      expect(getByPlaceholderText('Message…').props.inputAccessoryViewID).toBeUndefined();
+      expect(getByLabelText('Send')).toBeTruthy();
+    } finally {
+      Object.defineProperty(RN.Platform, 'OS', {
+        value: originalOS,
+        configurable: true,
+      });
+    }
   });
 
   // ── WebSocket real-time ────────────────────────────────────────────────────

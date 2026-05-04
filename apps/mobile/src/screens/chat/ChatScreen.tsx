@@ -3,7 +3,9 @@ import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
+  Dimensions,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -49,8 +51,33 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [isSending, setIsSending] = useState(false);
+  // iOS keyboard inset — bumps the visible composer above the keyboard.
+  // Manual tracking is used because KeyboardAvoidingView's measured frame is
+  // unreliable for non-Latin IMEs (Korean) when the keyboard frame changes
+  // mid-frame. We listen to keyboardWillChangeFrame so the inset stays in
+  // sync as the user toggles between Latin and Korean inputs. Android relies
+  // on adjustResize and keeps inset = 0.
+  const [keyboardInset, setKeyboardInset] = useState(0);
   const listRef = useRef<FlatList>(null);
   const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const onChange = (e: { endCoordinates: { screenY: number; height: number } }) => {
+      const screenHeight = Dimensions.get('window').height;
+      // screenY is the keyboard's top y in screen coordinates; the visible
+      // keyboard height is the gap between that and the screen bottom.
+      const visibleKeyboardHeight = Math.max(0, screenHeight - e.endCoordinates.screenY);
+      setKeyboardInset(visibleKeyboardHeight);
+    };
+    const onHide = () => setKeyboardInset(0);
+    const showSub = Keyboard.addListener('keyboardWillChangeFrame', onChange);
+    const hideSub = Keyboard.addListener('keyboardWillHide', onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const partnerId = useRef<string | null>(routePartnerId);
 
@@ -194,162 +221,168 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
 
   return (
     <Screen padded={false}>
-      {/* The whole chat body is wrapped in a single KeyboardAvoidingView so
-          the header, planning banner, message list and composer all shift
-          together when the keyboard appears. iOS uses `padding` (extra bottom
-          padding equal to the keyboard height); Android uses `height` (the
-          KAV shrinks itself by the keyboard height). The previous structure
-          wrapped only the list+input, which left the input hidden under the
-          keyboard whenever the offset didn't perfectly match the header
-          stack height. */}
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Pressable
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-            onPress={() => navigation.goBack()}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            <Text style={styles.backText}>{'←'}</Text>
-          </Pressable>
-          <View style={styles.headerCenter}>
-            <Text style={styles.headerName} numberOfLines={1}>
-              {partnerName}
-            </Text>
-          </View>
-          <View style={styles.headerActions}>
-            <Pressable
-              style={({ pressed }) => [styles.bookButton, pressed && styles.pressed]}
-              onPress={() =>
-                navigation.navigate('BookingComposer', { matchId, sport })
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Propose a session"
-            >
-              <Text style={styles.bookButtonText}>+ Session</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.overflowButton, pressed && styles.pressed]}
-              onPress={openSafetyMenu}
-              accessibilityRole="button"
-              accessibilityLabel="More options"
-            >
-              <Text style={styles.overflowText}>⋯</Text>
-            </Pressable>
-          </View>
+      {/* Header — kept OUTSIDE the KeyboardAvoidingView so it stays anchored
+          at the top regardless of keyboard state. */}
+      <View style={styles.header}>
+        <Pressable
+          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+        >
+          <Text style={styles.backText}>{'←'}</Text>
+        </Pressable>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerName} numberOfLines={1}>
+            {partnerName}
+          </Text>
         </View>
-
-        {/* Session-planning banner — always visible above messages so the
-            venue/booking flow is one tap from anywhere in the chat. The small
-            "+ Session" header pill remains for users who already know what
-            they're doing; this card is the discoverable entry. */}
-        <View style={styles.planBanner}>
-          <View style={styles.planBannerText}>
-            <Text style={styles.planBannerTitle}>Plan a session</Text>
-            <Text style={styles.planBannerSubtitle}>
-              Find a court and propose a time.
-            </Text>
-          </View>
+        <View style={styles.headerActions}>
           <Pressable
+            style={({ pressed }) => [styles.bookButton, pressed && styles.pressed]}
             onPress={() =>
-              navigation.navigate('BookingComposer', {
-                matchId,
-                sport,
-                openCourtPicker: true,
-              })
+              navigation.navigate('BookingComposer', { matchId, sport })
             }
             accessibilityRole="button"
-            accessibilityLabel="Find a court"
-            style={({ pressed }) => [styles.findCourtCta, pressed && styles.pressed]}
+            accessibilityLabel="Propose a session"
           >
-            <Text style={styles.findCourtCtaText}>Find a court</Text>
+            <Text style={styles.bookButtonText}>+ Session</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.overflowButton, pressed && styles.pressed]}
+            onPress={openSafetyMenu}
+            accessibilityRole="button"
+            accessibilityLabel="More options"
+          >
+            <Text style={styles.overflowText}>⋯</Text>
           </Pressable>
         </View>
+      </View>
 
-        {isLoading ? (
-          <View style={styles.centred}>
-            <ActivityIndicator size="large" color={colors.accent} />
-          </View>
-        ) : fetchError ? (
-          <View style={styles.centred}>
-            <Text style={styles.errorText}>{fetchError}</Text>
-            <Pressable style={styles.retryButton} onPress={fetchMessages}>
-              <Text style={styles.retryText}>Try again</Text>
+      {/* Session-planning banner — also kept outside the KAV. The banner
+          must not move when the keyboard opens; only the list+composer
+          should shift. */}
+      <View style={styles.planBanner}>
+        <View style={styles.planBannerText}>
+          <Text style={styles.planBannerTitle}>Plan a session</Text>
+          <Text style={styles.planBannerSubtitle}>
+            Find a court and propose a time.
+          </Text>
+        </View>
+        <Pressable
+          onPress={() =>
+            navigation.navigate('BookingComposer', {
+              matchId,
+              sport,
+              openCourtPicker: true,
+            })
+          }
+          accessibilityRole="button"
+          accessibilityLabel="Find a court"
+          style={({ pressed }) => [styles.findCourtCta, pressed && styles.pressed]}
+        >
+          <Text style={styles.findCourtCtaText}>Find a court</Text>
+        </Pressable>
+      </View>
+
+      {isLoading ? (
+        <View style={styles.centred}>
+          <ActivityIndicator size="large" color={colors.accent} />
+        </View>
+      ) : fetchError ? (
+        <View style={styles.centred}>
+          <Text style={styles.errorText}>{fetchError}</Text>
+          <Pressable style={styles.retryButton} onPress={fetchMessages}>
+            <Text style={styles.retryText}>Try again</Text>
+          </Pressable>
+        </View>
+      ) : (
+        // Single shared layout for both platforms. The composer is a normal
+        // visible View below the FlatList — it must be tappable BEFORE the
+        // keyboard opens, so it cannot live solely inside an
+        // InputAccessoryView (the previous attempt's structural bug).
+        //
+        // Keyboard handling:
+        //   - Android: rely on the OS via android:windowSoftInputMode=
+        //     "adjustResize" (Expo default). The KAV here is just a flex:1
+        //     wrapper — behavior=undefined, no manual lifting.
+        //   - iOS: KAV behavior is undefined (no KAV-driven padding) and the
+        //     composer's marginBottom is set from the iOS-only Keyboard event
+        //     listener. This avoids double-lifting and gives reliable results
+        //     for Korean / non-Latin IMEs where KAV's measured frame drifts.
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={undefined}
+          keyboardVerticalOffset={0}
+        >
+          <FlatList
+            ref={listRef}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <MessageBubble message={item} isOwn={item.senderId !== routePartnerId} />
+            )}
+            style={styles.flex}
+            contentContainerStyle={styles.messageList}
+            showsVerticalScrollIndicator={false}
+            onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            ListEmptyComponent={
+              <View style={styles.emptyWrap}>
+                <Text style={styles.emptyText}>
+                  Say hello to {partnerName} to get things started.
+                </Text>
+              </View>
+            }
+          />
+          <View
+            style={[
+              styles.inputRow,
+              // Resting paddingBottom keeps the composer clear of the iPhone
+              // home indicator when the keyboard is down.
+              { paddingBottom: spacing.sm + insets.bottom },
+              // iOS only: lift the composer by the visible keyboard height
+              // (minus the home-indicator inset, which the keyboard absorbs)
+              // so the input + Send button sit just above the keyboard, even
+              // for Korean IMEs that change keyboard frame mid-frame.
+              Platform.OS === 'ios' && keyboardInset > 0
+                ? { marginBottom: Math.max(0, keyboardInset - insets.bottom) }
+                : null,
+            ]}
+          >
+            <TextInput
+              style={styles.input}
+              value={draft}
+              onChangeText={setDraft}
+              placeholder="Message…"
+              placeholderTextColor={colors.textTertiary}
+              multiline
+              maxLength={1000}
+              returnKeyType="send"
+              onSubmitEditing={sendMessage}
+              blurOnSubmit={false}
+              // Anchor multi-line text to the top edge — without this, Android
+              // vertically centers the caret as the input grows, which makes
+              // the first line appear to "jump" while typing.
+              textAlignVertical="top"
+            />
+            <Pressable
+              style={({ pressed }) => [
+                styles.sendButton,
+                (!draft.trim() || isSending) && styles.sendButtonDisabled,
+                pressed && styles.pressed,
+              ]}
+              onPress={sendMessage}
+              disabled={!draft.trim() || isSending}
+              accessibilityRole="button"
+              accessibilityLabel="Send"
+            >
+              <Text style={styles.sendButtonText}>Send</Text>
             </Pressable>
           </View>
-        ) : (
-          <View style={styles.flex}>
-            <FlatList
-              ref={listRef}
-              data={messages}
-              // Message.id is required by the server contract and the local
-              // type — duplicates are eliminated upstream via dedupeMessagesById,
-              // so the stable id alone is the right key. No idx fallback needed.
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <MessageBubble message={item} isOwn={item.senderId === user?.id} />
-              )}
-              contentContainerStyle={styles.messageList}
-              showsVerticalScrollIndicator={false}
-              onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="interactive"
-              ListEmptyComponent={
-                <View style={styles.emptyWrap}>
-                  <Text style={styles.emptyText}>
-                    Say hello to {partnerName} to get things started.
-                  </Text>
-                </View>
-              }
-            />
-            <View
-              style={[
-                styles.inputRow,
-                // Respect the bottom safe-area inset so the composer never
-                // crashes into the iPhone home indicator. KAV adds
-                // keyboard-height padding above this when the keyboard is
-                // up, so this inset is the resting state pad only.
-                { paddingBottom: spacing.sm + insets.bottom },
-              ]}
-            >
-              <TextInput
-                style={styles.input}
-                value={draft}
-                onChangeText={setDraft}
-                placeholder="Message…"
-                placeholderTextColor={colors.textTertiary}
-                multiline
-                maxLength={1000}
-                returnKeyType="send"
-                onSubmitEditing={sendMessage}
-                blurOnSubmit={false}
-                // Anchor multi-line text to the top edge — without this, Android
-                // vertically centers the caret as the input grows, which makes
-                // the first line appear to "jump" while typing.
-                textAlignVertical="top"
-              />
-              <Pressable
-                style={({ pressed }) => [
-                  styles.sendButton,
-                  (!draft.trim() || isSending) && styles.sendButtonDisabled,
-                  pressed && styles.pressed,
-                ]}
-                onPress={sendMessage}
-                disabled={!draft.trim() || isSending}
-                accessibilityRole="button"
-                accessibilityLabel="Send"
-              >
-                <Text style={styles.sendButtonText}>Send</Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      )}
     </Screen>
   );
 }
