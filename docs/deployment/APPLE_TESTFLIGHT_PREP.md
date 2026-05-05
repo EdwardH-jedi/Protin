@@ -159,7 +159,7 @@ Detailed area-by-area tables follow.
 | URLs reachable from outside the build environment | configured | Confirmed live by the operator after Netlify deploy. | Re-verify with the §4.8 checklist after any custom-domain switch. |
 | Env example files document the values | configured | `apps/mobile/.env.example`, `apps/mobile/.env.staging.example`, and `.env.example` all carry the three `EXPO_PUBLIC_*_URL` values pointing at the Netlify host. | None. Update together with §4.8 commands if the host changes. |
 | EAS env values pinned (preview + production) | configured | `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_SUPPORT_URL` set on both `preview` and `production` environments via `eas env:create`. Verify with `eas env:list --environment {preview,production}`. | Re-apply with `eas env:update` if the host changes (e.g. custom-domain swap). |
-| Real-device tap-through of all three in-app legal links | verify on real device | No dated TestFlight/Expo Go run recorded. | Use the §4.8 local Expo + on-device checklist; record date and pass/fail. |
+| Real-device tap-through of all three in-app legal links | verified | 2026-05-05 — operator-confirmed PASS on iPhone via Expo Go / local development run: Privacy → `/privacy/`, Terms → `/terms/`, Support → `/support/` all opened on `https://sportgang.netlify.app/`. No "link unavailable" alert, no 404, no crash. Recorded in `docs/deployment/RELEASE_GATE_CHECKLIST.md` §4.6. | Re-run after the first preview/TestFlight on-device install and after any Netlify host change (custom-domain swap). |
 
 ### 4.5 Reviewer notes / contact / demo account path
 

@@ -245,6 +245,28 @@ screen flow; this area is device-only for the mobile side.
 | Full onboarding (profile -> identity preferences -> sport profiles) on real iPhone | mobile | screen-recording or stepped notes | [ ] |
 | App survives a cold start post-onboarding and lands on Discovery feed | mobile | notes | [ ] |
 
+### 4.6 Legal and support links (real-device tap-through)
+
+The static legal/marketing site is deployed to Netlify at
+`https://sportgang.netlify.app/`; all four routes return `200 OK` HTML
+over HTTPS. The three `EXPO_PUBLIC_*_URL` env vars are pinned on the
+EAS `preview` and `production` environments (verifiable with
+`eas env:list --environment {preview,production}`). On 2026-05-05 the
+in-app links were tap-tested on a real iPhone via Expo Go / local
+development run; all five links opened the expected Netlify pages
+without a "link unavailable" alert, without a 404, and without
+crashing the app. Detailed checklist + failure triage live in
+`docs/deployment/APPLE_TESTFLIGHT_PREP.md` section 4.8.
+
+| Check | Owner | Evidence required | Status / date |
+|---|---|---|---|
+| Privacy link opens `https://sportgang.netlify.app/privacy/` from the in-app affordance on a real iPhone | mobile | operator-confirmed PASS via Expo Go / local dev run | [x] PASS — 2026-05-05 |
+| Terms link opens `https://sportgang.netlify.app/terms/` from the in-app affordance on a real iPhone | mobile | operator-confirmed PASS via Expo Go / local dev run | [x] PASS — 2026-05-05 |
+| Support link opens `https://sportgang.netlify.app/support/` from the in-app affordance on a real iPhone | mobile | operator-confirmed PASS via Expo Go / local dev run | [x] PASS — 2026-05-05 |
+| No "link unavailable" alert on any of the three taps | mobile | operator-confirmed PASS | [x] PASS — 2026-05-05 |
+| No 404 on any loaded page | mobile | operator-confirmed PASS | [x] PASS — 2026-05-05 |
+| App does not crash; user can return to the app after opening a link | mobile | operator-confirmed PASS | [x] PASS — 2026-05-05 |
+
 ---
 
 ## 5. Apple-Side Setup Required
@@ -261,8 +283,8 @@ states the stage it blocks.
 | Push entitlement / APNs capability enabled on the bundle ID | Gate 2 (push claim) and Gate 3 | [ ] |
 | TestFlight internal tester group with 2 or more humans | Gate 2 | [ ] |
 | TestFlight external review (if used) | Gate 3 | [ ] |
-| Privacy Policy URL publicly hosted; URL in `apps/mobile/src/lib/legal.ts` updated to final | Gate 3 | [ ] |
-| Support URL publicly hosted | Gate 3 | [ ] |
+| Privacy Policy URL publicly hosted; URL in `apps/mobile/src/lib/legal.ts` updated to final | Gate 3 | [x] hosted at `https://sportgang.netlify.app/privacy/`; pinned via `EXPO_PUBLIC_PRIVACY_URL` on EAS preview + production. Constant-default swap in `apps/mobile/src/lib/legal.ts` is optional once the env-driven flow is shipped. |
+| Support URL publicly hosted | Gate 3 | [x] hosted at `https://sportgang.netlify.app/support/`; pinned via `EXPO_PUBLIC_SUPPORT_URL` on EAS preview + production. |
 | Reviewer demo account credentials seeded and captured | Gate 3 | [ ] |
 | App Review Contact Info (name, email, phone) finalized | Gate 3 | [ ] |
 | Review notes block finalized (see `APP_STORE_SUBMISSION.md` section 7) | Gate 3 | [ ] |
@@ -285,7 +307,8 @@ known-absent repo artifacts, and Apple-side unknowns live.
 | `apps/mobile/eas.json` still contains `REPLACE_WITH_APP_STORE_CONNECT_APP_ID` and `REPLACE_WITH_APPLE_TEAM_ID` placeholders | `eas submit` will refuse | Gate 2 | mobile / release owner | Real values in `eas.json` |
 | Push end-to-end on real iPhone not yet proven | Code-and-config readiness is not APNs delivery; claiming push as ready is the single highest rejection risk | Gate 2 push claim, Gate 3 | mobile and api | Section 4.3 rows checked with dated evidence |
 | Google Calendar flow not yet proven on real iPhone | Surface is exposed in booking UI; if unverified at Gate 3, hide or mark as optional | Gate 3 (risk) | mobile | Section 4.4 rows checked or feature hidden behind a flag |
-| Legal URLs in `apps/mobile/src/lib/legal.ts` still point at unpublished paths | App Store requires reachable Privacy Policy URL; mismatch risks a 5.1.2 rejection | Gate 3 | release owner | URLs live and constant updated |
+| Legal URLs in `apps/mobile/src/lib/legal.ts` still point at unpublished paths | App Store requires reachable Privacy Policy URL; mismatch risks a 5.1.2 rejection | Gate 3 | release owner | RESOLVED 2026-05-05 — URLs hosted on Netlify (`https://sportgang.netlify.app/{privacy,terms,support}/`), pinned on EAS preview + production via `EXPO_PUBLIC_*_URL`, and tap-tested on real iPhone (section 4.6). Hardcoded fallback constants in `apps/mobile/src/lib/legal.ts` may still be swapped in a separate slice once the env-driven flow is the only path. |
+| Public-facing brand spelling not yet normalized to `SportsGang` / `sportsgang` across app, website, and docs | Operator decided 2026-05-05 to standardize on `SportsGang` (the inner `s` better implies multiple sports and future multi-sport expansion). Today the website ships as `SportGang` and `apps/mobile/app.config.js` `expo.name` ships as `SportsGang`; docs and metadata mix the two. App Store listing wants a single canonical spelling | Gate 3 | release owner | One dedicated brand-name normalization slice that updates the website pages, the README, all release/legal docs, and any user-visible mobile copy to `SportsGang` consistently — separate from this device-test-recording commit |
 | Delete-account not verified on real device | Core Apple 5.1.1(v) requirement; code-only is not proof | Gate 2 and Gate 3 | mobile and api | Section 4.2 rows checked |
 | Reviewer-usable staging environment not confirmed live | "Backend exists" is not "a reviewer can sign in and see seeded data". No deployed staging URL has been probed; backend tests are green but reachability from outside the Docker network is unknown | Gate 1, Gate 2, Gate 3 | infra | Captured green health run plus reviewer account login on staging |
 | Real-device verification not performed | Sections 4.1 through 4.5 rows that require a real-iPhone run cannot be checked without one. The Current verification state summary in section 4 records what backend-only evidence exists today | Gate 2, Gate 3 | mobile + release owner | A dated device run per section 4 row, captured by owner |
