@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -12,19 +12,19 @@ import {
   View,
 } from 'react-native';
 
+import { CalendarPicker } from '../../components/CalendarPicker';
 import { Screen } from '../../components/Screen';
+import { TimeWheelPicker } from '../../components/TimeWheelPicker';
 import { api } from '../../lib/api';
 import {
   combineToLocalDate,
   computeValidationError,
-  dateOptions,
   defaultDate,
   defaultStartTime,
   formatDateLabel,
   formatTimeLabel,
   mapBackendError,
   plusOneHour,
-  timeOptions,
   type DateString,
   type TimeString,
 } from '../../lib/sessionTime';
@@ -74,7 +74,6 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
    */
   const handlePickStartTime = (next: TimeString) => {
     setStartTime(next);
-    setStartPickerOpen(false);
     const candidateEnd = combineToLocalDate(date, endTime);
     const candidateStart = combineToLocalDate(date, next);
     if (candidateEnd <= candidateStart) {
@@ -269,29 +268,23 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
         isOpen={datePickerOpen}
         selected={date}
         onClose={() => setDatePickerOpen(false)}
-        onSelect={(d) => {
-          setDate(d);
-          setDatePickerOpen(false);
-        }}
+        onSelect={(d) => setDate(d)}
       />
 
       <TimePickerModal
         isOpen={startPickerOpen}
         title="Start time"
-        selected={startTime}
+        value={startTime}
         onClose={() => setStartPickerOpen(false)}
-        onSelect={handlePickStartTime}
+        onChange={handlePickStartTime}
       />
 
       <TimePickerModal
         isOpen={endPickerOpen}
         title="End time"
-        selected={endTime}
+        value={endTime}
         onClose={() => setEndPickerOpen(false)}
-        onSelect={(t) => {
-          setEndTime(t);
-          setEndPickerOpen(false);
-        }}
+        onChange={(t) => setEndTime(t)}
       />
     </Screen>
   );
@@ -368,35 +361,6 @@ function PickerModal({
   );
 }
 
-function OptionRow({
-  label,
-  isSelected,
-  accessibilityLabel,
-  onPress,
-}: {
-  label: string;
-  isSelected: boolean;
-  accessibilityLabel: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      style={({ pressed }) => [
-        styles.optionRow,
-        isSelected && styles.optionRowSelected,
-        pressed && styles.pressed,
-      ]}
-    >
-      <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 function DatePickerModal({
   isOpen,
   selected,
@@ -408,26 +372,15 @@ function DatePickerModal({
   onClose: () => void;
   onSelect: (d: DateString) => void;
 }) {
-  // Built once per open: the option list is small and stable. ScrollView
-  // (instead of FlatList) avoids virtualization — the 90-day list is
-  // small enough to render in full, and tests can find every option.
-  const options = useMemo(() => dateOptions(), [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <PickerModal isOpen={isOpen} title="Date" onClose={onClose}>
-      <ScrollView
-        contentContainerStyle={styles.optionList}
-        showsVerticalScrollIndicator={false}
-      >
-        {options.map((item) => (
-          <OptionRow
-            key={item}
-            label={formatDateLabel(item)}
-            isSelected={item === selected}
-            accessibilityLabel={`Select ${formatDateLabel(item)}`}
-            onPress={() => onSelect(item)}
-          />
-        ))}
-      </ScrollView>
+      <CalendarPicker
+        selected={selected}
+        onSelect={(d) => {
+          onSelect(d);
+          onClose();
+        }}
+      />
     </PickerModal>
   );
 }
@@ -435,33 +388,40 @@ function DatePickerModal({
 function TimePickerModal({
   isOpen,
   title,
-  selected,
+  value,
   onClose,
-  onSelect,
+  onChange,
 }: {
   isOpen: boolean;
   title: string;
-  selected: TimeString;
+  value: TimeString;
   onClose: () => void;
-  onSelect: (t: TimeString) => void;
+  onChange: (t: TimeString) => void;
 }) {
-  const options = useMemo(() => timeOptions(), []);
+  // Local draft so the wheel can spin freely without flushing every micro
+  // change up to the parent (which would re-render the auto-shift logic
+  // on every intermediate tap). The committed value flows to the parent
+  // only when the user taps Done.
+  const [draft, setDraft] = useState<TimeString>(value);
+  // Re-seed draft when the modal transitions to open. Don't depend on
+  // `value` directly — that would clobber an in-progress spin if the
+  // parent's value updated for any reason while the picker is open.
+  useEffect(() => {
+    if (isOpen) setDraft(value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  const handleDone = () => {
+    onChange(draft);
+    onClose();
+  };
+
   return (
-    <PickerModal isOpen={isOpen} title={title} onClose={onClose}>
-      <ScrollView
-        contentContainerStyle={styles.optionList}
-        showsVerticalScrollIndicator={false}
-      >
-        {options.map((item) => (
-          <OptionRow
-            key={item}
-            label={formatTimeLabel(item)}
-            isSelected={item === selected}
-            accessibilityLabel={`Select ${formatTimeLabel(item)}`}
-            onPress={() => onSelect(item)}
-          />
-        ))}
-      </ScrollView>
+    <PickerModal isOpen={isOpen} title={title} onClose={handleDone}>
+      <View style={styles.timeWheelWrap}>
+        <TimeWheelPicker value={draft} onChange={setDraft} />
+        <Text style={styles.wheelHint}>15-minute increments</Text>
+      </View>
     </PickerModal>
   );
 }
@@ -645,25 +605,13 @@ const styles = StyleSheet.create({
     ...typography.button,
     color: colors.brand,
   },
-  optionList: {
-    paddingVertical: spacing.xs,
+  timeWheelWrap: {
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
   },
-  optionRow: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    minHeight: 48,
-    justifyContent: 'center',
-  },
-  optionRowSelected: {
-    backgroundColor: colors.brandSoft,
-  },
-  optionText: {
-    ...typography.body,
-    color: colors.textPrimary,
-  },
-  optionTextSelected: {
-    ...typography.body,
-    color: colors.brand,
-    fontWeight: '600',
+  wheelHint: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
+    marginTop: spacing.sm,
   },
 });

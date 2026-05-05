@@ -9,10 +9,18 @@ import {
   combineToLocalDate,
   computeValidationError,
   dateOptions,
+  daysInMonth,
   defaultDate,
   defaultStartTime,
+  firstWeekdayOfMonth,
+  isPastDate,
+  joinTime,
   mapBackendError,
+  monthLabel,
   plusOneHour,
+  shiftMonth,
+  snapMinuteTo15,
+  splitTime,
   timeOptions,
   toDateString,
   TIME_INCREMENT_MINUTES,
@@ -229,5 +237,91 @@ describe('default helpers compose into a valid session', () => {
     const start = defaultStartTime();
     const end = plusOneHour(start);
     expect(computeValidationError({ date, startTime: start, endTime: end })).toBeNull();
+  });
+});
+
+// ─── Time wheel helpers ──────────────────────────────────────────────────────
+
+describe('splitTime / joinTime', () => {
+  it('round-trips a simple time', () => {
+    expect(splitTime('09:30')).toEqual({ hour: 9, minute: 30 });
+    expect(joinTime(9, 30)).toBe('09:30');
+  });
+  it('zero-pads single-digit hours and minutes', () => {
+    expect(joinTime(0, 5)).toBe('00:05');
+    expect(joinTime(23, 45)).toBe('23:45');
+  });
+});
+
+describe('snapMinuteTo15', () => {
+  it('keeps already-aligned minutes unchanged', () => {
+    expect(snapMinuteTo15(0)).toBe(0);
+    expect(snapMinuteTo15(15)).toBe(15);
+    expect(snapMinuteTo15(30)).toBe(30);
+    expect(snapMinuteTo15(45)).toBe(45);
+  });
+  it('snaps to the nearest 15-minute slot', () => {
+    expect(snapMinuteTo15(7)).toBe(0); // closer to 0 than 15
+    expect(snapMinuteTo15(8)).toBe(15); // closer to 15 than 0
+    expect(snapMinuteTo15(22)).toBe(15);
+    expect(snapMinuteTo15(23)).toBe(30);
+    expect(snapMinuteTo15(40)).toBe(45);
+  });
+});
+
+// ─── Calendar helpers ────────────────────────────────────────────────────────
+
+describe('isPastDate', () => {
+  const today = new Date(2026, 5, 15, 14, 30, 0); // 2026-06-15 local
+  it('returns true for yesterday', () => {
+    expect(isPastDate('2026-06-14', today)).toBe(true);
+  });
+  it('returns false for today', () => {
+    expect(isPastDate('2026-06-15', today)).toBe(false);
+  });
+  it('returns false for tomorrow', () => {
+    expect(isPastDate('2026-06-16', today)).toBe(false);
+  });
+  it('handles month boundaries by string comparison', () => {
+    const lastDayOfMay = new Date(2026, 4, 31, 14, 0, 0);
+    expect(isPastDate('2026-04-30', lastDayOfMay)).toBe(true);
+    expect(isPastDate('2026-06-01', lastDayOfMay)).toBe(false);
+  });
+});
+
+describe('daysInMonth', () => {
+  it('handles 30/31-day months and February', () => {
+    expect(daysInMonth(2026, 0)).toBe(31);  // Jan
+    expect(daysInMonth(2026, 1)).toBe(28);  // Feb 2026 (non-leap)
+    expect(daysInMonth(2024, 1)).toBe(29);  // Feb 2024 (leap)
+    expect(daysInMonth(2026, 3)).toBe(30);  // Apr
+  });
+});
+
+describe('firstWeekdayOfMonth', () => {
+  it('returns 0..6 (Sun=0)', () => {
+    // 2026-06-01 is a Monday → 1
+    expect(firstWeekdayOfMonth(2026, 5)).toBe(1);
+  });
+});
+
+describe('monthLabel', () => {
+  it('returns a friendly label including the year', () => {
+    const label = monthLabel(2026, 5);
+    // Locale-dependent but always contains the year
+    expect(label).toMatch(/2026/);
+  });
+});
+
+describe('shiftMonth', () => {
+  it('steps forward correctly across year boundary', () => {
+    expect(shiftMonth(2026, 11, 1)).toEqual({ year: 2027, month: 0 });
+  });
+  it('steps backward correctly across year boundary', () => {
+    expect(shiftMonth(2026, 0, -1)).toEqual({ year: 2025, month: 11 });
+  });
+  it('handles multi-month steps', () => {
+    expect(shiftMonth(2026, 5, 6)).toEqual({ year: 2026, month: 11 });
+    expect(shiftMonth(2026, 5, 12)).toEqual({ year: 2027, month: 5 });
   });
 });

@@ -129,6 +129,35 @@ function expectedEndsAt(): string {
   return `${defaultDate()}T${plusOneHour(defaultStartTime())}:00`;
 }
 
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
+}
+
+/**
+ * Drive the wheel-based time picker:
+ *   1. open the picker
+ *   2. tap the requested hour row
+ *   3. tap the requested minute row (if not 00)
+ *   4. tap Done — the modal commits the draft to the parent.
+ */
+function pickTime(
+  getByLabelText: (label: string) => any,
+  field: 'start' | 'end',
+  hour: number,
+  minute: number
+) {
+  const fieldTitle = field === 'start' ? 'Start time' : 'End time';
+  fireEvent.press(getByLabelText(field === 'start' ? 'Choose start time' : 'Choose end time'));
+  fireEvent.press(getByLabelText(`Set hour ${pad2(hour)}`));
+  // Minute wheel default is 00 after the hour spin (`safeMinute` = 0); only
+  // tap the minute row when we want a non-zero minute, to avoid the
+  // already-selected-row no-op.
+  if (minute !== 0) {
+    fireEvent.press(getByLabelText(`Set minute ${pad2(minute)}`));
+  }
+  fireEvent.press(getByLabelText(`Close ${fieldTitle.toLowerCase()} picker`));
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('BookingComposerScreen', () => {
@@ -248,21 +277,17 @@ describe('BookingComposerScreen', () => {
 
   it('changing start time auto-shifts end time when end would become invalid', async () => {
     mockApiPost.mockResolvedValue({ id: 'b1' });
-    const { getByLabelText, getByText, queryByLabelText } = render(
+    const { getByLabelText, getByText } = render(
       <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
     );
 
-    // Open the start-time picker and select 23:00.
-    fireEvent.press(getByLabelText('Choose start time'));
-    fireEvent.press(getByLabelText(`Select ${formatTimeLabel('23:00')}`));
+    // Move start to 23:00. Default end was 10:00 — auto-shift should push
+    // end to 23:00 + 1h, clamped to 23:45 by the same-day rule.
+    pickTime(getByLabelText, 'start', 23, 0);
 
-    // The selectors should now reflect 23:00 and end auto-shifted to ≥ 23:30.
-    // plusOneHour('23:00') is clamped to '23:45' by sessionTime.
     expect(getByText(formatTimeLabel('23:00'))).toBeTruthy();
     expect(getByText(formatTimeLabel('23:45'))).toBeTruthy();
-    expect(queryByLabelText('Choose start time')).toBeTruthy();
 
-    // Submit and confirm the payload reflects the shifted times.
     await act(async () => {
       fireEvent.press(getByLabelText('Send proposal'));
     });
@@ -275,38 +300,47 @@ describe('BookingComposerScreen', () => {
     );
   });
 
-  it('selecting an end time before start time disables Send and shows a friendly inline error', async () => {
+  it('selecting an end time before start time disables Send and shows a friendly inline error', () => {
     const { getByLabelText, getByText } = render(
       <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
     );
     // Default start = 09:00, end = 10:00. Move end to 08:00 (before start).
-    fireEvent.press(getByLabelText('Choose end time'));
-    fireEvent.press(getByLabelText(`Select ${formatTimeLabel('08:00')}`));
+    pickTime(getByLabelText, 'end', 8, 0);
 
     expect(getByText('End time must be later than start time.')).toBeTruthy();
     expect(getByLabelText('Send proposal').props.accessibilityState?.disabled).toBe(true);
   });
 
-  it('rejects an end time that creates a session longer than 4 hours', async () => {
+  it('rejects an end time that creates a session longer than 4 hours', () => {
     const { getByLabelText, getByText } = render(
       <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
     );
     // 09:00 → 14:00 = 5 hours.
-    fireEvent.press(getByLabelText('Choose end time'));
-    fireEvent.press(getByLabelText(`Select ${formatTimeLabel('14:00')}`));
+    pickTime(getByLabelText, 'end', 14, 0);
     expect(getByText('Sessions can be up to 4 hours long.')).toBeTruthy();
     expect(getByLabelText('Send proposal').props.accessibilityState?.disabled).toBe(true);
   });
 
-  it('rejects an end time that creates a session shorter than 30 minutes', async () => {
+  it('rejects an end time that creates a session shorter than 30 minutes', () => {
     const { getByLabelText, getByText } = render(
       <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
     );
     // 09:00 → 09:15 = 15 minutes.
-    fireEvent.press(getByLabelText('Choose end time'));
-    fireEvent.press(getByLabelText(`Select ${formatTimeLabel('09:15')}`));
+    pickTime(getByLabelText, 'end', 9, 15);
     expect(getByText('Sessions must be at least 30 minutes long.')).toBeTruthy();
     expect(getByLabelText('Send proposal').props.accessibilityState?.disabled).toBe(true);
+  });
+
+  it('opens a calendar grid for date selection (no manual text entry)', () => {
+    const { getByLabelText, queryByPlaceholderText } = render(
+      <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+    );
+    // The previous freeform "2026-04-15" placeholder is gone — the date
+    // field is now a tappable selector that opens a calendar modal.
+    expect(queryByPlaceholderText('2026-04-15')).toBeNull();
+    fireEvent.press(getByLabelText('Choose date'));
+    // Calendar modal exposes month-nav buttons.
+    expect(getByLabelText('Next month')).toBeTruthy();
   });
 
   // ── Error handling ─────────────────────────────────────────────────────────

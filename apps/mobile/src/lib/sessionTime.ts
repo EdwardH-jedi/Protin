@@ -10,6 +10,11 @@ export const MAX_SESSION_MINUTES = 4 * 60;
 export const DATE_PICKER_DAYS_AHEAD = 90;
 export const TIME_INCREMENT_MINUTES = 15;
 
+/** Hours 0..23 for the time wheel. */
+export const HOUR_OPTIONS: readonly number[] = Array.from({ length: 24 }, (_, i) => i);
+/** Minute slots for the time wheel — 15-minute increments. */
+export const MINUTE_OPTIONS_15: readonly number[] = [0, 15, 30, 45];
+
 /** "YYYY-MM-DD" — the wire format the backend expects on the date side. */
 export type DateString = string;
 /** "HH:MM" — the wire format the backend expects on the time side. */
@@ -53,6 +58,32 @@ export function formatTimeLabel(time: TimeString): string {
   });
 }
 
+/** Split "HH:MM" into numeric { hour, minute }. */
+export function splitTime(time: TimeString): { hour: number; minute: number } {
+  const [hh, mm] = time.split(':').map(Number);
+  return { hour: hh, minute: mm };
+}
+
+/** Build "HH:MM" from numeric hour + minute. */
+export function joinTime(hour: number, minute: number): TimeString {
+  return `${pad2(hour)}:${pad2(minute)}`;
+}
+
+/** Snap a minute value to the nearest entry in MINUTE_OPTIONS_15. */
+export function snapMinuteTo15(minute: number): number {
+  // Pick the closest of [0, 15, 30, 45]; ties round down.
+  let best = MINUTE_OPTIONS_15[0];
+  let bestDelta = Math.abs(minute - best);
+  for (const m of MINUTE_OPTIONS_15) {
+    const delta = Math.abs(minute - m);
+    if (delta < bestDelta) {
+      best = m;
+      bestDelta = delta;
+    }
+  }
+  return best;
+}
+
 // ─── Default values ──────────────────────────────────────────────────────────
 
 /**
@@ -86,6 +117,48 @@ export function plusOneHour(time: TimeString): TimeString {
   // Clamp to 23:45 so we never roll into "tomorrow" (same-day-only rule).
   const clamped = Math.min(total, 23 * 60 + 45);
   return `${pad2(Math.floor(clamped / 60))}:${pad2(clamped % 60)}`;
+}
+
+// ─── Calendar helpers ────────────────────────────────────────────────────────
+
+/** Friendly month label, e.g. "June 2026". */
+export function monthLabel(year: number, month: number): string {
+  // month is 0-indexed (matches `Date.getMonth()`).
+  const d = new Date(year, month, 1);
+  return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+/** Number of days in the given (year, month). month is 0-indexed. */
+export function daysInMonth(year: number, month: number): number {
+  // Trick: day 0 of next month == last day of this month.
+  return new Date(year, month + 1, 0).getDate();
+}
+
+/** Weekday (0=Sun..6=Sat) of the first of the given month. */
+export function firstWeekdayOfMonth(year: number, month: number): number {
+  return new Date(year, month, 1).getDay();
+}
+
+/**
+ * String-compare check for "is this date strictly before today (local)".
+ *
+ * Uses YYYY-MM-DD lexicographic comparison rather than `Date` math because
+ * local-day boundaries are unambiguous in the date string but ambiguous
+ * once you start comparing `Date` objects across DST shifts.
+ */
+export function isPastDate(date: DateString, now: Date = new Date()): boolean {
+  return date < toDateString(now);
+}
+
+/** Step the given (year, month) backward or forward by `step` months. */
+export function shiftMonth(
+  year: number,
+  month: number,
+  step: number
+): { year: number; month: number } {
+  // Date constructor normalizes overflow / underflow correctly.
+  const d = new Date(year, month + step, 1);
+  return { year: d.getFullYear(), month: d.getMonth() };
 }
 
 // ─── Picker options ──────────────────────────────────────────────────────────
