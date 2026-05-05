@@ -75,8 +75,8 @@ Snapshot of where the seven areas stand right now, in plain present tense.
 - **App Store Connect app record** is `Apple-side setup required`. No ASC
   App ID is captured anywhere in the repo. `APP_STORE_SUBMISSION.md` has a
   one-time prerequisites block that captures what needs doing.
-- **Privacy policy / support URLs** are `hosted, EAS env wiring pending`.
-  The static site at `apps/web/site/` is deployed to Netlify and all four
+- **Privacy policy / support URLs** are `hosted and EAS-pinned`. The
+  static site at `apps/web/site/` is deployed to Netlify and all four
   canonical routes resolve over HTTPS today:
   - `https://sportgang.netlify.app/`
   - `https://sportgang.netlify.app/privacy/`
@@ -85,11 +85,13 @@ Snapshot of where the seven areas stand right now, in plain present tense.
   The sources at `docs/legal/PRIVACY_POLICY.md` and
   `docs/legal/TERMS_OF_SERVICE.md` remain the markdown reference. The
   `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, and
-  `EXPO_PUBLIC_SUPPORT_URL` env vars are now documented in
+  `EXPO_PUBLIC_SUPPORT_URL` env vars are documented in
   `apps/mobile/.env.example`, `apps/mobile/.env.staging.example`, and
-  `.env.example` so local Expo runs resolve them. The matching EAS preview
-  + production env values still need to be applied — see §4.4 and §4.8
-  below for the exact `eas env:create` commands.
+  `.env.example` so local Expo runs resolve them, and have been **applied
+  on the EAS `preview` and `production` environments** — verifiable with
+  `eas env:list --environment {preview,production}`. The only remaining
+  legal-link verification step is a dated real-device tap-through (see
+  §4.4 and §4.8).
 - **Reviewer notes / contact / demo account** are `blocked`. The notes
   template exists in `APP_STORE_SUBMISSION.md` section 7, but it requires a
   seeded review account that depends on `apps/api/scripts/seed_review_data.py`,
@@ -156,7 +158,7 @@ Detailed area-by-area tables follow.
 | Support URL | configured | Live at `https://sportgang.netlify.app/support/` | Pin into `EXPO_PUBLIC_SUPPORT_URL` on EAS production + preview. Same address must align with the App Store Connect "App Review Contact" form once a real `support@` mailbox exists. |
 | URLs reachable from outside the build environment | configured | Confirmed live by the operator after Netlify deploy. | Re-verify with the §4.8 checklist after any custom-domain switch. |
 | Env example files document the values | configured | `apps/mobile/.env.example`, `apps/mobile/.env.staging.example`, and `.env.example` all carry the three `EXPO_PUBLIC_*_URL` values pointing at the Netlify host. | None. Update together with §4.8 commands if the host changes. |
-| EAS env values pinned (preview + production) | blocked | `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_SUPPORT_URL` not yet set on EAS profiles. | Run the `eas env:create` commands in §4.8 against `--environment production` and `--environment preview`. |
+| EAS env values pinned (preview + production) | configured | `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_SUPPORT_URL` set on both `preview` and `production` environments via `eas env:create`. Verify with `eas env:list --environment {preview,production}`. | Re-apply with `eas env:update` if the host changes (e.g. custom-domain swap). |
 | Real-device tap-through of all three in-app legal links | verify on real device | No dated TestFlight/Expo Go run recorded. | Use the §4.8 local Expo + on-device checklist; record date and pass/fail. |
 
 ### 4.5 Reviewer notes / contact / demo account path
@@ -261,26 +263,67 @@ These are public URLs and safe to log/document. They are **not** secrets.
 
 #### EAS env wiring
 
-Run `eas env:list --environment <env>` first to see what's already set; if
-a value already exists, use `eas env:update` (same flags) instead of
-`:create`. Values are public and safe to log.
+**Status: applied.** All three `EXPO_PUBLIC_*_URL` values are set on the
+EAS `preview` and `production` environments. Verify any time with:
+
+```
+eas env:list --environment preview
+eas env:list --environment production
+```
+
+Each should show:
+
+```
+EXPO_PUBLIC_PRIVACY_URL=https://sportgang.netlify.app/privacy/
+EXPO_PUBLIC_SUPPORT_URL=https://sportgang.netlify.app/support/
+EXPO_PUBLIC_TERMS_URL=https://sportgang.netlify.app/terms/
+```
+
+If a value is missing or wrong (e.g. after a custom-domain swap), use
+`eas env:update` rather than `:create` to avoid duplicates. Source
+commands originally used to create:
 
 ```
 # Preview (internal-distribution / TestFlight internal)
-eas env:create --environment preview --name EXPO_PUBLIC_PRIVACY_URL --value https://sportgang.netlify.app/privacy/
-eas env:create --environment preview --name EXPO_PUBLIC_TERMS_URL   --value https://sportgang.netlify.app/terms/
-eas env:create --environment preview --name EXPO_PUBLIC_SUPPORT_URL --value https://sportgang.netlify.app/support/
+eas env:create --environment preview --name EXPO_PUBLIC_PRIVACY_URL --value https://sportgang.netlify.app/privacy/ --type string --visibility plaintext --non-interactive
+eas env:create --environment preview --name EXPO_PUBLIC_TERMS_URL   --value https://sportgang.netlify.app/terms/   --type string --visibility plaintext --non-interactive
+eas env:create --environment preview --name EXPO_PUBLIC_SUPPORT_URL --value https://sportgang.netlify.app/support/ --type string --visibility plaintext --non-interactive
 
 # Production (App Store)
-eas env:create --environment production --name EXPO_PUBLIC_PRIVACY_URL --value https://sportgang.netlify.app/privacy/
-eas env:create --environment production --name EXPO_PUBLIC_TERMS_URL   --value https://sportgang.netlify.app/terms/
-eas env:create --environment production --name EXPO_PUBLIC_SUPPORT_URL --value https://sportgang.netlify.app/support/
+eas env:create --environment production --name EXPO_PUBLIC_PRIVACY_URL --value https://sportgang.netlify.app/privacy/ --type string --visibility plaintext --non-interactive
+eas env:create --environment production --name EXPO_PUBLIC_TERMS_URL   --value https://sportgang.netlify.app/terms/   --type string --visibility plaintext --non-interactive
+eas env:create --environment production --name EXPO_PUBLIC_SUPPORT_URL --value https://sportgang.netlify.app/support/ --type string --visibility plaintext --non-interactive
 ```
 
-- [ ] Confirm `eas env:list --environment preview` shows all three values
+- [x] `eas env:list --environment preview` shows all three values pointing
+      at the Netlify URLs.
+- [x] `eas env:list --environment production` shows all three values
       pointing at the Netlify URLs.
-- [ ] Confirm `eas env:list --environment production` shows all three
-      values pointing at the Netlify URLs.
+
+#### Failure triage
+
+If the local Expo or on-device link tap doesn't open the expected page:
+
+- **"Link unavailable" alert appears.** The corresponding `EXPO_PUBLIC_*_URL`
+  is unset or empty. Check `apps/mobile/.env` (local) or
+  `eas env:list --environment <env>` (preview/production) and confirm all
+  three variables exist with the Netlify URLs above.
+- **Old / stale URL opens.** Expo's bundler is serving a cached env. Stop
+  Expo and restart with cache clear:
+  `npx expo start --clear` from `apps/mobile/`. For an on-device EAS build,
+  rebuild — env vars are baked at build time.
+- **404 page opens.** The Netlify deployment is missing a route, or a
+  custom-domain swap was done without redeploying. Re-verify each route
+  with `curl -I https://sportgang.netlify.app/{,privacy,terms,support}/`
+  and re-deploy from `apps/web/site/` if needed.
+- **`Linking.openURL` fails / nothing happens.** The device has no network,
+  or the URL scheme isn't `https://`. Confirm the device has internet,
+  then confirm each env var starts with `https://` (no missing protocol).
+- **In-app browser opens but content fails to load.** Same network checks
+  apply. Try the URL in the device's system browser to isolate whether the
+  in-app browser or the network is at fault.
+
+#### After a custom-domain swap
 
 #### After a custom-domain swap
 

@@ -129,7 +129,7 @@ The three `EXPO_PUBLIC_*_URL` env vars are read by
 link as "not available" until the env var is set on the EAS build profile.
 Do **not** ship the App Store record with the URLs unset.
 
-### Mobile env values to apply (EAS)
+### Mobile env values (EAS — applied)
 
 ```
 EXPO_PUBLIC_PRIVACY_URL=https://sportgang.netlify.app/privacy/
@@ -139,20 +139,18 @@ EXPO_PUBLIC_SUPPORT_URL=https://sportgang.netlify.app/support/
 
 These values are public and safe to commit; they live in the env example
 files (`apps/mobile/.env.example`, `apps/mobile/.env.staging.example`,
-`.env.example`) so local Expo runs resolve the same URLs.
-
-Example EAS commands (production):
+`.env.example`) so local Expo runs resolve the same URLs, and they have
+been pinned on the EAS `preview` and `production` environments. Verify
+with:
 
 ```
-eas env:create --environment production --name EXPO_PUBLIC_PRIVACY_URL --value https://sportgang.netlify.app/privacy/
-eas env:create --environment production --name EXPO_PUBLIC_TERMS_URL   --value https://sportgang.netlify.app/terms/
-eas env:create --environment production --name EXPO_PUBLIC_SUPPORT_URL --value https://sportgang.netlify.app/support/
+eas env:list --environment preview
+eas env:list --environment production
 ```
 
-Same three commands with `--environment preview` should be run for the
-internal-distribution preview profile so TestFlight/internal builds also
-resolve the in-app legal links. Use `eas env:update` instead of
-`:create` if a value is already set.
+If a custom domain is later pinned, update with `eas env:update` (not
+`:create`) on both environments. Full verification checklist + failure
+triage live in `docs/deployment/APPLE_TESTFLIGHT_PREP.md` §4.8.
 
 ## 9. Review notes draft
 
