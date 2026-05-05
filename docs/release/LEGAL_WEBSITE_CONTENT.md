@@ -15,23 +15,42 @@ Step 2 (`apps/mobile/src/lib/legal.ts`) point at the URLs hosted here.
 
 The mobile app reads three URLs from EAS env (`EXPO_PUBLIC_PRIVACY_URL`,
 `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_SUPPORT_URL`). The hosted site that
-backs those URLs has four canonical routes:
+backs those URLs has four canonical routes.
 
-| Route | Purpose | Linked from |
-|---|---|---|
-| `/` | Home / brand landing | Optional Marketing URL in App Store Connect; not linked from the in-app UI. |
-| `/privacy` | Privacy Policy | `EXPO_PUBLIC_PRIVACY_URL`, App Store Connect "Privacy Policy URL". |
-| `/terms` | Terms of Service | `EXPO_PUBLIC_TERMS_URL`. |
-| `/support` | Support / contact | `EXPO_PUBLIC_SUPPORT_URL`, App Store Connect "Support URL". |
+**Deployment status:** the static site at `apps/web/site/` is deployed to
+Netlify and **all four routes are live and reachable today** at the URLs
+in the table below. No further hosting work is required to make the App
+Store Connect submission pass the URL-reachability checks; the only open
+question is whether the operator wants to swap the Netlify subdomain for
+a final custom domain before public launch.
 
-Each route should resolve over plain HTTPS, return `200 OK`, and have a
-`Content-Type` of `text/html`. Apple's reviewer fetches these URLs on
-review; an HTML 200 is the bar.
+| Route | Live URL | Purpose | Linked from |
+|---|---|---|---|
+| `/` | `https://sportgang.netlify.app/` | Home / brand landing | Optional Marketing URL in App Store Connect; not linked from the in-app UI. |
+| `/privacy/` | `https://sportgang.netlify.app/privacy/` | Privacy Policy | `EXPO_PUBLIC_PRIVACY_URL`, App Store Connect "Privacy Policy URL". |
+| `/terms/` | `https://sportgang.netlify.app/terms/` | Terms of Service | `EXPO_PUBLIC_TERMS_URL`. |
+| `/support/` | `https://sportgang.netlify.app/support/` | Support / contact | `EXPO_PUBLIC_SUPPORT_URL`, App Store Connect "Support URL". |
 
-Recommended: keep the four routes on the *same* domain so the App Store
-Connect "Privacy Policy URL" and "Support URL" both belong to a domain the
-operator demonstrably controls. Mixed domains pass review but raise
-attention.
+Each route resolves over HTTPS, returns `200 OK`, and serves
+`Content-Type: text/html`. Apple's reviewer fetches these URLs on review;
+an HTML 200 is the bar.
+
+The four routes share a single domain (`sportgang.netlify.app`), so the
+App Store Connect "Privacy Policy URL" and "Support URL" both belong to a
+domain the operator demonstrably controls. If a custom domain is later
+pinned, keep all four routes on it so the same property holds.
+
+### Mobile env values pinned to these URLs
+
+```
+EXPO_PUBLIC_PRIVACY_URL=https://sportgang.netlify.app/privacy/
+EXPO_PUBLIC_TERMS_URL=https://sportgang.netlify.app/terms/
+EXPO_PUBLIC_SUPPORT_URL=https://sportgang.netlify.app/support/
+```
+
+These are public URLs and safe to document. The values must be set on the
+EAS production and preview profiles before TestFlight or App Store builds —
+see `APP_STORE_METADATA.md` §8 for the exact `eas env:create` commands.
 
 ---
 

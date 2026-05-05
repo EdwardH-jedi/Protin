@@ -42,6 +42,59 @@ The mobile app's `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, and
 `EXPO_PUBLIC_SUPPORT_URL` env vars (Step 2 of the v1 mobile-hardening
 work) point at the hosted versions of these three folder-style routes.
 
+## Deployment
+
+The site is deployed to **Netlify**. The current canonical host is:
+
+```
+https://sportgang.netlify.app/
+```
+
+Live, reachable routes (all return `200 OK` with `Content-Type: text/html`):
+
+| Route | Live URL |
+|---|---|
+| Home | https://sportgang.netlify.app/ |
+| Privacy | https://sportgang.netlify.app/privacy/ |
+| Terms | https://sportgang.netlify.app/terms/ |
+| Support | https://sportgang.netlify.app/support/ |
+
+Netlify configuration:
+
+- **Publish directory:** `apps/web/site/` — this folder is the entire
+  build output. Netlify serves it as-is; there is no build command, no
+  bundler, no install step.
+- **Reference design folder is excluded.** `apps/web/claude_design/` is a
+  local Claude Design export used as visual reference only. It is **not
+  deployed** and is git-ignored at the repo root. Nothing on the live
+  site links to it.
+
+### Mobile env values pinned to these URLs
+
+```
+EXPO_PUBLIC_PRIVACY_URL=https://sportgang.netlify.app/privacy/
+EXPO_PUBLIC_TERMS_URL=https://sportgang.netlify.app/terms/
+EXPO_PUBLIC_SUPPORT_URL=https://sportgang.netlify.app/support/
+```
+
+These are read by `apps/mobile/src/lib/legal.ts` at app startup. They
+must be set on the EAS production and preview profiles before TestFlight
+or App Store builds. Exact `eas env:create` commands and the verification
+checklist live in `docs/deployment/APPLE_TESTFLIGHT_PREP.md` §4.8 and
+`docs/release/APP_STORE_METADATA.md` §8.
+
+### Open follow-ups
+
+- **Custom domain.** `sportgang.netlify.app` is the deployment URL today.
+  If/when the operator pins a real domain (e.g. `https://sportgang.app/`),
+  swap the host in this README, in `docs/release/APP_STORE_METADATA.md`
+  §8, in `docs/release/LEGAL_WEBSITE_CONTENT.md` §1, in
+  `docs/deployment/APPLE_TESTFLIGHT_PREP.md` §4.4 and §4.8, and in the
+  three EAS env values together.
+- **Netlify redirects / 301 from old paths.** Not configured today; nothing
+  in the repo or in the App Store record points at any pre-deploy URL, so
+  no redirects are required for v1.
+
 ## How to view locally
 
 There is no build step. No `npm install`. No dependencies.
@@ -150,10 +203,13 @@ real answer before the site is announced.
       `SportsGang` (current `apps/mobile/app.config.js` `expo.name`).
       The mobile config is intentionally untouched in this slice. Same
       open question as `docs/release/APP_STORE_METADATA.md` §1.
-- [ ] **Final domain.** Pick the public domain that will host this
-      site. Static hosts that serve directory-style URLs (Cloudflare
-      Pages, Netlify, Vercel, GitHub Pages, S3 + CloudFront, etc.) are
-      all compatible with the file layout here.
+- [x] **Public host chosen and live.** Deployed to Netlify at
+      `https://sportgang.netlify.app/`. All four routes are reachable
+      today (see "Deployment" section above).
+- [ ] **Final custom domain (optional).** Decide whether to swap the
+      Netlify subdomain for a brand-owned domain (e.g.
+      `https://sportgang.app/`) before public launch. If swapped, update
+      the docs and EAS env values listed under "Open follow-ups" above.
 - [ ] **Real contact addresses.** Choose the real `support@`,
       `privacy@`, and `legal@` addresses on a domain the operator
       controls. Update §1 of the Support page to publish the real

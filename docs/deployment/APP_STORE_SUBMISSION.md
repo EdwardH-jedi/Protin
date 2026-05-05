@@ -43,7 +43,7 @@ Split between what the repo already supports today (no engineering work needed) 
 - `apps/mobile/assets/` does not yet exist in the repo. `app.config.js` directly references `./assets/notification-icon.png` (under the `expo-notifications` plugin) - `eas build` fails on a missing path. App icon, splash image, and Android adaptive-icon foreground are not currently referenced in `app.config.js`, so Expo would fall back to template defaults that will not pass App Store visual review; add them (and the matching `ios.icon`, `android.adaptiveIcon`, `splash.image` keys) before the first production build.
 - `apps/api/scripts/seed_review_data.py` does not exist. The review test account + two seed accounts + a pending booking (see section 6) depend on it.
 - `apps/mobile/eas.json` still contains `REPLACE_WITH_APP_STORE_CONNECT_APP_ID` and `REPLACE_WITH_APPLE_TEAM_ID` - replace both before `eas submit`.
-- Hosted URLs for the legal docs (currently placeholder `https://protin.app/...` in `apps/mobile/src/lib/legal.ts`) - publish the markdown and swap the constants.
+- Hosted URLs for the legal docs are **live** on Netlify at `https://sportgang.netlify.app/{privacy,terms,support}/`. Pin the matching `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_SUPPORT_URL` values onto the EAS production + preview profiles (commands in `docs/release/APP_STORE_METADATA.md` §8 and the verification checklist in `docs/deployment/APPLE_TESTFLIGHT_PREP.md` §4.8).
 - Fly secrets: `APPLE_CLIENT_ID=com.edh1223.protin`, `SECRET_KEY`, `FIELD_ENCRYPTION_KEY`. Without these the staging / production API refuses to boot and the `/auth/apple` endpoint returns 503.
 - Screenshots at both required iPhone sizes (section 9), 6 per size.
 - Apple Developer Program enrolment + ASC account (section Prerequisites).
@@ -120,7 +120,7 @@ Source of truth: `docs/legal/PRIVACY_POLICY.md` section 2. Apple's privacy quest
 | Browsing History | No | - | - | - |
 | Identifiers - Device ID | No (Expo push token is a service-scoped push identifier, not IDFA) | - | - | - |
 
-- **Privacy Policy URL** (required): host `docs/legal/PRIVACY_POLICY.md` and paste the public URL. Default placeholder: `https://protin.app/privacy`.
+- **Privacy Policy URL** (required): `https://sportgang.netlify.app/privacy/` — live on Netlify; serves the rendered policy at the canonical hosted site (`apps/web/site/privacy/index.html`). Replace with a final custom-domain URL if/when one is pinned.
 
 [1] Sentry only initialises when `EXPO_PUBLIC_SENTRY_DSN` is set at build time (`apps/mobile/App.tsx`). If you ship without a DSN, switch the two Sentry rows to **No** in the App Privacy questionnaire - collecting nothing is fine; mis-declaring is what triggers a 5.1.2 rejection.
 
@@ -227,8 +227,8 @@ CONTACT
 | Promotional Text | 170 | Editable without a new build - use for time-sensitive messaging. Skip for launch. |
 | Description | 4000 | Draft below |
 | Keywords | 100 (comma-separated) | Draft: `workout partner,gym buddy,golf partner,fitness,training,matchmaking,sydney,tennis,running,accountability` |
-| Support URL | - | `[https://protin.app/support]` - can be a simple contact page |
-| Marketing URL | - | Optional; leave blank at launch |
+| Support URL | - | `https://sportgang.netlify.app/support/` — live on Netlify (`apps/web/site/support/index.html`). Required field; same address must align with the App Review Contact email once a real `support@` mailbox exists. |
+| Marketing URL | - | `https://sportgang.netlify.app/` — optional in ASC; the Netlify-hosted home page is reachable today, so it can be supplied. Replace with a custom domain if/when one is pinned. |
 
 ### Description draft
 
@@ -301,8 +301,9 @@ Full details and rollback in `docs/deployment/RELEASE_RUNBOOK.md`.
 
 - [ ] Apple Developer enrolment complete, Team ID captured
 - [ ] ASC App ID captured and pasted into `apps/mobile/eas.json`
-- [ ] Privacy Policy and Terms of Service hosted at final public URLs
-- [ ] Legal doc URLs updated in `apps/mobile/src/lib/legal.ts`
+- [x] Privacy Policy, Terms of Service, and Support pages hosted on Netlify at `https://sportgang.netlify.app/{privacy,terms,support}/` (open follow-up: optional swap to a final custom domain)
+- [ ] `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_SUPPORT_URL` set on EAS production + preview profiles to the Netlify URLs above
+- [ ] Legal doc URLs updated in `apps/mobile/src/lib/legal.ts` (or env-driven flow confirmed wired)
 - [ ] `apps/mobile/assets/` created and populated. `notification-icon.png` is hard-required by `app.config.js`; app icon (1024x1024 for iOS), splash image, and Android adaptive-icon foreground need to be added and wired into `app.config.js` for App Store visual review to pass.
 - [ ] `EXPO_PUBLIC_SENTRY_DSN` set for the production `eas build` profile **iff** you want crash reporting at launch. If unset, downgrade the two Sentry rows in section 4 to "No".
 - [ ] `APPLE_CLIENT_ID=com.edh1223.protin` set as a Fly secret

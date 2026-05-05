@@ -102,19 +102,52 @@ captured in `APP_STORE_SUBMISSION.md` section 5; the working assumption is
 
 Confirm against the official questionnaire wording at submission time.
 
-## 8. URLs (placeholders)
+## 8. URLs
 
-| Field | Placeholder | Owner action |
+The static legal/marketing site is deployed to Netlify at the canonical
+host below. All four App Store Connect URL fields point at this host today.
+
+| Field | Value | Owner action |
 |---|---|---|
-| Privacy Policy URL | `https://<TBD>/privacy` | Host privacy page (see `LEGAL_WEBSITE_CONTENT.md`) and pin the resolved URL into `EXPO_PUBLIC_PRIVACY_URL`. |
-| Terms of Service URL | `https://<TBD>/terms` | Host terms page and pin into `EXPO_PUBLIC_TERMS_URL`. |
-| Support URL | `https://<TBD>/support` | Host support page and pin into `EXPO_PUBLIC_SUPPORT_URL`. |
-| Marketing URL (optional) | `https://<TBD>/` | Optional in App Store Connect; if present, point at the same site root. |
+| Marketing / Website URL (optional) | `https://sportgang.netlify.app/` | Site root; ASC field is optional but recommended. |
+| Privacy Policy URL | `https://sportgang.netlify.app/privacy/` | Pin into `EXPO_PUBLIC_PRIVACY_URL` on the EAS production + preview profiles. |
+| Terms of Service URL | `https://sportgang.netlify.app/terms/` | Pin into `EXPO_PUBLIC_TERMS_URL`. |
+| Support URL | `https://sportgang.netlify.app/support/` | Pin into `EXPO_PUBLIC_SUPPORT_URL`; same address must appear in ASC "App Review Contact" once a real `support@` mailbox exists. |
 
-These three env vars are already read by `apps/mobile/src/lib/legal.ts` (Step
-2). The mobile build will treat each link as "not available" until the env
-var is set on the EAS build profile. Do **not** ship the App Store record
-with the URLs unset.
+Notes:
+- `https://sportgang.netlify.app/` is the **current Netlify-hosted production
+  URL**. It is reachable today and serves all four routes above as `200 OK`
+  HTML.
+- **Open item:** replace the Netlify-subdomain URLs with a final custom
+  domain (e.g. `https://sportgang.app/...`) if/when the operator decides to
+  pin one. Update this section, `LEGAL_WEBSITE_CONTENT.md` §1, and the EAS
+  env values together if it changes.
+
+The three `EXPO_PUBLIC_*_URL` env vars are read by
+`apps/mobile/src/lib/legal.ts` (Step 2). The mobile build will treat each
+link as "not available" until the env var is set on the EAS build profile.
+Do **not** ship the App Store record with the URLs unset.
+
+### Mobile env values to apply (EAS)
+
+```
+EXPO_PUBLIC_PRIVACY_URL=https://sportgang.netlify.app/privacy/
+EXPO_PUBLIC_TERMS_URL=https://sportgang.netlify.app/terms/
+EXPO_PUBLIC_SUPPORT_URL=https://sportgang.netlify.app/support/
+```
+
+Example EAS commands (production):
+
+```
+eas env:create --environment production --name EXPO_PUBLIC_PRIVACY_URL --value https://sportgang.netlify.app/privacy/
+eas env:create --environment production --name EXPO_PUBLIC_TERMS_URL   --value https://sportgang.netlify.app/terms/
+eas env:create --environment production --name EXPO_PUBLIC_SUPPORT_URL --value https://sportgang.netlify.app/support/
+```
+
+Same three commands with `--environment preview` should be run for the
+internal-distribution preview profile so TestFlight/internal builds also
+resolve the in-app legal links. Use `eas env:update` instead of
+`:create` if a value is already set.
 
 ## 9. Review notes draft
 
@@ -177,14 +210,14 @@ shipping a screenshot of any of them would mis-advertise.
 |---|---|---|---|
 | 1 | Apple Developer Team ID | Apple-side setup | Operator (after Apple Developer Program enrollment). |
 | 2 | App Store Connect App ID | Apple-side setup | Operator (after ASC app record creation). |
-| 3 | Final domain URLs for privacy / terms / support | Hosting | Operator + content reviewer. |
+| 3 | Final domain URLs for privacy / terms / support | Hosting | Live today on `https://sportgang.netlify.app/{,privacy,terms,support}/`. Open: optional swap to a final custom domain. |
 | 4 | Final app icon + splash artwork | Design | Designer; replaces Step 5 placeholder PNGs. |
 | 5 | Final App Store screenshots per device class | Design + dated device run | Designer + tester. |
 | 6 | Final app name spelling (`SportGang` vs `SportsGang`) | Brand decision | Operator. |
 | 7 | App Privacy Label confirmation against actual SDK behavior | Privacy review | Operator (see `APP_PRIVACY_LABEL_DRAFT.md`). |
 | 8 | Reviewer demo account credentials (in ASC, not in repo) | Seed data | Operator + backend owner. |
 | 9 | Final review-notes copy in ASC | Operator | Operator. |
-| 10 | Privacy policy / terms / support pages reachable over HTTPS | Hosting | Operator. |
+| 10 | Privacy policy / terms / support pages reachable over HTTPS | Hosting | Done on Netlify (see §8). Re-verify after any custom-domain switch. |
 
 Until all ten lines are resolved, the App Store record is not ready to
 submit, even if the build itself passes review.

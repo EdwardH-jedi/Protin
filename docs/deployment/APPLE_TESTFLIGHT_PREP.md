@@ -75,11 +75,20 @@ Snapshot of where the seven areas stand right now, in plain present tense.
 - **App Store Connect app record** is `Apple-side setup required`. No ASC
   App ID is captured anywhere in the repo. `APP_STORE_SUBMISSION.md` has a
   one-time prerequisites block that captures what needs doing.
-- **Privacy policy / support URLs** are `blocked`. The sources exist at
-  `docs/legal/PRIVACY_POLICY.md` and `docs/legal/TERMS_OF_SERVICE.md`, but
-  `apps/mobile/src/lib/legal.ts` still points at unpublished
-  `https://protin.app/terms` and `https://protin.app/privacy` placeholders
-  (with a `TODO(launch)` comment). No Support URL has been chosen or hosted.
+- **Privacy policy / support URLs** are `hosted, env wiring pending`. The
+  static site at `apps/web/site/` is deployed to Netlify and all four
+  canonical routes resolve over HTTPS today:
+  - `https://sportgang.netlify.app/`
+  - `https://sportgang.netlify.app/privacy/`
+  - `https://sportgang.netlify.app/terms/`
+  - `https://sportgang.netlify.app/support/`
+  The sources at `docs/legal/PRIVACY_POLICY.md` and
+  `docs/legal/TERMS_OF_SERVICE.md` remain the markdown reference. The
+  `apps/mobile/src/lib/legal.ts` constants and the EAS env values
+  (`EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`,
+  `EXPO_PUBLIC_SUPPORT_URL`) are not yet pinned to the live URLs in this
+  slice — see §4.4 and the Legal/support URL verification checklist
+  below for the exact values and the `eas env:create` commands.
 - **Reviewer notes / contact / demo account** are `blocked`. The notes
   template exists in `APP_STORE_SUBMISSION.md` section 7, but it requires a
   seeded review account that depends on `apps/api/scripts/seed_review_data.py`,
@@ -140,10 +149,12 @@ Detailed area-by-area tables follow.
 |---|---|---|---|
 | Privacy policy source in repo | configured | `docs/legal/PRIVACY_POLICY.md` | None. |
 | Terms of service source in repo | configured | `docs/legal/TERMS_OF_SERVICE.md` | None. |
-| Privacy Policy public URL | blocked | `apps/mobile/src/lib/legal.ts` `PRIVACY_URL = "https://protin.app/privacy"` is a placeholder; the URL is not hosted | Host the markdown (or an HTML render) at a real public URL and update `PRIVACY_URL` in `apps/mobile/src/lib/legal.ts`. Rebuild the app. |
-| Terms public URL | blocked | Same file, `TERMS_URL = "https://protin.app/terms"` is a placeholder | Host and update `TERMS_URL`. Rebuild. |
-| Support URL | blocked | Not defined in-repo. `APP_STORE_SUBMISSION.md` section 8 has `[https://protin.app/support]` bracketed as "you decide" | Choose a support contact surface (a one-page contact page is sufficient), host it, and record the final URL in the prep checklist below and in `APP_STORE_SUBMISSION.md` section 8 at submission time. |
-| URLs reachable from outside the build environment | verify on real device | Not verifiable from the repo | Once hosted, curl from outside the Docker network to confirm `200 OK` + `Content-Type: text/html`. |
+| Static site published | configured | `apps/web/site/` deployed to Netlify; canonical host `https://sportgang.netlify.app/`. Routes `/`, `/privacy/`, `/terms/`, `/support/` all serve `200 OK` HTML. | None for the Netlify deployment. **Open:** swap to a final custom domain if/when the operator pins one. |
+| Privacy Policy public URL | configured | Live at `https://sportgang.netlify.app/privacy/` | Pin into `EXPO_PUBLIC_PRIVACY_URL` on EAS production + preview (and update `apps/mobile/src/lib/legal.ts` defaults if/when the env-driven flow is replaced). Rebuild. |
+| Terms public URL | configured | Live at `https://sportgang.netlify.app/terms/` | Pin into `EXPO_PUBLIC_TERMS_URL`. Rebuild. |
+| Support URL | configured | Live at `https://sportgang.netlify.app/support/` | Pin into `EXPO_PUBLIC_SUPPORT_URL`. Same address must appear in App Store Connect "App Review Contact" form once a real `support@` mailbox exists. |
+| URLs reachable from outside the build environment | configured | Confirmed live by the operator after Netlify deploy. | Re-verify after any custom-domain switch — see the Legal/support URL verification checklist below. |
+| EAS env values pinned | blocked | `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_SUPPORT_URL` not yet set on EAS profiles. | Run the `eas env:create` commands in `APP_STORE_METADATA.md` §8 against `--environment production` and `--environment preview`. |
 
 ### 4.5 Reviewer notes / contact / demo account path
 
@@ -188,6 +199,62 @@ above can in principle be prepared in parallel.
 None of these can be `configured`. Each needs a dated run, an owner, and a
 pass / fail note in `RELEASE_GATE_CHECKLIST.md` section 4 before the matching
 Apple / TestFlight gate passes.
+
+---
+
+### 4.8 Legal/support URL verification
+
+The static legal/marketing site is deployed to Netlify at
+`https://sportgang.netlify.app/`. Run this checklist any time the host
+changes (e.g. custom-domain swap), the `apps/web/site/` content is
+re-deployed, or before submitting a new TestFlight build that depends on
+the in-app legal links.
+
+Canonical URLs to verify:
+
+- `https://sportgang.netlify.app/`
+- `https://sportgang.netlify.app/privacy/`
+- `https://sportgang.netlify.app/terms/`
+- `https://sportgang.netlify.app/support/`
+
+Checklist:
+
+- [ ] Open `https://sportgang.netlify.app/` in a desktop browser; page
+      loads, `200 OK`, no console errors.
+- [ ] Open `https://sportgang.netlify.app/privacy/`; page renders the
+      Privacy Policy.
+- [ ] Open `https://sportgang.netlify.app/terms/`; page renders the
+      Terms of Service.
+- [ ] Open `https://sportgang.netlify.app/support/`; page renders the
+      Support / contact page.
+- [ ] From a TestFlight or local mobile build with the env vars below set,
+      tap each legal link in `Profile -> Legal` and confirm the in-app
+      browser opens the correct hosted page.
+- [ ] Confirm EAS env values are set on the **production** profile:
+      ```
+      EXPO_PUBLIC_PRIVACY_URL=https://sportgang.netlify.app/privacy/
+      EXPO_PUBLIC_TERMS_URL=https://sportgang.netlify.app/terms/
+      EXPO_PUBLIC_SUPPORT_URL=https://sportgang.netlify.app/support/
+      ```
+- [ ] Confirm the same three EAS env values are set on the **preview**
+      profile so internal-distribution builds also resolve the legal
+      links.
+
+Example EAS commands (run from a shell with `eas-cli` authenticated to
+the project; values are public and safe to log):
+
+```
+eas env:create --environment production --name EXPO_PUBLIC_PRIVACY_URL --value https://sportgang.netlify.app/privacy/
+eas env:create --environment production --name EXPO_PUBLIC_TERMS_URL   --value https://sportgang.netlify.app/terms/
+eas env:create --environment production --name EXPO_PUBLIC_SUPPORT_URL --value https://sportgang.netlify.app/support/
+
+eas env:create --environment preview    --name EXPO_PUBLIC_PRIVACY_URL --value https://sportgang.netlify.app/privacy/
+eas env:create --environment preview    --name EXPO_PUBLIC_TERMS_URL   --value https://sportgang.netlify.app/terms/
+eas env:create --environment preview    --name EXPO_PUBLIC_SUPPORT_URL --value https://sportgang.netlify.app/support/
+```
+
+If any value is already set, use `eas env:update` (same flags) instead of
+`:create`. Re-run this whole checklist after a custom-domain swap.
 
 ---
 
