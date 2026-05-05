@@ -46,6 +46,11 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
   const { matchId, partnerName, partnerId: routePartnerId, sport } = route.params;
   const { user, token } = useAuthStore();
   const currentUserId = user?.id ?? null;
+  // Treat empty / whitespace-only partner ids as null so an accidentally-blank
+  // navigation param can't drive the ownership fallback into thinking every
+  // sender is "not the partner" (i.e., "me"). See `isOwnMessage` below.
+  const normalizedRoutePartnerId =
+    routePartnerId && routePartnerId.trim().length > 0 ? routePartnerId : null;
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -340,7 +345,11 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
             renderItem={({ item }) => (
               <MessageBubble
                 message={item}
-                isOwn={isOwnMessage(item.senderId, currentUserId, routePartnerId)}
+                isOwn={isOwnMessage(
+                  item.senderId,
+                  currentUserId,
+                  normalizedRoutePartnerId
+                )}
               />
             )}
             style={styles.flex}
@@ -408,15 +417,37 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
   );
 }
 
+/**
+ * Decide whether a chat message belongs to the currently-authenticated user.
+ *
+ * Policy (deliberately conservative):
+ *
+ * 1. Missing / falsy `senderId` → not mine. We never let an undefined sender
+ *    speculate into "current user / right / neon".
+ * 2. Authenticated `currentUserId` is the source of truth. A message is
+ *    mine iff `senderId === currentUserId` — exact string match.
+ * 3. If auth user is unavailable (e.g. fresh login mid-session, before
+ *    `/auth/me` lands), default to NOT mine. Rendering everything as
+ *    partner/left is the safe failure mode — it merely looks slightly
+ *    wrong; the previous "mine" fallback could leak the wrong identity
+ *    onto the screen.
+ *
+ * The `routePartnerId` argument is intentionally accepted but unused: the
+ * old fallback (`senderId !== routePartnerId === "mine"`) was the source of
+ * the iPhone Chris/Sarah regression where a missing/empty partnerId made
+ * every UUID look like the current user. Keeping the parameter in the
+ * signature avoids a churning refactor at every call site while making the
+ * fallback no-op explicit.
+ */
 function isOwnMessage(
   senderId: string | null | undefined,
   currentUserId: string | null,
-  routePartnerId: string | null | undefined
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _routePartnerId: string | null | undefined
 ): boolean {
   if (!senderId) return false;
-  if (currentUserId) return senderId === currentUserId;
-  if (routePartnerId) return senderId !== routePartnerId;
-  return false;
+  if (!currentUserId) return false;
+  return senderId === currentUserId;
 }
 
 function MessageBubble({ message, isOwn }: { message: Message; isOwn: boolean }) {

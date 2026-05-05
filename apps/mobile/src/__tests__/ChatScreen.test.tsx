@@ -329,12 +329,14 @@ describe('ChatScreen', () => {
     }
   });
 
-  it('aligns own messages right and partner messages left even when auth user is null', async () => {
-    // Real-device regression: useAuthStore sets `user: null` right after
-    // login/register (only initialize() on cold-start populates it). When that
-    // happened, every message rendered with the partner ("other") style and
-    // outgoing messages appeared on the LEFT. The fix derives ownership from
-    // routeParams.partnerId so a 1:1 chat can identify "own" without auth user.
+  it('renders every message on the partner side when the auth user is unavailable (conservative fallback)', async () => {
+    // The Chris/Sarah iPhone regression was caused by an "if currentUserId is
+    // null, fall back to routePartnerId" branch that mis-rendered every UUID
+    // as "mine" when the partner id was missing/empty. The conservative fix
+    // refuses to speculate: when the auth user hasn't hydrated yet, every
+    // message renders on the partner side until /auth/me lands. This is the
+    // safer failure mode — looks slightly off, doesn't leak the wrong
+    // identity onto the screen.
     const authMock = require('../stores/auth') as { useAuthStore: () => unknown };
     const original = authMock.useAuthStore;
     authMock.useAuthStore = () => ({ user: null, token: 'test-jwt-token' });
@@ -349,29 +351,132 @@ describe('ChatScreen', () => {
         <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
       );
 
-      // Both bubbles render.
+      // Both bubbles render. Both must land on the partner/left side: with
+      // no auth user, the screen refuses to attribute any message to "me".
       const partnerText = await findByText('Hey! Want to train tomorrow?');
       const ownText = await findByText('Absolutely, sounds great!');
 
-      // The bubble container is the parent View of the Text node — assert its
-      // alignSelf via the resolved style. The partner bubble must be flex-start
-      // (left); the own bubble must be flex-end (right). This is the contract
-      // the screenshot bug violated.
-      const { StyleSheet, View } = require('react-native');
-      const pickAlignSelf = (textNode: any): string | undefined => {
-        // Find the closest enclosing View (the bubble) and read its style.
-        // testing-library nodes expose .parent which is the rendered React fiber.
-        const allViews = UNSAFE_getAllByType(View);
-        const bubble = allViews.find((v: any) =>
-          v.props.children &&
-          (Array.isArray(v.props.children) ? v.props.children : [v.props.children])
-            .some((c: any) => c === textNode || (c && c.props && c.props.children === textNode.props.children))
-        );
-        return bubble ? StyleSheet.flatten(bubble.props.style).alignSelf : undefined;
-      };
+      expect(getBubbleAlignSelf(UNSAFE_getAllByType, partnerText)).toBe('flex-start');
+      expect(getBubbleAlignSelf(UNSAFE_getAllByType, ownText)).toBe('flex-start');
+    } finally {
+      authMock.useAuthStore = original;
+    }
+  });
 
-      expect(pickAlignSelf(partnerText)).toBe('flex-start');
-      expect(pickAlignSelf(ownText)).toBe('flex-end');
+  it('treats currentUserId = Sarah as the inverse: Sarah right, Chris left', async () => {
+    // Same data shape as the Chris/Sarah test above, but with the auth user
+    // flipped to Sarah's id. This pins the symmetric case so a future
+    // refactor that hard-codes "me-123" can't slip through.
+    const authMock = require('../stores/auth') as { useAuthStore: () => unknown };
+    const original = authMock.useAuthStore;
+    authMock.useAuthStore = () => ({
+      user: { id: 'partner-456', email: 'sarah@example.com' },
+      token: 'test-jwt-token',
+    });
+    try {
+      mockApiGet.mockResolvedValue({
+        items: [
+          {
+            id: 'msg-chris',
+            matchId: 'match-1',
+            senderId: 'me-123',
+            body: 'Want to train this weekend?',
+            createdAt: '2026-04-08T08:00:00Z',
+          },
+          {
+            id: 'msg-sarah',
+            matchId: 'match-1',
+            senderId: 'partner-456',
+            body: "Let's plan a session.",
+            createdAt: '2026-04-08T08:01:00Z',
+          },
+        ],
+        total: 2,
+        limit: 100,
+        offset: 0,
+      });
+      const { findByText, UNSAFE_getAllByType } = render(
+        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      const chris = await findByText('Want to train this weekend?');
+      const sarah = await findByText("Let's plan a session.");
+      expect(getBubbleAlignSelf(UNSAFE_getAllByType, chris)).toBe('flex-start');
+      expect(getBubbleAlignSelf(UNSAFE_getAllByType, sarah)).toBe('flex-end');
+    } finally {
+      authMock.useAuthStore = original;
+    }
+  });
+
+  it('does not treat every message as mine when routePartnerId is empty / whitespace', async () => {
+    // Pin against the "missing partnerId makes everything render as mine"
+    // class of bug. Even with an empty-string partnerId on the navigation
+    // params, ownership is decided strictly by the auth user id.
+    mockApiGet.mockResolvedValue({
+      items: [
+        {
+          id: 'msg-chris',
+          matchId: 'match-1',
+          senderId: 'me-123',
+          body: 'Want to train this weekend?',
+          createdAt: '2026-04-08T08:00:00Z',
+        },
+        {
+          id: 'msg-sarah',
+          matchId: 'match-1',
+          senderId: 'partner-456',
+          body: "Let's plan a session.",
+          createdAt: '2026-04-08T08:01:00Z',
+        },
+      ],
+      total: 2,
+      limit: 100,
+      offset: 0,
+    });
+    const { findByText, UNSAFE_getAllByType } = render(
+      <ChatScreen
+        route={makeRoute({ partnerId: '   ' }) as any}
+        navigation={makeNavigation() as any}
+      />
+    );
+    const chris = await findByText('Want to train this weekend?');
+    const sarah = await findByText("Let's plan a session.");
+    // Default authMock: user.id = 'me-123' (Chris). Chris on right, Sarah on
+    // left — exactly as if the partnerId param were correct.
+    expect(getBubbleAlignSelf(UNSAFE_getAllByType, chris)).toBe('flex-end');
+    expect(getBubbleAlignSelf(UNSAFE_getAllByType, sarah)).toBe('flex-start');
+  });
+
+  it('null currentUserId never lets a message default to current-user/right, even with a valid partnerId', async () => {
+    // Two-pronged regression pin: the previous fallback used routePartnerId
+    // to flip messages right when currentUserId was null. With the
+    // conservative policy, all bubbles must land on the partner side until
+    // the auth user lands.
+    const authMock = require('../stores/auth') as { useAuthStore: () => unknown };
+    const original = authMock.useAuthStore;
+    authMock.useAuthStore = () => ({ user: null, token: 'test-jwt-token' });
+    try {
+      mockApiGet.mockResolvedValue({
+        items: [
+          {
+            id: 'msg-mine-pre-hydrate',
+            matchId: 'match-1',
+            senderId: 'me-123',
+            body: 'Pre-hydrate own message',
+            createdAt: '2026-04-08T08:00:00Z',
+          },
+        ],
+        total: 1,
+        limit: 100,
+        offset: 0,
+      });
+      const { findByText, UNSAFE_getAllByType } = render(
+        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      const node = await findByText('Pre-hydrate own message');
+      // Even though senderId === 'me-123' (the value the auth user *would*
+      // have if it were hydrated), with `user: null` the screen refuses to
+      // attribute it. Falls left.
+      expect(getBubbleAlignSelf(UNSAFE_getAllByType, node)).toBe('flex-start');
     } finally {
       authMock.useAuthStore = original;
     }
