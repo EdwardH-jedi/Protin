@@ -72,7 +72,7 @@ export function ReportScreen({ route, navigation }: ReportScreenProps) {
         <View style={styles.successWrap}>
           <Text style={styles.successTitle}>Report submitted</Text>
           <Text style={styles.successBody}>
-            Thanks for helping keep SportGang safe. We'll review this user.
+            Thanks for helping keep SportsGang safe. We'll review this user.
           </Text>
           <Pressable
             style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}

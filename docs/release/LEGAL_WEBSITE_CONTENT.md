@@ -39,8 +39,8 @@ attention.
 
 Brand landing only. No marketing claims about features hidden in v1.
 
-- Site title: `<TBD final brand spelling — SportGang vs SportsGang>` —
-  see metadata draft, item §1.
+- Site title: `SportsGang` (resolved 2026-05-05; see
+  `APP_STORE_METADATA.md` §1).
 - Headline: "Find your sports partner."
 - One-paragraph description, in plain present tense, of what the app does
   *today*:

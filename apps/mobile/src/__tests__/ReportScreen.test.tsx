@@ -195,7 +195,7 @@ describe('ReportScreen', () => {
 
     await waitFor(() => getByText('Report submitted'));
     expect(
-      getByText("Thanks for helping keep SportGang safe. We'll review this user.")
+      getByText("Thanks for helping keep SportsGang safe. We'll review this user.")
     ).toBeTruthy();
   });
 

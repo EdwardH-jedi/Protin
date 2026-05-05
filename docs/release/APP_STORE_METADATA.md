@@ -17,7 +17,7 @@ without touching app code.
 
 | Field | Draft value | Notes |
 |---|---|---|
-| App Store display name | `SportsGang` | The mobile config (`app.config.js` `expo.name`) currently uses `SportsGang` (with the inner `s`). The internal repo / package / bundle still uses `Protin` / `protin` / `com.edh1223.protin`. **Confirm the final spelling — `SportGang` vs `SportsGang` — before submission.** This is a metadata decision; do not change code/config in this Step 6A slice. |
+| App Store display name | `SportsGang` | **Resolved 2026-05-05: public brand spelling is `SportsGang` / `sportsgang`** (the inner `s` better implies multiple sports and future multi-sport expansion). The mobile config (`app.config.js` `expo.name`) already uses `SportsGang` and is unchanged. Technical identifiers remain unchanged for v1: slug `protin`, iOS `bundleIdentifier` `com.edh1223.protin`, Android `package` `com.edh1223.protin`, npm workspace names `@protin/*`, EAS project `@edwardh1234/protin`. |
 | App Store subtitle (≤30 chars) | `Find your sports partner` | Working draft. Subtitle must remain under 30 characters in App Store Connect. |
 | Bundle identifier | `com.edh1223.protin` | Already wired in `app.config.js`. Document only — do not change in Step 6A. |
 | SKU (App Store Connect, internal) | `protin-ios-1` | Suggestion. Must be unique within the developer account. |
@@ -216,7 +216,7 @@ shipping a screenshot of any of them would mis-advertise.
 | 3 | Final domain URLs for privacy / terms / support | Hosting | Live today on `https://sportgang.netlify.app/{,privacy,terms,support}/`. Open: optional swap to a final custom domain. |
 | 4 | Final app icon + splash artwork | Design | Designer; replaces Step 5 placeholder PNGs. |
 | 5 | Final App Store screenshots per device class | Design + dated device run | Designer + tester. |
-| 6 | Final app name spelling (`SportGang` vs `SportsGang`) | Brand decision | Operator. |
+| 6 | ~~Final app name spelling (`SportGang` vs `SportsGang`)~~ | Brand decision | **Resolved 2026-05-05: public brand spelling is `SportsGang` / `sportsgang`. Technical identifiers (slug, bundle ID, package names, EAS project) remain unchanged for v1.** |
 | 7 | App Privacy Label confirmation against actual SDK behavior | Privacy review | Operator (see `APP_PRIVACY_LABEL_DRAFT.md`). |
 | 8 | Reviewer demo account credentials (in ASC, not in repo) | Seed data | Operator + backend owner. |
 | 9 | Final review-notes copy in ASC | Operator | Operator. |
