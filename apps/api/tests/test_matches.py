@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock
 
@@ -14,8 +15,10 @@ from app.db.redis import get_redis
 from app.db.session import get_db
 from app.main import app
 
-# Import all model modules so Base.metadata is fully populated.
-from app.models import match, profile, user  # noqa: F401
+# Import all model modules so Base.metadata is fully populated. The chat
+# model is needed because list_matches now joins messages to surface the
+# last-message preview on each match row.
+from app.models import chat, match, profile, user  # noqa: F401
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -203,3 +206,118 @@ async def test_archive_nonexistent_match_returns_404(client: AsyncClient) -> Non
     token, _ = await _register(client, "match_noexist@example.com")
     r = await client.patch("/matches/00000000-0000-0000-0000-000000000001", json={}, headers=_auth(token))
     assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Last-message preview fields
+# ---------------------------------------------------------------------------
+
+
+async def test_match_with_no_messages_has_null_last_message_fields(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "match_lm_empty_a@example.com")
+    token_b, uid_b = await _register(client, "match_lm_empty_b@example.com")
+
+    await _mutual_like(client, token_a, uid_b, token_b, uid_a, sport="gym")
+
+    r = await client.get("/matches", headers=_auth(token_a))
+    assert r.status_code == 200
+    m = r.json()["items"][0]
+    # Brand-new match: every preview field must be explicitly null so the
+    # mobile client can render its empty-state fallback ("Start the
+    # conversation") rather than fabricating a message.
+    assert m["last_message"] is None
+    assert m["last_message_at"] is None
+    assert m["last_message_sender_id"] is None
+
+
+async def test_match_surfaces_latest_message_body_and_sender(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "match_lm_one_a@example.com")
+    token_b, uid_b = await _register(client, "match_lm_one_b@example.com")
+
+    await _mutual_like(client, token_a, uid_b, token_b, uid_a, sport="gym")
+
+    matches_r = await client.get("/matches", headers=_auth(token_a))
+    match_id = matches_r.json()["items"][0]["id"]
+
+    # B sends a message → A's match row should preview it as a partner
+    # message (sender_id == B's user id, not A's).
+    await client.post(
+        f"/matches/{match_id}/messages",
+        json={"body": "Want to train this weekend?"},
+        headers=_auth(token_b),
+    )
+
+    r = await client.get("/matches", headers=_auth(token_a))
+    assert r.status_code == 200
+    m = r.json()["items"][0]
+    assert m["last_message"] == "Want to train this weekend?"
+    assert m["last_message_at"] is not None
+    assert m["last_message_sender_id"] == uid_b
+
+
+async def test_match_preview_shows_only_the_most_recent_message(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "match_lm_latest_a@example.com")
+    token_b, uid_b = await _register(client, "match_lm_latest_b@example.com")
+
+    await _mutual_like(client, token_a, uid_b, token_b, uid_a, sport="tennis")
+
+    matches_r = await client.get("/matches", headers=_auth(token_a))
+    match_id = matches_r.json()["items"][0]["id"]
+
+    # Send three messages in order; the latest is from A and must win.
+    # SQLite's `CURRENT_TIMESTAMP` is second-precision, so the messages
+    # need at least a one-second gap to be ordered deterministically by
+    # `created_at DESC`. Two short sleeps cap the test at ~2.1s.
+    await client.post(
+        f"/matches/{match_id}/messages",
+        json={"body": "Want to train this weekend?"},
+        headers=_auth(token_b),
+    )
+    await asyncio.sleep(1.05)
+    await client.post(
+        f"/matches/{match_id}/messages",
+        json={"body": "Saturday morning works for me."},
+        headers=_auth(token_a),
+    )
+    await asyncio.sleep(1.05)
+    await client.post(
+        f"/matches/{match_id}/messages",
+        json={"body": "Sounds good."},
+        headers=_auth(token_a),
+    )
+
+    r = await client.get("/matches", headers=_auth(token_a))
+    m = r.json()["items"][0]
+    # The latest message is from A — sender_id should match A's user id.
+    assert m["last_message"] == "Sounds good."
+    assert m["last_message_sender_id"] == uid_a
+
+
+async def test_match_preview_is_independent_per_match(client: AsyncClient) -> None:
+    """Latest-message lookup must not bleed across matches."""
+    token_a, uid_a = await _register(client, "match_lm_iso_a@example.com")
+    token_b, uid_b = await _register(client, "match_lm_iso_b@example.com")
+    token_c, uid_c = await _register(client, "match_lm_iso_c@example.com")
+
+    await _mutual_like(client, token_a, uid_b, token_b, uid_a, sport="gym")
+    await _mutual_like(client, token_a, uid_c, token_c, uid_a, sport="tennis")
+
+    matches_r = await client.get("/matches", headers=_auth(token_a))
+    items = matches_r.json()["items"]
+    by_sport = {m["sport"]: m for m in items}
+    gym_id = by_sport["gym"]["id"]
+    tennis_id = by_sport["tennis"]["id"]
+
+    # Only post on the gym match; tennis must remain previewless.
+    await client.post(
+        f"/matches/{gym_id}/messages",
+        json={"body": "Let's plan a session."},
+        headers=_auth(token_a),
+    )
+
+    r = await client.get("/matches", headers=_auth(token_a))
+    items = r.json()["items"]
+    by_id = {m["id"]: m for m in items}
+    assert by_id[gym_id]["last_message"] == "Let's plan a session."
+    assert by_id[tennis_id]["last_message"] is None
+    assert by_id[tennis_id]["last_message_sender_id"] is None

@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.chat import Message
 from app.models.match import Match
 from app.models.profile import SportProfile, UserProfile
 from app.models.user import User
@@ -11,6 +12,32 @@ from app.schemas.discovery import PartnerCardResponse, SportProfileSummary
 from app.schemas.matches import MatchListResponse, MatchResponse
 
 _CURRENT_YEAR = datetime.now().year
+
+
+async def _fetch_latest_message_by_match(
+    db: AsyncSession, match_ids: list[UUID]
+) -> dict[UUID, Message]:
+    """Return a {match_id: latest Message} dict for the given match ids.
+
+    Uses one ``IN`` query and groups in Python — portable across Postgres
+    and SQLite (test backend), avoids N+1 even with the page-size 50 cap
+    on the matches list.
+    """
+    if not match_ids:
+        return {}
+    stmt = (
+        select(Message)
+        .where(Message.match_id.in_(match_ids))
+        .order_by(Message.created_at.desc())
+    )
+    rows = list((await db.execute(stmt)).scalars().all())
+    latest: dict[UUID, Message] = {}
+    for msg in rows:
+        # Rows arrive newest-first, so the first one we see per match is
+        # the latest. Skip subsequent older rows for the same match.
+        if msg.match_id not in latest:
+            latest[msg.match_id] = msg
+    return latest
 
 
 async def list_matches(
@@ -33,10 +60,13 @@ async def list_matches(
     count_stmt = select(Match.id).where(participant_filter)
     total = len((await db.execute(count_stmt)).all())
 
+    latest_messages = await _fetch_latest_message_by_match(db, [m.id for m in matches])
+
     items: list[MatchResponse] = []
     for m in matches:
         partner_id = m.user2_id if m.user1_id == current_user_id else m.user1_id
         partner = await _build_partner_card(db, partner_id, m.sport)
+        last = latest_messages.get(m.id)
         items.append(
             MatchResponse(
                 id=m.id,
@@ -46,6 +76,9 @@ async def list_matches(
                 status=m.status,
                 created_at=m.created_at,
                 partner=partner,
+                last_message=last.body if last else None,
+                last_message_at=last.created_at if last else None,
+                last_message_sender_id=last.sender_id if last else None,
             )
         )
 

@@ -14,6 +14,12 @@ class MatchResponse(BaseModel):
     status: str
     created_at: datetime
     partner: PartnerCardResponse
+    # Last-message preview for the chat list. All three fields are
+    # optional so a brand-new match (no messages yet) serializes cleanly
+    # — clients render an empty-state fallback in that case.
+    last_message: str | None = None
+    last_message_at: datetime | None = None
+    last_message_sender_id: UUID | None = None
 
 
 class MatchListResponse(BaseModel):
