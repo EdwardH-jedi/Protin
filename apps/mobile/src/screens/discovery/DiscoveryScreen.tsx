@@ -54,16 +54,37 @@ function MatchBanner({ visible }: { visible: boolean }) {
 
 // ─── Hero / avatar ────────────────────────────────────────────────────────────
 
+/**
+ * Per-sport hero palette. v1 uses an initials avatar on a sport-keyed
+ * "gradient" instead of real partner photos — the cards are 100%
+ * `View` / `Text` so screenshots never depend on user-uploaded media,
+ * external images, or any copyrighted asset.
+ *
+ * Each entry is a top color (bright sport identity) + a bottom color
+ * (always near-black) — the fade between is faked with stacked
+ * semi-transparent fills, no gradient library required.
+ */
+const SPORT_HERO_PALETTE: Record<string, { top: string; bottom: string }> = {
+  gym:     { top: '#A8E61A', bottom: '#0A0A0A' }, // electric lime (brand)
+  golf:    { top: '#1FAA59', bottom: '#0A0A0A' }, // forest green
+  tennis:  { top: '#F5A524', bottom: '#0A0A0A' }, // amber / clay-court
+  running: { top: '#2EB6FF', bottom: '#0A0A0A' }, // sky-blue
+};
+
+function getSportHeroPalette(sport: string) {
+  return SPORT_HERO_PALETTE[sport] ?? SPORT_HERO_PALETTE.gym;
+}
+
 function CardHero({
   displayName,
-  avatarUrl,
   age,
   suburb,
+  sport,
 }: {
   displayName: string;
-  avatarUrl?: string;
   age?: number | null;
   suburb?: string | null;
+  sport: string;
 }) {
   const initials = displayName
     .split(' ')
@@ -71,24 +92,35 @@ function CardHero({
     .slice(0, 2)
     .join('');
   const ageStr = age ? `, ${age}` : '';
+  const palette = getSportHeroPalette(sport);
 
   return (
-    <View style={styles.hero}>
-      {avatarUrl ? (
-        <Image
-          source={{ uri: avatarUrl }}
-          style={styles.heroImage}
-          resizeMode="cover"
-          accessibilityLabel={`${displayName} profile photo`}
-        />
-      ) : (
-        <View style={styles.heroFallback}>
-          <Text style={styles.heroFallbackInitials}>{initials || '·'}</Text>
-        </View>
-      )}
+    <View
+      style={[styles.hero, { backgroundColor: palette.bottom }]}
+      accessibilityLabel={`${displayName} card`}
+    >
+      {/* Top band — full bright sport color, occupies the upper portion. */}
+      <View
+        style={[styles.heroTopBand, { backgroundColor: palette.top }]}
+      />
+      {/* Mid fade — semi-transparent bottom color overlapping the band so
+          the join reads as a smooth gradient instead of a hard edge. */}
+      <View
+        style={[styles.heroFade, { backgroundColor: palette.bottom }]}
+      />
 
-      {/* Gradient-ish darken layered on top of the image so the name reads
-          on any photo without depending on a gradient library. */}
+      {/* Initials chip — centered in the bright upper area. White ring +
+          translucent fill so the chip reads cleanly on any sport color. */}
+      <View style={styles.heroInitialsWrap}>
+        <View style={styles.heroInitialsRing}>
+          <View style={styles.heroInitialsCircle}>
+            <Text style={styles.heroInitialsText}>{initials || '·'}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Bottom darken so the name + suburb stay legible regardless of
+          which sport palette is active. */}
       <View style={styles.heroDarken} />
 
       <View style={styles.heroOverlay}>
@@ -138,9 +170,9 @@ function PartnerCardView({
     <View style={styles.card}>
       <CardHero
         displayName={partner.displayName}
-        avatarUrl={partner.avatarUrl}
         age={partner.age}
         suburb={partner.suburb}
+        sport={sport}
       />
 
       <View style={styles.cardBody}>
@@ -585,24 +617,60 @@ const styles = StyleSheet.create({
   hero: {
     width: '100%',
     height: HERO_HEIGHT,
-    backgroundColor: colors.brandSoft,
+    overflow: 'hidden',
+    // backgroundColor is set inline per-sport.
   },
-  heroImage: {
-    width: '100%',
-    height: '100%',
+  heroTopBand: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    // Bright sport color occupies the upper ~62%; the lower ~38% is the
+    // dark base color set on the hero parent.
+    height: HERO_HEIGHT * 0.62,
   },
-  heroFallback: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.brand,
+  heroFade: {
+    // Sits over the band's bottom edge; semi-transparent dark fill
+    // approximates a soft top→bottom fade without a gradient library.
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: HERO_HEIGHT * 0.32,
+    height: HERO_HEIGHT * 0.4,
+    opacity: 0.55,
+  },
+  heroInitialsWrap: {
+    position: 'absolute',
+    top: HERO_HEIGHT * 0.18,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  heroInitialsRing: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.85)',
+    backgroundColor: 'rgba(0,0,0,0.18)',
+  },
+  heroInitialsCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroFallbackInitials: {
-    fontSize: 64,
+  heroInitialsText: {
+    fontSize: 44,
     fontWeight: '700',
-    color: colors.textInverse,
-    letterSpacing: -2,
+    letterSpacing: -1.5,
+    // Hardcoded white: the initials chip is rendered on a sport-coloured
+    // band that varies per card, but white reads on every band in this
+    // palette set.
+    color: '#FFFFFF',
   },
   heroDarken: {
     position: 'absolute',

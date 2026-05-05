@@ -162,6 +162,27 @@ describe('DiscoveryScreen', () => {
     getByText('Love morning lifts.');
   });
 
+  it('renders the partner card hero with initials and no <Image> (v1 photo-free)', () => {
+    // v1 screenshot policy: the discovery card hero must NOT render any
+    // user-supplied photo, even if the partner record carries an
+    // avatarUrl. The hero is built purely from <View> + <Text>: a
+    // sport-keyed colored band plus an initials chip.
+    const partnerWithAvatar: PartnerCard = {
+      ...samplePartner,
+      // Even though the discovery card never reads avatarUrl in v1, the
+      // type allows it. Pass one to confirm it's ignored.
+      avatarUrl: 'https://example.com/face.jpg',
+    };
+    setupDiscovery({ partners: [partnerWithAvatar] });
+    const { getByText, UNSAFE_queryAllByType } = render(<DiscoveryScreen />);
+    // Initials are derived from the display name ("Alex Smith" → "AS").
+    getByText('AS');
+    // No <Image> anywhere in the rendered card — the only Images in the
+    // tree would be from the partner-preview modal, which is not open.
+    const { Image } = require('react-native');
+    expect(UNSAFE_queryAllByType(Image).length).toBe(0);
+  });
+
   it('renders action buttons for a partner card', () => {
     setupDiscovery({ partners: [samplePartner] });
     const { getByLabelText } = render(<DiscoveryScreen />);
