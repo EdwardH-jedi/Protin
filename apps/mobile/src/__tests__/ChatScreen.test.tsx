@@ -572,6 +572,57 @@ describe('ChatScreen', () => {
     }
   });
 
+  it('mounts exactly one TextInput composer — never zero, never nested duplicates', async () => {
+    // The focus-loop regression hid the only iOS TextInput inside an
+    // InputAccessoryView, which presents AFTER focus, so the user could
+    // see zero focusable inputs on cold open. A second flavour of the
+    // same bug would be rendering two composers (a hidden visible one
+    // plus an accessory-hosted one) — equally broken, harder to spot.
+    // This assertion pins the structural contract: exactly one composer
+    // TextInput exists at initial mount, before any focus event.
+    mockApiGet.mockResolvedValue(emptyMessageResponse);
+    const { getByPlaceholderText, UNSAFE_getAllByType } = render(
+      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+    );
+    await waitFor(() => getByPlaceholderText('Message…'));
+
+    const RN = require('react-native');
+    const inputs = UNSAFE_getAllByType(RN.TextInput);
+    expect(inputs.length).toBe(1);
+    // Sanity: that one input is the composer (matches the placeholder).
+    expect(inputs[0].props.placeholder).toBe('Message…');
+  });
+
+  it('composer row uses normal layout flow — never position:absolute', async () => {
+    // A second class of "invisible composer" bug is layering the composer
+    // out of normal flow (absolute / overlay) so it never gets a real
+    // tappable rect. Pin the inputRow to normal flow.
+    mockApiGet.mockResolvedValue(emptyMessageResponse);
+    const { getByPlaceholderText, UNSAFE_getAllByType } = render(
+      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+    );
+    await waitFor(() => getByPlaceholderText('Message…'));
+
+    const { StyleSheet, View } = require('react-native');
+    const allViews = UNSAFE_getAllByType(View);
+    // The inputRow is the single View that directly contains the composer
+    // TextInput; find it and flatten its style.
+    const composerRow = allViews.find((v: any) => {
+      const children = Array.isArray(v.props.children)
+        ? v.props.children
+        : [v.props.children];
+      return children.some(
+        (c: any) => c && c.props && c.props.placeholder === 'Message…'
+      );
+    });
+    expect(composerRow).toBeDefined();
+    const flatStyle = StyleSheet.flatten(composerRow.props.style);
+    // RN style default is `position: 'relative'`. Anything other than
+    // 'relative' or undefined would lift the composer out of flow and
+    // re-introduce the visibility class of bug.
+    expect(['relative', undefined]).toContain(flatStyle.position);
+  });
+
   // ── WebSocket real-time ────────────────────────────────────────────────────
 
   it('opens a WebSocket connection on mount with the correct URL', async () => {
