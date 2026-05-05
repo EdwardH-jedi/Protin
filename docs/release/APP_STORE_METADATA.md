@@ -53,10 +53,10 @@ session — all in one place. Built around the game, not the profile,
 SportsGang is for people who'd rather play than scroll.
 
 Set up your profile in a few taps: pick the sport you play, your
-level, and the suburb you train in. Browse other players nearby,
-connect with the ones you'd like to play with, and chat one-to-one
-to agree on a time and a place to meet. SportsGang covers a range of
-sports — including gym, tennis, golf, and running — with more on the
+level, and the suburb you train in. Browse other players who share
+your sports interests, connect with the ones you'd like to play
+with, and chat one-to-one to agree on a time and a place to meet.
+SportsGang covers gym, golf, tennis, and running, with more on the
 way.
 
 Your control is built in. Report or block any user from inside a
@@ -96,14 +96,16 @@ App Store keyword field is a single 100-character comma-separated string.
 The app name and category are auto-included — do not duplicate them here.
 
 ```
-sports,fitness,tennis,badminton,running,golf,players,chat,training,social
+sports,fitness,gym,golf,tennis,running,players,chat,social,training
 ```
 
-83 characters. Tuned for v1 positioning:
+74 characters. Tuned for v1 positioning:
 
-- **Sports-first vocabulary.** `sports`, `fitness`, `training`, plus four
-  named sports including badminton (search demand exceeds gym/tennis-only
-  in many markets and signals multi-sport intent without over-promising).
+- **Sports-first vocabulary.** `sports`, `fitness`, `training`, plus the
+  four named sports the v1 app actually supports: gym, golf, tennis, and
+  running. Do **not** add sports the app does not currently support
+  (e.g. badminton, football, soccer, basketball) — App Store keywords
+  must reflect the visible v1 sport allowlist, not aspirational coverage.
 - **Partner-finding intent.** `players`, `chat`, `social` — capture intent
   for "who do I play with" without leaning on dating-app vocabulary.
 - **No competitor brand names.** Apple rejects keyword stuffing of
@@ -134,35 +136,38 @@ Confirm both selections in App Store Connect at submission time.
 
 ## 7. Age rating considerations
 
-This is an open operator decision; do not hardcode the final rating until
-the questionnaire is answered in App Store Connect. The product has two
-characteristics that pull the conservative-positioning lever upward:
+> **Recommended conservative age-rating target: 17+** due to user
+> profiles, chat, and real-world sports session coordination. Final
+> rating must be confirmed in App Store Connect's age-rating
+> questionnaire.
+
+The product has two characteristics that drive this recommendation:
 
 - **User-generated content.** Display name, bio, profile photos, and 1:1
   chat are all user-provided. The questionnaire row "User-Generated
-  Content" must be answered honestly — at minimum `Infrequent/Mild`,
-  potentially higher depending on moderation maturity.
+  Content" must be answered honestly — chat-based social apps
+  consistently land at 17+ once UGC is acknowledged at meaningful
+  frequency, and SportsGang's chat surface is core to the product.
 - **Real-world meet-ups.** SportsGang exists to coordinate physical
   sports sessions between two adults who haven't met before. The Terms
   carry an explicit real-world meeting risk disclaimer.
 
-Three positioning options the operator should weigh:
+Operator may additionally elect an **18+ minimum-age policy**: a 17+
+App Store rating combined with a Terms-of-Service clause requiring 18+.
+The age gate is then enforced contractually, not via the rating
+questionnaire alone. Picking this requires
+`docs/release/LEGAL_WEBSITE_CONTENT.md` Terms §2 (Eligibility) to name
+18+ as the minimum age, with the matching Privacy §11 update.
 
-| Option | Drives | When to pick |
-|---|---|---|
-| **12+** | Existing draft assumption (`APP_STORE_SUBMISSION.md` §5). UGC = "Infrequent/Mild"; everything else "None". Lowest age gate, widest reach. | Only if the operator is confident moderation tooling can credibly catch even infrequent inappropriate UGC at this rating. |
-| **17+** | Frequent/Intense UGC, or unrestricted web access if any in-app browser surface is added. Common for chat-based social apps. | Recommended conservative default for v1 — acknowledges that two-stranger chat + real-world meet-ups are not a 12+ shape. |
-| **18+ via policy** | A 17+ App Store rating combined with a Terms-of-Service minimum-age clause requiring 18+. The age gate is enforced contractually, not via the rating questionnaire alone. | If the operator decides real-world meet-up coordination warrants an explicit adult-only product. Requires Terms §2 (Eligibility) to name 18+ as the minimum age. |
+Do **not** position the app as 12+. Earlier draft notes carried a 12+
+working assumption based on "Infrequent/Mild" UGC; that has been
+withdrawn as inconsistent with chat + real-world-meet-up coordination.
+The aligned recommendation across this file,
+`docs/deployment/APP_STORE_SUBMISSION.md` §5, and
+`docs/deployment/APPLE_TESTFLIGHT_PREP.md` §4.3 is 17+.
 
-For v1 the **recommended conservative default is 17+** with a Terms
-clause keeping the minimum-age policy visible. Final answer must be
-entered in App Store Connect's Age Rating questionnaire and aligned with
-`docs/release/LEGAL_WEBSITE_CONTENT.md` Privacy §11 / Terms §2 before
-submission.
-
-Cross-doc note: if the rating decision changes, also update
-`APP_STORE_SUBMISSION.md` §5 — that doc still carries the earlier 12+
-working assumption.
+Apple has not assigned any rating yet; 17+ is the operator-side
+recommendation pending the App Store Connect questionnaire result.
 
 ## 8. URLs
 

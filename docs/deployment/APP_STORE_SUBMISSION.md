@@ -133,7 +133,7 @@ Answer **None** to everything, with two exceptions:
 | Question | Answer | Why |
 |---|---|---|
 | Unrestricted Web Access | None | No in-app webviews for arbitrary URLs |
-| User Generated Content (chat, profiles, bookings) | **Infrequent/Mild** | You have a chat and a bio field. Say "Infrequent/Mild" - triggers the 12+ rating, not 17+. Do NOT say None; Apple will catch it and reject. |
+| User Generated Content (chat, profiles, bookings) | **Frequent/Intense** | Chat is a core, frequently-used surface and the product coordinates real-world meet-ups between strangers. Answering honestly here is the basis for the recommended 17+ target below. Do NOT say None; Apple will catch it and reject under 5.1.2. |
 | Contests | None | - |
 | Unrestricted Internet Access | None | - |
 | Medical / Treatment Information | None | No medical claims |
@@ -146,7 +146,12 @@ Answer **None** to everything, with two exceptions:
 | Violence - Realistic | None | - |
 | Sexual Content or Nudity | None | - |
 
-Expected rating: **12+** (driven by the user-generated-content flag).
+Recommended conservative age-rating target: **17+** due to user
+profiles, chat, and real-world sports session coordination. Final
+rating must be confirmed in App Store Connect's age-rating
+questionnaire — Apple has not assigned any rating yet. Aligned with
+`docs/release/APP_STORE_METADATA.md` §7 and
+`docs/deployment/APPLE_TESTFLIGHT_PREP.md` §4.3.
 
 ---
 

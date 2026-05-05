@@ -144,7 +144,7 @@ Detailed area-by-area tables follow.
 | ASC app record created | Apple-side setup required | Not verifiable from the repo | Create `Protin`, Platform `iOS`, Primary language `English (Australia)`, Bundle ID `com.edh1223.protin`, SKU `protin-ios-1` (or equivalent). See `APP_STORE_SUBMISSION.md` section 1. |
 | ASC App ID captured | Apple-side setup required | Not in `eas.json` | After record creation, paste into `eas.json` `submit.production.ios.ascAppId` and confirm `eas submit --platform ios --latest` resolves. |
 | App Privacy questionnaire answered | Apple-side setup required | `APP_STORE_SUBMISSION.md` section 4 holds the intended answers | Enter the answers exactly as documented; if Sentry DSN is not shipped, switch the two Sentry rows to `No`. |
-| Age rating questionnaire | Apple-side setup required | Template in `APP_STORE_SUBMISSION.md` section 5 | Answer per the template (user-generated content is `Infrequent/Mild`, everything else `None`; target rating 12+). |
+| Age rating questionnaire | Apple-side setup required | Template in `APP_STORE_SUBMISSION.md` section 5 + recommended target in `APP_STORE_METADATA.md` §7 | Recommended conservative age-rating target: 17+ due to user profiles, chat, and real-world sports session coordination. Final rating must be confirmed in App Store Connect's age-rating questionnaire — Apple has not assigned any rating yet. |
 
 ### 4.4 Privacy policy / support URL readiness
 
