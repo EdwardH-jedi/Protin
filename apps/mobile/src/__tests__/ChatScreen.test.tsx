@@ -156,6 +156,17 @@ const sampleMessages = [
   },
 ];
 
+function getBubbleAlignSelf(UNSAFE_getAllByType: any, textNode: any): string | undefined {
+  const { StyleSheet, View } = require('react-native');
+  const allViews = UNSAFE_getAllByType(View);
+  const bubble = allViews.find((v: any) =>
+    v.props.children &&
+    (Array.isArray(v.props.children) ? v.props.children : [v.props.children])
+      .some((c: any) => c === textNode || (c && c.props && c.props.children === textNode.props.children))
+  );
+  return bubble ? StyleSheet.flatten(bubble.props.style).alignSelf : undefined;
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('ChatScreen', () => {
@@ -217,6 +228,105 @@ describe('ChatScreen', () => {
       getByText('Hey! Want to train tomorrow?');
       getByText('Absolutely, sounds great!');
     });
+  });
+
+  it('renders a mixed Chris/Sarah conversation on both sides for the current user', async () => {
+    mockApiGet.mockResolvedValue({
+      items: [
+        {
+          id: 'msg-chris-1',
+          matchId: 'match-1',
+          senderId: 'me-123',
+          body: 'Want to train this weekend?',
+          createdAt: '2026-04-08T08:00:00Z',
+        },
+        {
+          id: 'msg-sarah-1',
+          matchId: 'match-1',
+          senderId: 'partner-456',
+          body: "Let's plan a session.",
+          createdAt: '2026-04-08T08:01:00Z',
+        },
+        {
+          id: 'msg-chris-2',
+          matchId: 'match-1',
+          senderId: 'me-123',
+          body: 'Saturday morning works for me.',
+          createdAt: '2026-04-08T08:02:00Z',
+        },
+      ],
+      total: 3,
+      limit: 100,
+      offset: 0,
+    });
+
+    const { findByText, UNSAFE_getAllByType } = render(
+      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+    );
+
+    const chrisFirst = await findByText('Want to train this weekend?');
+    const sarah = await findByText("Let's plan a session.");
+    const chrisSecond = await findByText('Saturday morning works for me.');
+
+    expect(getBubbleAlignSelf(UNSAFE_getAllByType, chrisFirst)).toBe('flex-end');
+    expect(getBubbleAlignSelf(UNSAFE_getAllByType, sarah)).toBe('flex-start');
+    expect(getBubbleAlignSelf(UNSAFE_getAllByType, chrisSecond)).toBe('flex-end');
+  });
+
+  it('uses the authenticated user id when route partnerId is missing or stale', async () => {
+    mockApiGet.mockResolvedValue({
+      items: sampleMessages,
+      total: 2,
+      limit: 100,
+      offset: 0,
+    });
+
+    const { findByText, UNSAFE_getAllByType } = render(
+      <ChatScreen
+        route={makeRoute({ partnerId: undefined }) as any}
+        navigation={makeNavigation() as any}
+      />
+    );
+
+    const partnerText = await findByText('Hey! Want to train tomorrow?');
+    const ownText = await findByText('Absolutely, sounds great!');
+
+    expect(getBubbleAlignSelf(UNSAFE_getAllByType, partnerText)).toBe('flex-start');
+    expect(getBubbleAlignSelf(UNSAFE_getAllByType, ownText)).toBe('flex-end');
+  });
+
+  it('renders messages from unknown senders as partner-side instead of assuming mine', async () => {
+    const authMock = require('../stores/auth') as { useAuthStore: () => unknown };
+    const original = authMock.useAuthStore;
+    authMock.useAuthStore = () => ({ user: null, token: 'test-jwt-token' });
+    try {
+      mockApiGet.mockResolvedValue({
+        items: [
+          {
+            id: 'msg-unknown',
+            matchId: 'match-1',
+            senderId: undefined,
+            body: 'Unknown sender',
+            createdAt: '2026-04-08T08:00:00Z',
+          },
+        ],
+        total: 1,
+        limit: 100,
+        offset: 0,
+      });
+
+      const { findByText, UNSAFE_getAllByType } = render(
+        <ChatScreen
+          route={makeRoute({ partnerId: undefined }) as any}
+          navigation={makeNavigation() as any}
+        />
+      );
+
+      const unknown = await findByText('Unknown sender');
+      expect(getBubbleAlignSelf(UNSAFE_getAllByType, unknown)).toBe('flex-start');
+    } finally {
+      authMock.useAuthStore = original;
+    }
   });
 
   it('aligns own messages right and partner messages left even when auth user is null', async () => {

@@ -45,6 +45,7 @@ interface MessageListResponse {
 export function ChatScreen({ route, navigation }: ChatScreenProps) {
   const { matchId, partnerName, partnerId: routePartnerId, sport } = route.params;
   const { user, token } = useAuthStore();
+  const currentUserId = user?.id ?? null;
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -337,7 +338,10 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
             data={messages}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <MessageBubble message={item} isOwn={item.senderId !== routePartnerId} />
+              <MessageBubble
+                message={item}
+                isOwn={isOwnMessage(item.senderId, currentUserId, routePartnerId)}
+              />
             )}
             style={styles.flex}
             contentContainerStyle={styles.messageList}
@@ -402,6 +406,17 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
       )}
     </Screen>
   );
+}
+
+function isOwnMessage(
+  senderId: string | null | undefined,
+  currentUserId: string | null,
+  routePartnerId: string | null | undefined
+): boolean {
+  if (!senderId) return false;
+  if (currentUserId) return senderId === currentUserId;
+  if (routePartnerId) return senderId !== routePartnerId;
+  return false;
 }
 
 function MessageBubble({ message, isOwn }: { message: Message; isOwn: boolean }) {
