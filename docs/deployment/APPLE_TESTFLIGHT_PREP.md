@@ -327,7 +327,9 @@ If the local Expo or on-device link tap doesn't open the expected page:
 
 #### After a custom-domain swap
 
-If the operator later pins a custom domain (e.g. `https://sportgang.app/`),
+If the operator later pins a custom domain (e.g. `https://sportsgang.app/`
+— hypothetical, not yet registered; do not claim either `sportsgang.app`
+or `sportgang.app` is live until it actually is),
 update the URL list at the top of this checklist, the env example files
 (`apps/mobile/.env.example`, `apps/mobile/.env.staging.example`,
 `.env.example`), `docs/release/APP_STORE_METADATA.md` §8, the EAS env
