@@ -140,7 +140,7 @@ describe('DiscoveryScreen', () => {
   it('shows the empty-state message when partners is empty and not loading', () => {
     setupDiscovery({ partners: [] });
     const { getByText } = render(<DiscoveryScreen />);
-    getByText('No more players nearby.');
+    getByText('No players to show right now.');
     getByText('Check back soon — new players join every week.');
   });
 

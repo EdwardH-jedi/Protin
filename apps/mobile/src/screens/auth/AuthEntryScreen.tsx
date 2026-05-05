@@ -26,14 +26,14 @@ export function AuthEntryScreen({ navigation }: AuthEntryScreenProps) {
         <View style={styles.heroContent}>
           <View style={styles.brandBlock}>
             <Text style={styles.wordmark}>sportsgang</Text>
-            <Text style={styles.eyebrow}>Sydney · Find sports partners</Text>
+            <Text style={styles.eyebrow}>Sydney</Text>
           </View>
 
           <View style={styles.headlineBlock}>
             <Text style={styles.headline}>Find your</Text>
-            <Text style={styles.headline}>sports partner.</Text>
+            <Text style={styles.headline}>next game.</Text>
             <Text style={styles.tagline}>
-              No solo grind. Match, chat, and book your next session.
+              Match, chat, and plan your next session.
             </Text>
           </View>
 

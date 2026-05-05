@@ -11,9 +11,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { RankSummaryCard } from '../../components/RankSummaryCard';
 import { Screen } from '../../components/Screen';
-import { useRankSummary } from '../../hooks/useRankSummary';
 import { api } from '../../lib/api';
 import { openLegal, PRIVACY_URL, SUPPORT_URL, TERMS_URL } from '../../lib/legal';
 import { useAuthStore } from '../../stores/auth';
@@ -24,7 +22,6 @@ import type { RootStackParamList } from '../../navigation/types';
 export function ProfileScreen() {
   const { logout } = useAuthStore();
   const { profile, sportProfiles, fetchProfile } = useProfileStore();
-  const { summary: rankSummary, isLoading: rankLoading } = useRankSummary();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -201,10 +198,6 @@ export function ProfileScreen() {
               </View>
             ) : null}
 
-            <RankSummaryCard
-              summary={rankSummary}
-              isLoading={rankLoading}
-            />
           </View>
         ) : null}
 

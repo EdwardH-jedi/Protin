@@ -451,17 +451,14 @@ describe('ProfileScreen', () => {
     });
   });
 
-  // ── Sports reputation (rank/honor) integration ─────────────────────────────
+  // ── Sports reputation (rank/honor) — hidden in v1 ──────────────────────────
+  // The Rank/Honor surface is intentionally not rendered on Profile in v1.
+  // The component itself (RankSummaryCard) and its hook (useRankSummary) are
+  // still unit-tested separately; these tests guard the Profile-level
+  // contract that no rank/honor copy reaches a screenshot frame.
 
-  describe('rank summary section', () => {
-    it('renders the section title once a profile exists', async () => {
-      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
-      mockRankSummary = null;
-      const { getByText } = render(<ProfileScreen />);
-      await waitFor(() => getByText('Sports reputation'));
-    });
-
-    it('renders honor + tier rows when a real summary is present', async () => {
+  describe('rank summary section (v1: hidden)', () => {
+    it('does not render the rank/honor section when a profile exists', async () => {
       mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
       mockRankSummary = {
         honor: 105,
@@ -469,33 +466,18 @@ describe('ProfileScreen', () => {
           { sport: 'tennis', rankPoints: 10, tier: 'Bronze', sessionsCompleted: 2 },
         ],
       };
-      const { getByText } = render(<ProfileScreen />);
-      await waitFor(() => {
-        getByText('105');
-        getByText('Tennis');
-        getByText('Bronze');
-      });
-    });
-
-    it('handles a missing summary gracefully — empty state, no fake numbers', async () => {
-      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
-      mockRankSummary = null;
-      const { getByText, queryByText } = render(<ProfileScreen />);
-      await waitFor(() => getByText('No reputation yet'));
-      // Critical: a brand-new user must NOT see invented values that imply
-      // they have a tier/rank. The empty state must be the only thing.
-      expect(queryByText('Rookie')).toBeNull();
+      const { queryByText, getByText } = render(<ProfileScreen />);
+      await waitFor(() => getByText('Jordan Lee'));
+      expect(queryByText('Sports reputation')).toBeNull();
+      expect(queryByText('Honor')).toBeNull();
       expect(queryByText('Bronze')).toBeNull();
-      expect(queryByText('100')).toBeNull();
-      expect(queryByText('/200')).toBeNull();
+      expect(queryByText('105')).toBeNull();
     });
 
-    it('does not render the section when no profile exists', async () => {
+    it('does not render the rank/honor section when no profile exists', async () => {
       mockProfile = null;
       const { queryByText, getByText } = render(<ProfileScreen />);
       await waitFor(() => getByText('Profile not set up'));
-      // The reputation card lives in the same cardStack as the profile
-      // cards — both should be hidden when there's no profile yet.
       expect(queryByText('Sports reputation')).toBeNull();
     });
   });

@@ -50,14 +50,22 @@ describe('AuthEntryScreen', () => {
       <AuthEntryScreen navigation={makeNavigation() as any} route={{} as any} />
     );
     getByText('Find your');
-    getByText('sports partner.');
+    getByText('next game.');
   });
 
   it('renders the sport / city eyebrow', () => {
     const { getByText } = render(
       <AuthEntryScreen navigation={makeNavigation() as any} route={{} as any} />
     );
-    getByText('Sydney · Find sports partners');
+    getByText('Sydney');
+  });
+
+  it('renders the v1-safe tagline (no overpromise on booking)', () => {
+    const { getByText, queryByText } = render(
+      <AuthEntryScreen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    getByText('Match, chat, and plan your next session.');
+    expect(queryByText(/book your next session/i)).toBeNull();
   });
 
   it('renders Get started and Log in buttons', () => {

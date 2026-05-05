@@ -348,7 +348,7 @@ export function DiscoveryScreen() {
           <View style={styles.emptyIcon}>
             <Text style={styles.emptyIconText}>·</Text>
           </View>
-          <Text style={styles.emptyTitle}>No more players nearby.</Text>
+          <Text style={styles.emptyTitle}>No players to show right now.</Text>
           <Text style={styles.emptyBody}>Check back soon — new players join every week.</Text>
           <Pressable
             style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
