@@ -6,12 +6,20 @@
  *  - React Navigation (navigation.goBack, navigation.replace)
  *  - Screen component
  *  - theme
+ *  - NearbyCourtsModal (stub that exposes a single "pick venue" Pressable)
  */
 
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 import { BookingComposerScreen } from '../screens/bookings/BookingComposerScreen';
+import {
+  defaultDate,
+  defaultStartTime,
+  formatDateLabel,
+  formatTimeLabel,
+  plusOneHour,
+} from '../lib/sessionTime';
 
 // ─── Mock api ─────────────────────────────────────────────────────────────────
 
@@ -61,9 +69,6 @@ jest.mock('../theme', () => ({
 }));
 
 // ─── Mock NearbyCourtsModal ──────────────────────────────────────────────────
-// The modal is unit-tested in its own file; here we stub it so the composer
-// tests stay focused on form / submission behavior. The stub exposes a tiny
-// "pick a venue" button when `isOpen` so the integration path is testable.
 
 jest.mock('../screens/bookings/NearbyCourtsModal', () => {
   const { Pressable, Text } = require('react-native');
@@ -114,12 +119,14 @@ function makeRoute(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Fill all required fields with valid values. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function fillRequiredFields(getByPlaceholderText: (s: string) => any) {
-  fireEvent.changeText(getByPlaceholderText('2026-04-15'), '2026-06-01');
-  fireEvent.changeText(getByPlaceholderText('09:00'), '09:00');
-  fireEvent.changeText(getByPlaceholderText('10:00'), '10:00');
+/** Default startsAt the screen sends when the user submits without touching the pickers. */
+function expectedStartsAt(): string {
+  return `${defaultDate()}T${defaultStartTime()}:00`;
+}
+
+/** Default endsAt — start + 1 hour. */
+function expectedEndsAt(): string {
+  return `${defaultDate()}T${plusOneHour(defaultStartTime())}:00`;
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -138,55 +145,44 @@ describe('BookingComposerScreen', () => {
     expect(getByText('Propose a session')).toBeTruthy();
   });
 
-  it('renders all form field placeholders', () => {
+  it('renders date + start + end as tappable selectors with friendly defaults', () => {
+    const { getByLabelText, getByText } = render(
+      <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+    );
+    expect(getByLabelText('Choose date')).toBeTruthy();
+    expect(getByLabelText('Choose start time')).toBeTruthy();
+    expect(getByLabelText('Choose end time')).toBeTruthy();
+    // Friendly default labels: tomorrow + 09:00 → 10:00 in the local locale.
+    expect(getByText(formatDateLabel(defaultDate()))).toBeTruthy();
+    expect(getByText(formatTimeLabel(defaultStartTime()))).toBeTruthy();
+    expect(getByText(formatTimeLabel(plusOneHour(defaultStartTime())))).toBeTruthy();
+  });
+
+  it('renders the optional venue + notes inputs', () => {
     const { getByPlaceholderText } = render(
       <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
     );
-    expect(getByPlaceholderText('2026-04-15')).toBeTruthy();
-    expect(getByPlaceholderText('09:00')).toBeTruthy();
-    expect(getByPlaceholderText('10:00')).toBeTruthy();
-    // Court / venue field shows a "Find a court" CTA + a freeform fallback.
     expect(getByPlaceholderText('Or type a location, e.g. Bondi gym')).toBeTruthy();
     expect(getByPlaceholderText('Anything your partner should know…')).toBeTruthy();
   });
 
-  // ── canSubmit guard ────────────────────────────────────────────────────────
+  // ── canSubmit / defaults ──────────────────────────────────────────────────
 
-  it('Send proposal button is disabled when all fields are empty', () => {
+  it('Send proposal is enabled out of the box thanks to valid defaults', () => {
     const { getByLabelText } = render(
       <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
     );
-    expect(getByLabelText('Send proposal').props.accessibilityState?.disabled).toBe(true);
-  });
-
-  it('Send proposal button is disabled when date is incomplete', () => {
-    const { getByPlaceholderText, getByLabelText } = render(
-      <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
-    fireEvent.changeText(getByPlaceholderText('2026-04-15'), '2026-06'); // only 7 chars
-    fireEvent.changeText(getByPlaceholderText('09:00'), '09:00');
-    fireEvent.changeText(getByPlaceholderText('10:00'), '10:00');
-    expect(getByLabelText('Send proposal').props.accessibilityState?.disabled).toBe(true);
-  });
-
-  it('Send proposal button becomes enabled when all required fields are filled', () => {
-    const { getByPlaceholderText, getByLabelText } = render(
-      <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
-    fillRequiredFields(getByPlaceholderText);
     expect(getByLabelText('Send proposal').props.accessibilityState?.disabled).toBe(false);
   });
 
   // ── Successful submission ──────────────────────────────────────────────────
 
-  it('calls api.post with the correct payload (freeform location, no venue)', async () => {
+  it('submits the default date + time when nothing is changed (freeform location, no venue)', async () => {
     mockApiPost.mockResolvedValue({ id: 'new-booking-id' });
     const navigation = makeNavigation();
-    const { getByPlaceholderText, getByLabelText } = render(
+    const { getByLabelText, getByPlaceholderText } = render(
       <BookingComposerScreen route={makeRoute() as any} navigation={navigation as any} />
     );
-
-    fillRequiredFields(getByPlaceholderText);
     fireEvent.changeText(
       getByPlaceholderText('Or type a location, e.g. Bondi gym'),
       'City Gym'
@@ -200,8 +196,8 @@ describe('BookingComposerScreen', () => {
     expect(mockApiPost).toHaveBeenCalledWith('/bookings', {
       matchId: 'match-abc',
       sport: 'gym',
-      startsAt: '2026-06-01T09:00:00',
-      endsAt: '2026-06-01T10:00:00',
+      startsAt: expectedStartsAt(),
+      endsAt: expectedEndsAt(),
       location: 'City Gym',
       venueId: undefined,
       notes: 'Bring towel',
@@ -210,17 +206,12 @@ describe('BookingComposerScreen', () => {
 
   it('omits location and notes when left empty', async () => {
     mockApiPost.mockResolvedValue({ id: 'new-booking-id' });
-    const navigation = makeNavigation();
-    const { getByPlaceholderText, getByLabelText } = render(
-      <BookingComposerScreen route={makeRoute() as any} navigation={navigation as any} />
+    const { getByLabelText } = render(
+      <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
     );
-
-    fillRequiredFields(getByPlaceholderText);
-
     await act(async () => {
       fireEvent.press(getByLabelText('Send proposal'));
     });
-
     expect(mockApiPost).toHaveBeenCalledWith('/bookings', expect.objectContaining({
       location: undefined,
       notes: undefined,
@@ -230,78 +221,149 @@ describe('BookingComposerScreen', () => {
   it('navigates to BookingDetail with the returned booking id on success', async () => {
     mockApiPost.mockResolvedValue({ id: 'new-booking-id' });
     const navigation = makeNavigation();
-    const { getByPlaceholderText, getByLabelText } = render(
+    const { getByLabelText } = render(
       <BookingComposerScreen route={makeRoute() as any} navigation={navigation as any} />
     );
-
-    fillRequiredFields(getByPlaceholderText);
-
     await act(async () => {
       fireEvent.press(getByLabelText('Send proposal'));
     });
-
     expect(navigation.replace).toHaveBeenCalledWith('BookingDetail', { bookingId: 'new-booking-id' });
   });
 
   it('shows ActivityIndicator while submitting', async () => {
     let resolve!: (v: unknown) => void;
     mockApiPost.mockReturnValue(new Promise((res) => { resolve = res; }));
-    const { getByPlaceholderText, getByLabelText, UNSAFE_queryAllByType } = render(
+    const { getByLabelText, UNSAFE_queryAllByType } = render(
       <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
     );
-
-    fillRequiredFields(getByPlaceholderText);
     act(() => { fireEvent.press(getByLabelText('Send proposal')); });
 
     const { ActivityIndicator } = require('react-native');
     expect(UNSAFE_queryAllByType(ActivityIndicator).length).toBeGreaterThan(0);
 
-    // Clean up — resolve the promise so no state-update warnings
     await act(async () => { resolve({ id: 'x' }); });
+  });
+
+  // ── Picker interaction ────────────────────────────────────────────────────
+
+  it('changing start time auto-shifts end time when end would become invalid', async () => {
+    mockApiPost.mockResolvedValue({ id: 'b1' });
+    const { getByLabelText, getByText, queryByLabelText } = render(
+      <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+    );
+
+    // Open the start-time picker and select 23:00.
+    fireEvent.press(getByLabelText('Choose start time'));
+    fireEvent.press(getByLabelText(`Select ${formatTimeLabel('23:00')}`));
+
+    // The selectors should now reflect 23:00 and end auto-shifted to ≥ 23:30.
+    // plusOneHour('23:00') is clamped to '23:45' by sessionTime.
+    expect(getByText(formatTimeLabel('23:00'))).toBeTruthy();
+    expect(getByText(formatTimeLabel('23:45'))).toBeTruthy();
+    expect(queryByLabelText('Choose start time')).toBeTruthy();
+
+    // Submit and confirm the payload reflects the shifted times.
+    await act(async () => {
+      fireEvent.press(getByLabelText('Send proposal'));
+    });
+    expect(mockApiPost).toHaveBeenCalledWith(
+      '/bookings',
+      expect.objectContaining({
+        startsAt: `${defaultDate()}T23:00:00`,
+        endsAt: `${defaultDate()}T23:45:00`,
+      })
+    );
+  });
+
+  it('selecting an end time before start time disables Send and shows a friendly inline error', async () => {
+    const { getByLabelText, getByText } = render(
+      <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+    );
+    // Default start = 09:00, end = 10:00. Move end to 08:00 (before start).
+    fireEvent.press(getByLabelText('Choose end time'));
+    fireEvent.press(getByLabelText(`Select ${formatTimeLabel('08:00')}`));
+
+    expect(getByText('End time must be later than start time.')).toBeTruthy();
+    expect(getByLabelText('Send proposal').props.accessibilityState?.disabled).toBe(true);
+  });
+
+  it('rejects an end time that creates a session longer than 4 hours', async () => {
+    const { getByLabelText, getByText } = render(
+      <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+    );
+    // 09:00 → 14:00 = 5 hours.
+    fireEvent.press(getByLabelText('Choose end time'));
+    fireEvent.press(getByLabelText(`Select ${formatTimeLabel('14:00')}`));
+    expect(getByText('Sessions can be up to 4 hours long.')).toBeTruthy();
+    expect(getByLabelText('Send proposal').props.accessibilityState?.disabled).toBe(true);
+  });
+
+  it('rejects an end time that creates a session shorter than 30 minutes', async () => {
+    const { getByLabelText, getByText } = render(
+      <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+    );
+    // 09:00 → 09:15 = 15 minutes.
+    fireEvent.press(getByLabelText('Choose end time'));
+    fireEvent.press(getByLabelText(`Select ${formatTimeLabel('09:15')}`));
+    expect(getByText('Sessions must be at least 30 minutes long.')).toBeTruthy();
+    expect(getByLabelText('Send proposal').props.accessibilityState?.disabled).toBe(true);
   });
 
   // ── Error handling ─────────────────────────────────────────────────────────
 
-  it('shows an error message when api.post rejects', async () => {
-    mockApiPost.mockRejectedValue(new Error('Booking overlap'));
-    const { getByPlaceholderText, getByLabelText, findByText } = render(
+  it('maps a backend "starts_at in the past" error to a friendly message', async () => {
+    mockApiPost.mockRejectedValue(new Error('starts_at cannot be more than 1 hour in the past'));
+    const { getByLabelText, findByText } = render(
       <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
     );
-
-    fillRequiredFields(getByPlaceholderText);
     await act(async () => {
       fireEvent.press(getByLabelText('Send proposal'));
     });
+    await findByText('Choose a future start time.');
+  });
 
-    await findByText('Booking overlap');
+  it('maps a backend overlap error to a friendly message', async () => {
+    mockApiPost.mockRejectedValue(new Error('Booking overlap'));
+    const { getByLabelText, findByText } = render(
+      <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+    );
+    await act(async () => {
+      fireEvent.press(getByLabelText('Send proposal'));
+    });
+    await findByText('You already have a session at this time.');
+  });
+
+  it('falls back to a generic friendly message for unknown backend errors', async () => {
+    mockApiPost.mockRejectedValue(new Error('Server error'));
+    const { getByLabelText, findByText } = render(
+      <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+    );
+    await act(async () => {
+      fireEvent.press(getByLabelText('Send proposal'));
+    });
+    await findByText("Couldn't propose this session. Please try again.");
   });
 
   it('does not navigate when api.post rejects', async () => {
     mockApiPost.mockRejectedValue(new Error('Server error'));
     const navigation = makeNavigation();
-    const { getByPlaceholderText, getByLabelText } = render(
+    const { getByLabelText } = render(
       <BookingComposerScreen route={makeRoute() as any} navigation={navigation as any} />
     );
-
-    fillRequiredFields(getByPlaceholderText);
     await act(async () => {
       fireEvent.press(getByLabelText('Send proposal'));
     });
-
     expect(navigation.replace).not.toHaveBeenCalled();
   });
 
   it('re-enables Send proposal after an error so the user can retry', async () => {
     mockApiPost.mockRejectedValue(new Error('Server error'));
-    const { getByPlaceholderText, getByLabelText } = render(
+    const { getByLabelText } = render(
       <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
     );
-
-    fillRequiredFields(getByPlaceholderText);
     await act(async () => {
       fireEvent.press(getByLabelText('Send proposal'));
     });
-
     await waitFor(() => {
       expect(getByLabelText('Send proposal').props.accessibilityState?.disabled).toBe(false);
     });
@@ -319,9 +381,6 @@ describe('BookingComposerScreen', () => {
   });
 
   // ── Venue picker integration ───────────────────────────────────────────────
-  // The NearbyCourtsModal is mocked in this file so these tests focus on
-  // the composer's state + payload behavior. The modal stub immediately picks
-  // a known venue when its "mock-pick-venue" Pressable is fired.
 
   describe('venue picker', () => {
     it('shows the Find a court CTA when no venue is selected', () => {
@@ -335,23 +394,20 @@ describe('BookingComposerScreen', () => {
       const { getByLabelText, getByText, queryByPlaceholderText } = render(
         <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
       );
-      // Open the (mocked) modal, then pick the stub venue.
       fireEvent.press(getByLabelText('Choose a court or venue'));
       await act(async () => {
         fireEvent.press(getByLabelText('mock-pick-venue'));
       });
-      // Freeform input is gone; selected venue chip is visible.
       expect(queryByPlaceholderText('Or type a location, e.g. Bondi gym')).toBeNull();
       expect(getByText('Tennis Court Alpha')).toBeTruthy();
       expect(getByLabelText('Clear selected court')).toBeTruthy();
     });
 
-    it('sends venueId AND a venue-derived location when a venue is picked (Codex Blocker 3)', async () => {
+    it('sends venueId AND a venue-derived location when a venue is picked', async () => {
       mockApiPost.mockResolvedValue({ id: 'booking-with-venue' });
-      const { getByLabelText, getByPlaceholderText } = render(
+      const { getByLabelText } = render(
         <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
       );
-      fillRequiredFields(getByPlaceholderText);
       fireEvent.press(getByLabelText('Choose a court or venue'));
       await act(async () => {
         fireEvent.press(getByLabelText('mock-pick-venue'));
@@ -359,9 +415,6 @@ describe('BookingComposerScreen', () => {
       await act(async () => {
         fireEvent.press(getByLabelText('Send proposal'));
       });
-      // The mock venue has area "Bondi" and no address, so the derived
-      // string is "<name> — <area>". Persisting this on the booking
-      // means the calendar event has a meaningful location field.
       expect(mockApiPost).toHaveBeenCalledWith(
         '/bookings',
         expect.objectContaining({
@@ -372,18 +425,15 @@ describe('BookingComposerScreen', () => {
     });
 
     it('Change clears the selected venue back to the freeform field', async () => {
-      const { getByLabelText, getByPlaceholderText, queryByPlaceholderText } = render(
+      const { getByLabelText, getByPlaceholderText } = render(
         <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
       );
       fireEvent.press(getByLabelText('Choose a court or venue'));
       await act(async () => {
         fireEvent.press(getByLabelText('mock-pick-venue'));
       });
-      // Now clear the selection.
       fireEvent.press(getByLabelText('Clear selected court'));
-      // Freeform input is back.
       expect(getByPlaceholderText('Or type a location, e.g. Bondi gym')).toBeTruthy();
-      expect(queryByPlaceholderText).toBeTruthy();
     });
   });
 
@@ -391,19 +441,15 @@ describe('BookingComposerScreen', () => {
 
   it('passes the sport from route params to the API call', async () => {
     mockApiPost.mockResolvedValue({ id: 'booking-golf' });
-    const navigation = makeNavigation();
-    const { getByPlaceholderText, getByLabelText } = render(
+    const { getByLabelText } = render(
       <BookingComposerScreen
         route={makeRoute({ sport: 'golf' }) as any}
-        navigation={navigation as any}
+        navigation={makeNavigation() as any}
       />
     );
-
-    fillRequiredFields(getByPlaceholderText);
     await act(async () => {
       fireEvent.press(getByLabelText('Send proposal'));
     });
-
     expect(mockApiPost).toHaveBeenCalledWith('/bookings', expect.objectContaining({ sport: 'golf' }));
   });
 });

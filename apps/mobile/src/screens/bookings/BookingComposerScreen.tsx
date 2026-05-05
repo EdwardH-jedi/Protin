@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +14,20 @@ import {
 
 import { Screen } from '../../components/Screen';
 import { api } from '../../lib/api';
+import {
+  combineToLocalDate,
+  computeValidationError,
+  dateOptions,
+  defaultDate,
+  defaultStartTime,
+  formatDateLabel,
+  formatTimeLabel,
+  mapBackendError,
+  plusOneHour,
+  timeOptions,
+  type DateString,
+  type TimeString,
+} from '../../lib/sessionTime';
 import { formatVenueLocation } from '../../lib/venueLocation';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { BookingComposerScreenProps } from '../../navigation/types';
@@ -24,25 +39,52 @@ import { NearbyCourtsModal } from './NearbyCourtsModal';
 export function BookingComposerScreen({ route, navigation }: BookingComposerScreenProps) {
   const { matchId, sport } = route.params;
 
-  const [date, setDate] = useState('');        // YYYY-MM-DD
-  const [startTime, setStartTime] = useState(''); // HH:MM
-  const [endTime, setEndTime] = useState('');     // HH:MM
+  // Date-stable defaults: tomorrow 09:00 → 10:00. Ensures the screen opens
+  // in a valid, submittable state regardless of the device clock.
+  const [date, setDate] = useState<DateString>(() => defaultDate());
+  const [startTime, setStartTime] = useState<TimeString>(() => defaultStartTime());
+  const [endTime, setEndTime] = useState<TimeString>(() => plusOneHour(defaultStartTime()));
   const [location, setLocation] = useState('');
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [isVenuePickerOpen, setIsVenuePickerOpen] = useState(false);
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const canSubmit =
-    date.trim().length === 10 &&
-    startTime.trim().length === 5 &&
-    endTime.trim().length === 5 &&
-    !isSubmitting;
+  // Open-state for the three picker modals.
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [startPickerOpen, setStartPickerOpen] = useState(false);
+  const [endPickerOpen, setEndPickerOpen] = useState(false);
+
+  // Validation is derived from the picker state on every render so the
+  // submit button + inline error always reflect the current selection
+  // without an imperative validate-on-submit step.
+  const validationError = useMemo(
+    () => computeValidationError({ date, startTime, endTime }),
+    [date, startTime, endTime]
+  );
+
+  const canSubmit = !validationError && !isSubmitting;
+
+  /**
+   * When the user picks a new start time, auto-shift the end time to
+   * start + 1 hour if the existing end is now invalid (≤ start). This
+   * keeps the form continuously submittable without forcing the user to
+   * touch both pickers.
+   */
+  const handlePickStartTime = (next: TimeString) => {
+    setStartTime(next);
+    setStartPickerOpen(false);
+    const candidateEnd = combineToLocalDate(date, endTime);
+    const candidateStart = combineToLocalDate(date, next);
+    if (candidateEnd <= candidateStart) {
+      setEndTime(plusOneHour(next));
+    }
+  };
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
-    setError(null);
+    setSubmitError(null);
     setIsSubmitting(true);
     try {
       const startsAt = `${date}T${startTime}:00`;
@@ -50,11 +92,8 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
 
       // Fallback chain for the persisted location string:
       //   1. typed text (manually entered always wins)
-      //   2. venue-derived "Name — Address" (so calendar events have a
-      //      meaningful place, even if the consumer never reads venue_id)
+      //   2. venue-derived "Name — Address"
       //   3. undefined
-      // Mirrors apps/mobile/src/lib/venueLocation.ts and
-      // _booking_to_event in app/services/google_calendar.py.
       const trimmedTyped = location.trim();
       const venueDerived = selectedVenue ? formatVenueLocation(selectedVenue) : '';
       const payloadLocation = trimmedTyped || venueDerived || undefined;
@@ -71,10 +110,16 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
 
       navigation.replace('BookingDetail', { bookingId: booking.id });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to propose session.');
+      const raw = err instanceof Error ? err.message : '';
+      setSubmitError(mapBackendError(raw));
       setIsSubmitting(false);
     }
   };
+
+  // The inline error shown under the time fields is the validation error
+  // (live, derived) OR — if the user has tried to submit and the server
+  // rejected — the friendly mapped message.
+  const inlineError = validationError ?? submitError;
 
   return (
     <Screen padded={false}>
@@ -104,40 +149,34 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
           showsVerticalScrollIndicator={false}
         >
           <Field label="Date">
-            <TextInput
-              style={styles.input}
-              value={date}
-              onChangeText={setDate}
-              placeholder="2026-04-15"
-              placeholderTextColor={colors.textTertiary}
-              keyboardType="numbers-and-punctuation"
-              maxLength={10}
+            <SelectorButton
+              label={formatDateLabel(date)}
+              accessibilityLabel="Choose date"
+              onPress={() => setDatePickerOpen(true)}
             />
           </Field>
 
           <Field label="Start time">
-            <TextInput
-              style={styles.input}
-              value={startTime}
-              onChangeText={setStartTime}
-              placeholder="09:00"
-              placeholderTextColor={colors.textTertiary}
-              keyboardType="numbers-and-punctuation"
-              maxLength={5}
+            <SelectorButton
+              label={formatTimeLabel(startTime)}
+              accessibilityLabel="Choose start time"
+              onPress={() => setStartPickerOpen(true)}
             />
           </Field>
 
           <Field label="End time">
-            <TextInput
-              style={styles.input}
-              value={endTime}
-              onChangeText={setEndTime}
-              placeholder="10:00"
-              placeholderTextColor={colors.textTertiary}
-              keyboardType="numbers-and-punctuation"
-              maxLength={5}
+            <SelectorButton
+              label={formatTimeLabel(endTime)}
+              accessibilityLabel="Choose end time"
+              onPress={() => setEndPickerOpen(true)}
             />
           </Field>
+
+          {inlineError ? (
+            <Text style={styles.errorText} accessibilityLiveRegion="polite">
+              {inlineError}
+            </Text>
+          ) : null}
 
           <Field label="Court / venue (optional)">
             {selectedVenue ? (
@@ -193,8 +232,6 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
             />
           </Field>
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
           <Text style={styles.timezoneHint}>Times are in your local timezone.</Text>
 
           <Pressable
@@ -227,9 +264,40 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
         }}
         onClose={() => setIsVenuePickerOpen(false)}
       />
+
+      <DatePickerModal
+        isOpen={datePickerOpen}
+        selected={date}
+        onClose={() => setDatePickerOpen(false)}
+        onSelect={(d) => {
+          setDate(d);
+          setDatePickerOpen(false);
+        }}
+      />
+
+      <TimePickerModal
+        isOpen={startPickerOpen}
+        title="Start time"
+        selected={startTime}
+        onClose={() => setStartPickerOpen(false)}
+        onSelect={handlePickStartTime}
+      />
+
+      <TimePickerModal
+        isOpen={endPickerOpen}
+        title="End time"
+        selected={endTime}
+        onClose={() => setEndPickerOpen(false)}
+        onSelect={(t) => {
+          setEndTime(t);
+          setEndPickerOpen(false);
+        }}
+      />
     </Screen>
   );
 }
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -237,6 +305,164 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <Text style={styles.fieldLabel}>{label}</Text>
       {children}
     </View>
+  );
+}
+
+function SelectorButton({
+  label,
+  accessibilityLabel,
+  onPress,
+}: {
+  label: string;
+  accessibilityLabel: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={({ pressed }) => [styles.selector, pressed && styles.pressed]}
+    >
+      <Text style={styles.selectorText}>{label}</Text>
+      <Text style={styles.selectorChevron}>{'›'}</Text>
+    </Pressable>
+  );
+}
+
+function PickerModal({
+  isOpen,
+  title,
+  onClose,
+  children,
+}: {
+  isOpen: boolean;
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Modal
+      visible={isOpen}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalRoot}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{title}</Text>
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel={`Close ${title.toLowerCase()} picker`}
+              style={({ pressed }) => [styles.modalClose, pressed && styles.pressed]}
+            >
+              <Text style={styles.modalCloseText}>Done</Text>
+            </Pressable>
+          </View>
+          {children}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function OptionRow({
+  label,
+  isSelected,
+  accessibilityLabel,
+  onPress,
+}: {
+  label: string;
+  isSelected: boolean;
+  accessibilityLabel: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={({ pressed }) => [
+        styles.optionRow,
+        isSelected && styles.optionRowSelected,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function DatePickerModal({
+  isOpen,
+  selected,
+  onClose,
+  onSelect,
+}: {
+  isOpen: boolean;
+  selected: DateString;
+  onClose: () => void;
+  onSelect: (d: DateString) => void;
+}) {
+  // Built once per open: the option list is small and stable. ScrollView
+  // (instead of FlatList) avoids virtualization — the 90-day list is
+  // small enough to render in full, and tests can find every option.
+  const options = useMemo(() => dateOptions(), [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <PickerModal isOpen={isOpen} title="Date" onClose={onClose}>
+      <ScrollView
+        contentContainerStyle={styles.optionList}
+        showsVerticalScrollIndicator={false}
+      >
+        {options.map((item) => (
+          <OptionRow
+            key={item}
+            label={formatDateLabel(item)}
+            isSelected={item === selected}
+            accessibilityLabel={`Select ${formatDateLabel(item)}`}
+            onPress={() => onSelect(item)}
+          />
+        ))}
+      </ScrollView>
+    </PickerModal>
+  );
+}
+
+function TimePickerModal({
+  isOpen,
+  title,
+  selected,
+  onClose,
+  onSelect,
+}: {
+  isOpen: boolean;
+  title: string;
+  selected: TimeString;
+  onClose: () => void;
+  onSelect: (t: TimeString) => void;
+}) {
+  const options = useMemo(() => timeOptions(), []);
+  return (
+    <PickerModal isOpen={isOpen} title={title} onClose={onClose}>
+      <ScrollView
+        contentContainerStyle={styles.optionList}
+        showsVerticalScrollIndicator={false}
+      >
+        {options.map((item) => (
+          <OptionRow
+            key={item}
+            label={formatTimeLabel(item)}
+            isSelected={item === selected}
+            accessibilityLabel={`Select ${formatTimeLabel(item)}`}
+            onPress={() => onSelect(item)}
+          />
+        ))}
+      </ScrollView>
+    </PickerModal>
   );
 }
 
@@ -294,6 +520,26 @@ const styles = StyleSheet.create({
   inputMultiline: {
     minHeight: 88,
     textAlignVertical: 'top',
+  },
+  selector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    minHeight: 48,
+  },
+  selectorText: {
+    ...typography.body,
+    color: colors.textPrimary,
+  },
+  selectorChevron: {
+    fontSize: 22,
+    color: colors.textTertiary,
   },
   findCourtButton: {
     borderWidth: 1,
@@ -364,4 +610,60 @@ const styles = StyleSheet.create({
     color: colors.textInverse,
   },
   pressed: { opacity: 0.65 },
+
+  // ── Picker modal ───────────────────────────────────────────────────────────
+  modalRoot: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radii.lg,
+    borderTopRightRadius: radii.lg,
+    maxHeight: '70%',
+    paddingTop: spacing.md,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.separator,
+  },
+  modalTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+  },
+  modalClose: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  modalCloseText: {
+    ...typography.button,
+    color: colors.brand,
+  },
+  optionList: {
+    paddingVertical: spacing.xs,
+  },
+  optionRow: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  optionRowSelected: {
+    backgroundColor: colors.brandSoft,
+  },
+  optionText: {
+    ...typography.body,
+    color: colors.textPrimary,
+  },
+  optionTextSelected: {
+    ...typography.body,
+    color: colors.brand,
+    fontWeight: '600',
+  },
 });
