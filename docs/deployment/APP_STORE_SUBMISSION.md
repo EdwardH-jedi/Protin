@@ -52,7 +52,7 @@ Split between what the repo already supports today (no engineering work needed) 
 
 - `apps/mobile/assets/` does not yet exist in the repo. `app.config.js` directly references `./assets/notification-icon.png` (under the `expo-notifications` plugin) - `eas build` fails on a missing path. App icon, splash image, and Android adaptive-icon foreground are not currently referenced in `app.config.js`, so Expo would fall back to template defaults that will not pass App Store visual review; add them (and the matching `ios.icon`, `android.adaptiveIcon`, `splash.image` keys) before the first production build.
 - `apps/api/scripts/seed_review_data.py` does not exist. The review test account + two seed accounts + a pending booking (see section 6) depend on it.
-- `apps/mobile/eas.json` still contains `REPLACE_WITH_APP_STORE_CONNECT_APP_ID` and `REPLACE_WITH_APPLE_TEAM_ID` - replace both before `eas submit`.
+- `apps/mobile/eas.json` `submit.production.ios.ascAppId` and `appleTeamId` are pinned to the real values (`6767027447` and `37C8A2733Y` respectively) as of 2026-05-07. The earlier `REPLACE_WITH_*` placeholders are gone; `eas submit --platform ios --latest` is unblocked once a production build artifact exists.
 - Hosted URLs for the legal docs are **live** on Netlify at `https://sportgang.netlify.app/{privacy,terms,support}/`, and the matching `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, and `EXPO_PUBLIC_SUPPORT_URL` values are pinned on the EAS `preview` and `production` environments (verify with `eas env:list --environment {preview,production}`). Same values also live in the env example files (`apps/mobile/.env.example`, `apps/mobile/.env.staging.example`, `.env.example`) for local Expo runs. **Privacy / Terms / Support real-device tap-through: PASS — 2026-05-05** (operator-confirmed on iPhone via Expo Go; recorded in `docs/deployment/RELEASE_GATE_CHECKLIST.md` §4.6 and `docs/deployment/APPLE_TESTFLIGHT_PREP.md` §4.8). The same tap-through must be re-run against the actual signed TestFlight build before submission — that re-run remains PENDING.
 - Fly secrets: `APPLE_CLIENT_ID=com.edh1223.protin`, `SECRET_KEY`, `FIELD_ENCRYPTION_KEY`. Without these the staging / production API refuses to boot and the `/auth/apple` endpoint returns 503.
 - Screenshots at both required iPhone sizes (section 9), 6 per size.
@@ -65,10 +65,10 @@ Subscriptions / in-app purchases are **not** implemented. Do not select any IAP 
 
 ## Prerequisites (one-time)
 
-- [ ] **Apple Developer Program** enrolled - $99/yr, ~24-48h approval. Use an individual or business entity - whichever is on the privacy policy legal entity line.
-- [ ] **App Store Connect** account linked to the Developer Program.
-- [ ] **Apple Team ID** captured - used in `apps/mobile/eas.json` (`appleTeamId`).
-- [ ] **App Store Connect App ID (ASC App ID)** captured after the app record is created - also used in `apps/mobile/eas.json` (`ascAppId`).
+- [x] **Apple Developer Program** enrolled (2026-05-07).
+- [x] **App Store Connect** account linked to the Developer Program.
+- [x] **Apple Team ID** captured: `37C8A2733Y` — pinned in `apps/mobile/eas.json` `submit.production.ios.appleTeamId`.
+- [x] **App Store Connect App ID (ASC App ID)** captured: `6767027447` — pinned in `apps/mobile/eas.json` `submit.production.ios.ascAppId`.
 
 ---
 
@@ -83,7 +83,7 @@ Subscriptions / in-app purchases are **not** implemented. Do not select any IAP 
 | SKU | `protin-ios-1` (internal; any unique string). Internal-only; never user-visible. |
 | User access | Full access (default) |
 
-After creation, save the generated **ASC App ID** into `apps/mobile/eas.json` -> `submit.production.ios.ascAppId`.
+After creation, save the generated **ASC App ID** into `apps/mobile/eas.json` -> `submit.production.ios.ascAppId`. ✅ Done 2026-05-07: `ascAppId = "6767027447"`, `appleTeamId = "37C8A2733Y"`.
 
 ---
 
@@ -274,8 +274,8 @@ Full details and rollback in `docs/deployment/RELEASE_RUNBOOK.md`.
 
 ## 11. Final pre-submit checklist
 
-- [ ] Apple Developer enrolment complete, Team ID captured
-- [ ] ASC App ID captured and pasted into `apps/mobile/eas.json`
+- [x] Apple Developer enrolment complete, Team ID `37C8A2733Y` captured (2026-05-07)
+- [x] ASC App ID `6767027447` captured and pasted into `apps/mobile/eas.json` (2026-05-07)
 - [x] Privacy Policy, Terms of Service, and Support pages hosted on Netlify at `https://sportgang.netlify.app/{privacy,terms,support}/` (open follow-up: optional swap to a final custom domain)
 - [x] `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_SUPPORT_URL` set on EAS preview + production profiles to the Netlify URLs above. Verify with `eas env:list --environment {preview,production}` (see `docs/deployment/APPLE_TESTFLIGHT_PREP.md` §4.8)
 - [ ] Legal doc URLs reflected in `apps/mobile/src/lib/legal.ts` defaults if/when the env-driven flow is replaced (env values above are already documented in `apps/mobile/.env.example`, `apps/mobile/.env.staging.example`, and `.env.example`)

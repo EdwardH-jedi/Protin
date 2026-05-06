@@ -441,9 +441,9 @@ states the stage it blocks.
 
 | Requirement | Required by gate | Status |
 |---|---|---|
-| Apple Developer Program enrollment (Team ID captured) | Gate 2 | [ ] |
-| App Store Connect app record created (ASC App ID captured) | Gate 2 | [ ] |
-| Bundle identifier consistency: `apps/mobile/app.config.js` vs ASC app record vs APNs capability | Gate 2 | [ ] |
+| Apple Developer Program enrollment (Team ID captured) | Gate 2 | [x] PASS — 2026-05-07. Apple Team ID `37C8A2733Y` captured. |
+| App Store Connect app record created (ASC App ID captured) | Gate 2 | [x] PASS — 2026-05-07. SportsGang app record created in App Store Connect; ASC App ID `6767027447` captured. |
+| Bundle identifier consistency: `apps/mobile/app.config.js` vs ASC app record vs APNs capability | Gate 2 | [~] App ↔ ASC bundle consistency confirmed (`com.edh1223.protin` in both as of 2026-05-07). APNs capability on the bundle ID is still Apple-side setup required. |
 | Signing credentials: EAS-managed or team-owned; confirmed on first `eas build` | Gate 2 | [ ] |
 | Push entitlement / APNs capability enabled on the bundle ID | Gate 2 (push claim) and Gate 3 | [ ] |
 | TestFlight internal tester group with 2 or more humans | Gate 2 | [ ] |
@@ -453,7 +453,7 @@ states the stage it blocks.
 | Reviewer demo account credentials seeded and captured | Gate 3 | [ ] |
 | App Review Contact Info (name, email, phone) finalized | Gate 3 | [ ] |
 | Review notes block finalized (see `APP_STORE_SUBMISSION.md` section 7) | Gate 3 | [ ] |
-| `apps/mobile/eas.json` `ascAppId` and `appleTeamId` filled (non-placeholder) | Gate 2 | [ ] |
+| `apps/mobile/eas.json` `ascAppId` and `appleTeamId` filled (non-placeholder) | Gate 2 | [x] PASS — 2026-05-07. `ascAppId = "6767027447"`, `appleTeamId = "37C8A2733Y"` pinned in `apps/mobile/eas.json`. |
 
 Do not treat any of these as "will-do" during a gate review. If the row is
 unchecked at decision time, the gate does not pass.
@@ -469,7 +469,7 @@ known-absent repo artifacts, and Apple-side unknowns live.
 |---|---|---|---|---|
 | `apps/mobile/assets/` directory does not exist | `app.config.js` references `./assets/notification-icon.png`; `eas build` fails on missing path. App icon, splash, and adaptive icon also not wired | Gate 2 | mobile | Assets committed and referenced in `app.config.js` |
 | `apps/api/scripts/seed_review_data.py` does not exist | Reviewers need a pre-populated demo account plus matches plus a pending booking; submission doc assumes this script | Gate 3 | api | Script exists, documented, and run against staging with captured credentials |
-| `apps/mobile/eas.json` still contains `REPLACE_WITH_APP_STORE_CONNECT_APP_ID` and `REPLACE_WITH_APPLE_TEAM_ID` placeholders | `eas submit` will refuse | Gate 2 | mobile / release owner | Real values in `eas.json` |
+| ~~`apps/mobile/eas.json` still contains `REPLACE_WITH_APP_STORE_CONNECT_APP_ID` and `REPLACE_WITH_APPLE_TEAM_ID` placeholders~~ | RESOLVED 2026-05-07 — `ascAppId = "6767027447"` and `appleTeamId = "37C8A2733Y"` are pinned in `apps/mobile/eas.json` `submit.production.ios`. | Gate 2 | mobile / release owner | Real values in `eas.json` |
 | Push end-to-end on real iPhone not yet proven | Code-and-config readiness is not APNs delivery; claiming push as ready is the single highest rejection risk | Gate 2 push claim, Gate 3 | mobile and api | Section 4.3 rows checked with dated evidence |
 | Google Calendar flow not yet proven on real iPhone | Surface is exposed in booking UI; if unverified at Gate 3, hide or mark as optional | Gate 3 (risk) | mobile | Section 4.4 rows checked or feature hidden behind a flag |
 | Legal URLs in `apps/mobile/src/lib/legal.ts` still point at unpublished paths | App Store requires reachable Privacy Policy URL; mismatch risks a 5.1.2 rejection | Gate 3 | release owner | RESOLVED 2026-05-05 — URLs hosted on Netlify (`https://sportgang.netlify.app/{privacy,terms,support}/`), pinned on EAS preview + production via `EXPO_PUBLIC_*_URL`, and tap-tested on real iPhone (section 4.6). Hardcoded fallback constants in `apps/mobile/src/lib/legal.ts` may still be swapped in a separate slice once the env-driven flow is the only path. |
@@ -547,11 +547,14 @@ deployed backend.
 - [ ] Section 4.3 push rows: at minimum permission prompt, token
   registration, and one successful real-device delivery logged.
 - [ ] Section 4.5 onboarding row checked on a real iPhone.
-- [ ] Apple Developer Program enrollment, App Store Connect app record,
-  Team ID, and ASC App ID all captured (section 5).
-- [ ] Bundle identifier matches across `app.config.js`, the ASC app record,
-  and APNs capability.
-- [ ] `apps/mobile/eas.json` `ascAppId` and `appleTeamId` non-placeholder.
+- [x] Apple Developer Program enrollment, App Store Connect app record,
+  Team ID `37C8A2733Y`, and ASC App ID `6767027447` all captured 2026-05-07
+  (section 5).
+- [~] Bundle identifier matches across `app.config.js` (`com.edh1223.protin`)
+  and the ASC app record (confirmed 2026-05-07). APNs capability on that
+  bundle ID is still Apple-side setup required.
+- [x] `apps/mobile/eas.json` `ascAppId = "6767027447"` and
+  `appleTeamId = "37C8A2733Y"` (non-placeholder) — committed 2026-05-07.
 - [ ] `apps/mobile/assets/` exists with the files referenced by
   `app.config.js` and by the first App Store visual pass.
 - [ ] TestFlight internal tester group populated with 2 or more humans.

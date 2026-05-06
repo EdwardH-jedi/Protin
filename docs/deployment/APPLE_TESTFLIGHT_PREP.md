@@ -69,12 +69,14 @@ Snapshot of where the seven areas stand right now, in plain present tense.
   `Apple-side setup required`.
 - **EAS build path** has three profiles (development, preview, production).
   Production targets `https://protin-api.fly.dev` and `autoIncrement: true`.
-  The `submit.production.ios` block still has placeholders for `ascAppId`
-  and `appleTeamId`; until those are replaced, `eas submit` cannot run.
-  Signing credentials and APNs entitlement are `Apple-side setup required`.
-- **App Store Connect app record** is `Apple-side setup required`. No ASC
-  App ID is captured anywhere in the repo. `APP_STORE_SUBMISSION.md` has a
-  one-time prerequisites block that captures what needs doing.
+  The `submit.production.ios` block carries the real `ascAppId`
+  (`6767027447`) and `appleTeamId` (`37C8A2733Y`) as of 2026-05-07.
+  Signing credentials and APNs entitlement remain `Apple-side setup
+  required` (exercised on the first `eas build`).
+- **App Store Connect app record** is `configured`. The `SportsGang`
+  app record was created 2026-05-07; the ASC App ID `6767027447` is
+  pinned in `apps/mobile/eas.json`. `APP_STORE_SUBMISSION.md` section 1
+  captures the one-time setup that produced it.
 - **Privacy policy / support URLs** are `hosted and EAS-pinned`. The
   static site at `apps/web/site/` is deployed to Netlify and all four
   canonical routes resolve over HTTPS today:
@@ -119,7 +121,7 @@ Detailed area-by-area tables follow.
 | iOS `bundleIdentifier` | configured | `apps/mobile/app.config.js:49` -> `ios.bundleIdentifier = "com.edh1223.protin"` | Use this exact string when creating the App Store Connect app record. |
 | Android `package` matches | configured | `apps/mobile/app.config.js:61` -> `android.package = "com.edh1223.protin"` | None. |
 | App name / slug / version | configured | `app.config.js` -> `name: "Protin"`, `slug: "protin"`, `version: "1.0.0"`, `ios.buildNumber: "1"` | Bump `version` only for user-visible release; `autoIncrement` handles build number on production profile. |
-| ASC app record uses same bundle | Apple-side setup required | No ASC App ID captured in-repo | Create the ASC app record with `Bundle ID = com.edh1223.protin`. Capture the generated ASC App ID. |
+| ASC app record uses same bundle | configured | App Store Connect app record created 2026-05-07 with public name `SportsGang`, Bundle ID `com.edh1223.protin`. ASC App ID `6767027447` captured. | None. |
 | APNs capability enabled on the bundle ID | Apple-side setup required | Not verifiable from the repo | Enable "Push Notifications" on the bundle ID in the Apple Developer portal once the app record exists. |
 
 ### 4.2 EAS build / signing / APNs path
@@ -131,18 +133,18 @@ Detailed area-by-area tables follow.
 | HTTPS API URL enforcement | configured | `app.config.js` `resolveApiUrl()` throws at config-eval when `APP_ENV=production` and the URL is missing / not `https://` | None. |
 | Expo notifications plugin | configured | `app.config.js` declares `expo-notifications` with an icon + color | Icon path depends on `apps/mobile/assets/notification-icon.png` (see 4.6 blockers). |
 | iOS `UIBackgroundModes` for push | configured | `app.config.js:57` -> `infoPlist.UIBackgroundModes = ["remote-notification"]` | None until APNs entitlement lands. |
-| Signing credentials | Apple-side setup required | Not verifiable from the repo | On first `eas build --platform ios --profile production`, accept the EAS-managed credentials flow (or upload a team-owned cert). Capture the Team ID into `eas.json`. |
-| `ascAppId` in `eas.json` | blocked | `eas.json:30` still has `"REPLACE_WITH_APP_STORE_CONNECT_APP_ID"` | Replace with the real ASC App ID after the App Store Connect record is created. |
-| `appleTeamId` in `eas.json` | blocked | `eas.json:31` still has `"REPLACE_WITH_APPLE_TEAM_ID"` | Replace with the real Apple Team ID. |
+| Signing credentials | Apple-side setup required | Apple Team ID `37C8A2733Y` captured 2026-05-07 and pinned in `eas.json` `submit.production.ios.appleTeamId`. EAS-managed credentials flow has not yet been exercised. | On first `eas build --platform ios --profile production`, accept the EAS-managed credentials flow (or upload a team-owned cert). |
+| `ascAppId` in `eas.json` | configured | `apps/mobile/eas.json` `submit.production.ios.ascAppId` is `"6767027447"` (committed 2026-05-07). | None. |
+| `appleTeamId` in `eas.json` | configured | `apps/mobile/eas.json` `submit.production.ios.appleTeamId` is `"37C8A2733Y"` (committed 2026-05-07). | None. |
 | APNs delivery to a real iPhone | verify on real device | Backend notification path is covered by tests; APNs is not | After the bundle-ID APNs capability is enabled and an EAS build is installed on a device, exercise `POST /notifications/token` then trigger a send and confirm arrival. |
 
 ### 4.3 App Store Connect app-record readiness
 
 | Item | Status | Evidence / what is missing | Next action |
 |---|---|---|---|
-| Apple Developer Program enrolled | Apple-side setup required | Not verifiable from the repo | Enroll ($99/yr); capture the Team ID. |
-| ASC app record created | Apple-side setup required | Not verifiable from the repo | Create `Protin`, Platform `iOS`, Primary language `English (Australia)`, Bundle ID `com.edh1223.protin`, SKU `protin-ios-1` (or equivalent). See `APP_STORE_SUBMISSION.md` section 1. |
-| ASC App ID captured | Apple-side setup required | Not in `eas.json` | After record creation, paste into `eas.json` `submit.production.ios.ascAppId` and confirm `eas submit --platform ios --latest` resolves. |
+| Apple Developer Program enrolled | configured | Enrollment complete; Apple Team ID `37C8A2733Y` captured 2026-05-07 and pinned in `apps/mobile/eas.json`. | None. |
+| ASC app record created | configured | App Store Connect app record created 2026-05-07 — public name `SportsGang`, Platform `iOS`, Primary language `English (Australia)`, Bundle ID `com.edh1223.protin`. See `APP_STORE_SUBMISSION.md` section 1. | None. |
+| ASC App ID captured | configured | ASC App ID `6767027447` pinned in `apps/mobile/eas.json` `submit.production.ios.ascAppId`. | `eas submit --platform ios --latest` is unblocked once the first production build artifact exists. |
 | App Privacy questionnaire answered | Apple-side setup required | `APP_STORE_SUBMISSION.md` section 4 holds the intended answers | Enter the answers exactly as documented; if Sentry DSN is not shipped, switch the two Sentry rows to `No`. |
 | Age rating questionnaire | Apple-side setup required | Template in `APP_STORE_SUBMISSION.md` section 5 + recommended target in `APP_STORE_METADATA.md` §7 | Recommended conservative age-rating target: 17+ due to user profiles, chat, and real-world sports session coordination. Final rating must be confirmed in App Store Connect's age-rating questionnaire — Apple has not assigned any rating yet. |
 
@@ -369,11 +371,12 @@ blockers to clear, in dependency order:
    artwork must replace these placeholders before public submission.
    Android `adaptiveIcon.foregroundImage` is still TODO; the fallback to
    `icon` is acceptable for internal TestFlight.
-2. **Apple Developer Program enrollment.** Needed to create the ASC app
-   record, generate signing credentials, and enable APNs on the bundle ID.
-3. **ASC app record created with `com.edh1223.protin`.** Capture the ASC
-   App ID and Team ID. Paste both into `apps/mobile/eas.json`, replacing
-   the `REPLACE_WITH_*` placeholders.
+2. **Apple Developer Program enrollment.** ✅ Complete (2026-05-07).
+   Apple Team ID `37C8A2733Y` captured.
+3. **ASC app record created with `com.edh1223.protin`.** ✅ Complete
+   (2026-05-07). Public name `SportsGang`, ASC App ID `6767027447`. Both
+   `ascAppId` and `appleTeamId` are pinned in `apps/mobile/eas.json`
+   `submit.production.ios`.
 4. **APNs capability enabled on the bundle ID.** Without this, any claim
    of push readiness is unsupportable.
 5. **Signing credentials accepted on first `eas build`.** EAS-managed is
@@ -383,9 +386,10 @@ blockers to clear, in dependency order:
 8. **TestFlight internal tester group with at least 2 humans** associated
    with that build.
 
-Items 1, 3 (the placeholder swap), and the `APPLE_CLIENT_ID` on the
-deployed backend are the three things a contributor can do inside the repo
-or its immediate config surface. Items 2, 4, 5, 7, and 8 are Apple-side.
+Items 1, the (now-resolved) `eas.json` ID swap, and the `APPLE_CLIENT_ID`
+on the deployed backend are the things a contributor can resolve inside
+the repo or its immediate config surface. Items 4, 5, 6, 7, and 8 are
+Apple-side / build-side and remain open.
 
 Gate 3 (submission prep) additionally requires the privacy/terms/support
 URLs and the reviewer demo account path from sections 4.4 and 4.5.
@@ -431,10 +435,11 @@ App Store artwork. Before public submission:
 - Add `android.adaptiveIcon.foregroundImage` once the Android adaptive
   icon foreground is finalized.
 
-No fake App Store / Apple Team ID values were introduced for this slice.
-The `eas.json` `submit.production.ios.ascAppId` and `appleTeamId`
-placeholders remain `REPLACE_WITH_*` and are documented as Apple-side
-setup in §4.2; both must be filled before `eas submit` can run.
+App Store / Apple Team ID values are now real. As of 2026-05-07,
+`eas.json` `submit.production.ios.ascAppId` is `"6767027447"` and
+`appleTeamId` is `"37C8A2733Y"`; the `REPLACE_WITH_*` placeholders are
+gone. `eas submit --platform ios --latest` is unblocked once the first
+production build artifact exists.
 
 No fake Firebase credential files were introduced. `app.config.js`
 already gates `googleServicesFile` resolution behind `isStrictBuild()`

@@ -369,13 +369,14 @@ For the device-class capture mechanics (iPhone 16 Pro Max 6.9", iPhone
 | R4 | Real-iPhone tap-test of in-app legal/support links | PASS, 2026-05-05 — recorded in `RELEASE_GATE_CHECKLIST.md` §4.6. All five links opened the expected Netlify pages, no "link unavailable" alert, no 404, no crash. |
 | R5 | Final local iOS screenshot package | PASS, 2026-05-06 — six PNGs prepared in `docs/release/screenshots/ios/` in the §11 order. Local package only — App Store Connect upload remains PENDING (see Remaining item 4). |
 | R6 | App Store metadata copy review | PASS, 2026-05-06 — full pass over §1 identity, §2 promo (now references Events), §4 description (includes session proposal + court/venue + Accept/Decline + Events), §5 keywords (no badminton / push / calendar / tournament / rank / dating / nearby — `events` intentionally still excluded), §7 age rating (consistent 17+ across this file, `APP_STORE_SUBMISSION.md` §5, and `APPLE_TESTFLIGHT_PREP.md` §4.3), §8 URLs (Netlify host pinned), §9 review-notes walkthrough (extended through proposal + Events). `APP_STORE_SUBMISSION.md` §7 review-notes block, §8 description / keywords drafts, §9 screenshot lineup, and §12 rejection-recovery row that referenced "push notification flows" all replaced with pointers / cleaned copy so the two docs stay in lockstep. ASC submission itself remains PENDING (see Remaining items 4, 6, 7). |
+| R7 | Apple Developer enrollment + ASC app record + EAS ID configuration | PASS, 2026-05-07 — Apple Developer Program enrollment complete, App Store Connect app record `SportsGang` created (Bundle ID `com.edh1223.protin`), Apple Team ID `37C8A2733Y` and ASC App ID `6767027447` captured and pinned in `apps/mobile/eas.json` `submit.production.ios`. APNs capability on the bundle ID, signing credentials, EAS iOS build, TestFlight upload, and TestFlight QA all remain PENDING. |
 
 ### Remaining
 
 | # | Item | Blocker type | Owner |
 |---|---|---|---|
-| 1 | Apple Developer Team ID | Apple-side setup | Operator (after Apple Developer Program enrollment). |
-| 2 | App Store Connect App ID | Apple-side setup | Operator (after ASC app record creation). |
+| ~~1~~ | ~~Apple Developer Team ID~~ | ~~Apple-side setup~~ | RESOLVED 2026-05-07 — Team ID `37C8A2733Y` captured. See Resolved row R7. |
+| ~~2~~ | ~~App Store Connect App ID~~ | ~~Apple-side setup~~ | RESOLVED 2026-05-07 — ASC App ID `6767027447` captured. See Resolved row R7. |
 | 3 | Final app icon + splash artwork (replace Step 5 placeholders) | Design | Designer; replaces the placeholder PNGs in `apps/mobile/assets/`. |
 | 4 | App Store Connect screenshot upload (per device class) | Apple-side upload | Operator. Local package is prepared in `docs/release/screenshots/ios/` (six PNGs in §11 order). Per-device-class resolution sets and the actual ASC upload remain pending — see `APP_STORE_SUBMISSION.md` §9 for the iPhone 16 Pro Max 6.9" / iPhone 14 Plus 6.5" capture matrix. |
 | 5 | App Privacy Label confirmation against actual SDK behavior | Privacy review | Operator (see `APP_PRIVACY_LABEL_DRAFT.md`). |
@@ -384,7 +385,7 @@ For the device-class capture mechanics (iPhone 16 Pro Max 6.9", iPhone
 | 8 | Final age rating answered in ASC questionnaire | Operator | See §7. v1 recommended conservative default is 17+; final answer must align with `LEGAL_WEBSITE_CONTENT.md` Privacy §11 / Terms §2 minimum-age clause. |
 | 9 | Real `support@`, `privacy@`, `legal@` mailboxes on a domain the operator controls | Operator | Required before the §9 review-notes contact line and the Support page footer can drop their placeholder addresses. |
 | 10 | Optional custom-domain swap (`sportsgang.app` or similar) | Operator (optional) | Hypothetical only; do not claim the domain is live. If pinned, re-run §8 EAS env updates and the §4.6 / §4.8 verification in `RELEASE_GATE_CHECKLIST.md` and `APPLE_TESTFLIGHT_PREP.md`. |
-| 11 | First green `eas build --platform ios --profile production` plus `eas submit --platform ios --latest` | Build path | Mobile / release owner. Gated by items 1, 2, 3, and the `eas.json` `ascAppId` / `appleTeamId` placeholder swap tracked in `APPLE_TESTFLIGHT_PREP.md` §4.2. |
+| 11 | First green `eas build --platform ios --profile production` plus `eas submit --platform ios --latest` | Build path | Mobile / release owner. Items 1 and 2 (Apple Developer Team ID and ASC App ID) and the `eas.json` `ascAppId` / `appleTeamId` placeholder swap are now resolved (2026-05-07). Still gated by item 3 (final app icon + splash artwork), the APNs capability on the bundle ID, and the EAS-managed signing credentials flow on first build — both tracked in `APPLE_TESTFLIGHT_PREP.md` §4.2 / §4.3. |
 | 12 | TestFlight internal tester group with 2+ humans, plus a dated on-device run of the §4.6 link tap-test against the actual signed build | Apple-side + device proof | Operator + at least one tester. Re-runs the §4.6 checklist on the production build, not just Expo Go. |
 
 Until every "Remaining" line is resolved, the App Store record is not
