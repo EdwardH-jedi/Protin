@@ -78,6 +78,7 @@ jest.mock('../screens/onboarding/OnboardingStep2Screen', () => ({ OnboardingStep
 jest.mock('../screens/onboarding/OnboardingStep3Screen', () => ({ OnboardingStep3Screen: () => null }));
 jest.mock('../screens/onboarding/OnboardingStep4Screen', () => ({ OnboardingStep4Screen: () => null }));
 jest.mock('../screens/discovery/DiscoveryScreen', () => ({ DiscoveryScreen: () => null }));
+jest.mock('../screens/events/EventsScreen', () => ({ EventsScreen: () => null }));
 jest.mock('../screens/matches/MatchesScreen', () => ({ MatchesScreen: () => null }));
 jest.mock('../screens/profile/ProfileScreen', () => ({ ProfileScreen: () => null }));
 jest.mock('../screens/profile/EditProfileScreen', () => ({ EditProfileScreen: () => null }));

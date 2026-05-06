@@ -16,6 +16,7 @@ import { OnboardingStep2Screen } from '../screens/onboarding/OnboardingStep2Scre
 import { OnboardingStep3Screen } from '../screens/onboarding/OnboardingStep3Screen';
 import { OnboardingStep4Screen } from '../screens/onboarding/OnboardingStep4Screen';
 import { DiscoveryScreen } from '../screens/discovery/DiscoveryScreen';
+import { EventsScreen } from '../screens/events/EventsScreen';
 import { MatchesScreen } from '../screens/matches/MatchesScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { EditProfileScreen } from '../screens/profile/EditProfileScreen';
@@ -79,6 +80,11 @@ function MainTabs() {
         name="Matches"
         component={MatchesScreen}
         options={{ title: 'Matches' }}
+      />
+      <Tab.Screen
+        name="Events"
+        component={EventsScreen}
+        options={{ title: 'Events' }}
       />
       <Tab.Screen
         name="Profile"

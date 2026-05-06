@@ -29,6 +29,7 @@ export type RootStackParamList = {
 export type MainTabParamList = {
   Discovery: undefined;
   Matches: undefined;
+  Events: undefined;
   Profile: undefined;
 };
 
@@ -45,6 +46,7 @@ export type OnboardingStep4ScreenProps = NativeStackScreenProps<RootStackParamLi
 
 export type DiscoveryScreenProps = BottomTabScreenProps<MainTabParamList, 'Discovery'>;
 export type MatchesScreenProps = BottomTabScreenProps<MainTabParamList, 'Matches'>;
+export type EventsScreenProps = BottomTabScreenProps<MainTabParamList, 'Events'>;
 export type ProfileScreenProps = BottomTabScreenProps<MainTabParamList, 'Profile'>;
 export type EditProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 
