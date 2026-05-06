@@ -19,6 +19,39 @@ interface AuthState {
 }
 
 /**
+ * Monotonically increasing operation counter shared by every auth path that
+ * mutates the global `api._token` or the in-memory `user`. Each
+ * initialize/login/register/loginWithApple/logout captures `++authOpVersion`
+ * at start; once captured, ANY subsequent auth operation invalidates the
+ * captured number, and the in-flight call must drop its results without
+ * touching the api token, SecureStore, or the store.
+ *
+ * Why: backend evidence (Chris/Sarah real-device test, both messages saved
+ * with sender_id = Sarah) proves the bearer header at POST time was Sarah's
+ * even when the UI believed it was Chris. The structural cause is that
+ * `setToken` is global and several async paths (initialize's /auth/me,
+ * hydrate's /auth/me, logout) can resolve out of order. Without a guard, a
+ * delayed /auth/me from a stale operation can re-pin the api token / user
+ * AFTER a later logout-then-login has already landed the new identity.
+ *
+ * The guard makes the invariant explicit: only the LATEST auth operation
+ * may write identity. Stale results are silently dropped. This is invariant
+ * regardless of which exact production trigger reopens the window
+ * (background/foreground pauses, slow networks, iOS keychain hiccups,
+ * StrictMode double-effects).
+ */
+let authOpVersion = 0;
+
+function nextAuthOp(): number {
+  authOpVersion += 1;
+  return authOpVersion;
+}
+
+function isCurrent(op: number): boolean {
+  return op === authOpVersion;
+}
+
+/**
  * After `/auth/login`, `/auth/register`, or `/auth/apple` returns a token,
  * persist the token and immediately fetch `/auth/me` so the in-memory `user`
  * is populated for the rest of the session. Without this hydration step, the
@@ -31,18 +64,30 @@ interface AuthState {
  * conservative behavior: drop the just-stored token so the app stays in a
  * logged-out state rather than carrying a token without a user, and rethrow
  * a friendly error so the auth screen can surface it.
+ *
+ * Stale-op guard: every state mutation here is gated on `isCurrent(op)`. A
+ * later logout/login increments the version, so a slow /auth/me from this
+ * call cannot overwrite identity after the user has moved on.
  */
 async function hydrateUserAfterToken(
   set: (partial: Partial<AuthState>) => void,
-  accessToken: string
+  accessToken: string,
+  op: number
 ): Promise<void> {
   await SecureStore.setItemAsync(TOKEN_KEY, accessToken);
+  if (!isCurrent(op)) return;
   setToken(accessToken);
   set({ token: accessToken, user: null });
   try {
     const me = await api.get<MeResponse>('/auth/me');
+    if (!isCurrent(op)) return;
     set({ user: me });
   } catch (err) {
+    if (!isCurrent(op)) {
+      throw err instanceof Error
+        ? err
+        : new Error('Signed in, but could not load your account. Please try again.');
+    }
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     setToken(null);
     set({ token: null, user: null });
@@ -58,26 +103,31 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: false,
 
   login: async (email, password) => {
+    const op = nextAuthOp();
     set({ isLoading: true });
     try {
       const data = await api.post<TokenResponse>('/auth/login', { email, password });
-      await hydrateUserAfterToken(set, data.accessToken);
+      await hydrateUserAfterToken(set, data.accessToken, op);
     } finally {
+      // isLoading is UI affordance, not identity — safe to release even on
+      // a stale op. Without this, a stale login would leave the spinner up.
       set({ isLoading: false });
     }
   },
 
   register: async (email, password) => {
+    const op = nextAuthOp();
     set({ isLoading: true });
     try {
       const data = await api.post<TokenResponse>('/auth/register', { email, password });
-      await hydrateUserAfterToken(set, data.accessToken);
+      await hydrateUserAfterToken(set, data.accessToken, op);
     } finally {
       set({ isLoading: false });
     }
   },
 
   loginWithApple: async (payload) => {
+    const op = nextAuthOp();
     set({ isLoading: true });
     try {
       const data = await api.post<TokenResponse>('/auth/apple', {
@@ -86,13 +136,17 @@ export const useAuthStore = create<AuthState>((set) => ({
         email: payload.email ?? undefined,
         name: payload.name ?? undefined,
       });
-      await hydrateUserAfterToken(set, data.accessToken);
+      await hydrateUserAfterToken(set, data.accessToken, op);
     } finally {
       set({ isLoading: false });
     }
   },
 
   logout: async () => {
+    // Bump the version FIRST. Any hydrate/initialize whose /auth/me is in
+    // flight must observe a stale op the moment it next checks, so it
+    // cannot re-pin the api token or repopulate user after we clear here.
+    nextAuthOp();
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     setToken(null);
     set({ token: null, user: null });
@@ -104,13 +158,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   initialize: async () => {
+    const op = nextAuthOp();
     try {
       const stored = await SecureStore.getItemAsync(TOKEN_KEY);
       if (!stored) return;
+      if (!isCurrent(op)) return;
       setToken(stored);
       const user = await api.get<MeResponse>('/auth/me');
+      if (!isCurrent(op)) return;
       set({ token: stored, user });
     } catch {
+      if (!isCurrent(op)) return;
       // Token may be invalid — clear it silently
       await SecureStore.deleteItemAsync(TOKEN_KEY);
       setToken(null);

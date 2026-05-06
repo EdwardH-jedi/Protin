@@ -165,3 +165,101 @@ describe('useAuthStore — switching accounts mid-session', () => {
     expect(useAuthStore.getState().user?.id).toBe('sarah-id');
   });
 });
+
+// ─── Stale-op guard regression tests ─────────────────────────────────────────
+//
+// These tests pin the version-guard contract introduced after the iPhone
+// Chris/Sarah real-device test, where both messages were saved with
+// sender_id = Sarah even though the tester believed the second was sent as
+// Chris. The bearer header at POST time matches whatever `setToken` last
+// wrote into the api module, so a stale /auth/me that lands AFTER a later
+// logout/login must be silently dropped — otherwise the api token gets
+// re-pinned to the previous account and every subsequent request is mis-
+// authenticated as that user.
+
+describe('useAuthStore — stale auth-op results cannot overwrite a later identity', () => {
+  it('drops a hydrate /auth/me result that resolves AFTER a logout-then-login', async () => {
+    // 1) Chris login starts. POST /auth/login returns a token; /auth/me is
+    //    deferred — the hydrate will sit on it indefinitely until we resolve
+    //    chrisMeDefer manually below. This simulates a slow-network /auth/me
+    //    response that doesn't arrive until the user has moved on.
+    let resolveChrisMe: (v: unknown) => void = () => {};
+    const chrisMeDefer = new Promise((resolve) => {
+      resolveChrisMe = resolve;
+    });
+
+    mockApiPost.mockResolvedValueOnce({ accessToken: 'chris-token', tokenType: 'bearer' });
+    mockApiGet.mockReturnValueOnce(chrisMeDefer);
+
+    // Kick off Chris's login. Don't await — we want it pending while the
+    // logout + Sarah login race ahead.
+    const chrisLogin = useAuthStore.getState().login('chris@example.com', 'password123');
+
+    // Yield so the hydrate has a chance to run setToken('chris-token') and
+    // queue the /auth/me request before we move on.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // 2) Logout. This MUST bump the auth-op version before the SecureStore
+    //    delete await so a stale /auth/me resolution is invalidated.
+    await useAuthStore.getState().logout();
+
+    // 3) Sarah login lands FULLY and synchronously (her /auth/me resolves
+    //    immediately so her identity is committed before Chris's /auth/me
+    //    finally arrives below).
+    mockApiPost.mockResolvedValueOnce({ accessToken: 'sarah-token', tokenType: 'bearer' });
+    mockApiGet.mockResolvedValueOnce({ ...FAKE_ME, id: 'sarah-id', email: 'sarah@example.com' });
+    await useAuthStore.getState().login('sarah@example.com', 'password123');
+
+    // Sanity: the store is Sarah at this point.
+    expect(useAuthStore.getState().user?.id).toBe('sarah-id');
+    expect(useAuthStore.getState().token).toBe('sarah-token');
+
+    // 4) Chris's /auth/me FINALLY resolves. Without the guard, this would
+    //    set user = Chris, leaving the api module token = sarah-token but
+    //    user = Chris (or worse, also re-pin the api token). With the guard
+    //    the result is dropped silently — Sarah's identity stays intact.
+    resolveChrisMe({ ...FAKE_ME, id: 'chris-id', email: 'chris@example.com' });
+    await chrisLogin;
+
+    expect(useAuthStore.getState().user?.id).toBe('sarah-id');
+    expect(useAuthStore.getState().token).toBe('sarah-token');
+    // The last setToken call must be for Sarah, NOT for null (the catch
+    // path) and NOT for Chris's token: Chris's hydrate must observe a stale
+    // op before re-pinning the api token.
+    expect(mockSetToken).toHaveBeenLastCalledWith('sarah-token');
+  });
+
+  it('drops a stale initialize /auth/me result that resolves AFTER a later login', async () => {
+    // SecureStore returns Chris's stored token on cold start.
+    (SecureStore.getItemAsync as jest.Mock).mockResolvedValueOnce('chris-token');
+
+    // initialize's /auth/me is deferred — slow cold-start network.
+    let resolveInitMe: (v: unknown) => void = () => {};
+    const initMeDefer = new Promise((resolve) => {
+      resolveInitMe = resolve;
+    });
+    mockApiGet.mockReturnValueOnce(initMeDefer);
+
+    const initPromise = useAuthStore.getState().initialize();
+
+    // Let initialize() reach its /auth/me await.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // User logs in as Sarah while init's /auth/me is still hanging.
+    mockApiPost.mockResolvedValueOnce({ accessToken: 'sarah-token', tokenType: 'bearer' });
+    mockApiGet.mockResolvedValueOnce({ ...FAKE_ME, id: 'sarah-id', email: 'sarah@example.com' });
+    await useAuthStore.getState().login('sarah@example.com', 'password123');
+
+    expect(useAuthStore.getState().user?.id).toBe('sarah-id');
+
+    // Now initialize's /auth/me arrives with the OLD Chris user. Without a
+    // guard, set({ token: chris-token, user: Chris }) would clobber Sarah.
+    resolveInitMe({ ...FAKE_ME, id: 'chris-id', email: 'chris@example.com' });
+    await initPromise;
+
+    expect(useAuthStore.getState().user?.id).toBe('sarah-id');
+    expect(useAuthStore.getState().token).toBe('sarah-token');
+  });
+});
