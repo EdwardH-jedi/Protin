@@ -370,6 +370,33 @@ Key commit backing this row: `56d338b` (fix session calendar weekday
 alignment). The fix has unit and component coverage but the on-device
 visual recheck has not been recorded yet.
 
+### 4.11 Final local iOS screenshot package
+
+The six final iOS screenshots for v1 submission are committed at
+`docs/release/screenshots/ios/` in the order Apple shows them in the
+App Store search-results card. Local package only — this row does NOT
+imply the screenshots have been uploaded to App Store Connect, that
+device-class resolution sets have been generated, or that any
+TestFlight build has been cut.
+
+| Check | Owner | Evidence required | Status / date |
+|---|---|---|---|
+| `01-discovery-gym-partners.png` present in repo | release owner | file at `docs/release/screenshots/ios/01-discovery-gym-partners.png` | [x] PASS — 2026-05-06 |
+| `02-matches-message-previews.png` present in repo | release owner | file at `docs/release/screenshots/ios/02-matches-message-previews.png` | [x] PASS — 2026-05-06 |
+| `03-chat-confirmed-session.png` present in repo | release owner | file at `docs/release/screenshots/ios/03-chat-confirmed-session.png` | [x] PASS — 2026-05-06 |
+| `04-events-sessions.png` present in repo | release owner | file at `docs/release/screenshots/ios/04-events-sessions.png` | [x] PASS — 2026-05-06 |
+| `05-propose-session-form.png` present in repo | release owner | file at `docs/release/screenshots/ios/05-propose-session-form.png` | [x] PASS — 2026-05-06 |
+| `08-profile-legal-account.png` present in repo | release owner | file at `docs/release/screenshots/ios/08-profile-legal-account.png` | [x] PASS — 2026-05-06 |
+| Final order matches `APP_STORE_METADATA.md` §11 capture order | release owner | filenames sort by leading number into the §11 order | [x] PASS — 2026-05-06 |
+| Per-device-class capture set generated (iPhone 16 Pro Max 6.9", iPhone 14 Plus 6.5") | release owner | per-device PNGs at the resolutions in `APP_STORE_SUBMISSION.md` §9 | [ ] PENDING |
+| Screenshots uploaded to App Store Connect | operator | ASC screenshot panel populated for both device classes | [ ] PENDING |
+
+Captions, surface choices, and v1-safety guidance live in
+`APP_STORE_METADATA.md` §11. The local package is intentionally six
+images — Auth/Login and Onboarding screens were considered for the
+search-results carousel but cut so the visible story leads directly
+with the core loop (Discover → Match → Chat → Events).
+
 ---
 
 ## 5. Apple-Side Setup Required

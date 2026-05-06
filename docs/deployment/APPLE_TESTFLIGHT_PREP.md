@@ -343,6 +343,19 @@ update the URL list at the top of this checklist, the env example files
 `.env.example`), `docs/release/APP_STORE_METADATA.md` §8, the EAS env
 values via `eas env:update`, and re-run this entire checklist.
 
+### 4.9 Final local iOS screenshot package
+
+The six final iOS screenshots for the v1 App Store carousel are
+prepared locally at `docs/release/screenshots/ios/` (filenames `01-`
+through `08-`; see `APP_STORE_METADATA.md` §11 for the order, surface
+each image shows, and the v1-safe capture guidance). This is **local
+preparation only** — the package has not been uploaded to App Store
+Connect, no per-device-class resolution variants have been generated,
+and no signed TestFlight build has been cut from these images. The
+upload step is tracked under
+`RELEASE_GATE_CHECKLIST.md` §4.11 (last two rows still PENDING) and
+under §12 Remaining item 4 of `APP_STORE_METADATA.md`.
+
 ---
 
 ## 5. Immediate Blockers Before Internal TestFlight

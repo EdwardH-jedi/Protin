@@ -298,18 +298,19 @@ requirements (counts and resolutions) with Apple's screenshot specs at
 submission time; `APP_STORE_SUBMISSION.md` §9 carries the per-device
 resolution table.
 
-Required surfaces, in suggested capture order — first three are the ones
-shown in App Store search results, so they should carry the strongest
-positioning:
+The final local screenshot package for v1 lives at
+`docs/release/screenshots/ios/`. Six images are committed in the
+display order below — the first three carry the strongest positioning
+since Apple shows them in the App Store search-results card.
 
-| # | Surface | Screen | Why it ships in v1 |
+| # | File | Surface | Why it ships in v1 |
 |---|---|---|---|
-| 1 | Auth / login entry | `AuthEntryScreen` / `LoginScreen` | Establishes the SportsGang brand and the auth options (email + password, Sign in with Apple on iOS). First impression for the search-results card. |
-| 2 | Onboarding / profile setup | `OnboardingStep1Screen` (and Step 2 / Step 3 if the screenshot still reads cleanly at thumbnail size) | Shows the sport / level / suburb setup that drives discovery. Reinforces the multi-sport positioning. |
-| 3 | Discovery / find players | `DiscoveryScreen` | The core loop — players filtered by sport. This is the screenshot most likely to convert. |
-| 4 | Chat | `ChatScreen` | The 1:1 conversation surface. Shows the safety overflow (header → ⋯) is reachable. |
-| 5 | Plan a session | The session-coordination view inside a chat (only if the v1 surface is stable and reads cleanly; otherwise skip and stay at four screenshots) | Demonstrates the "plan your next sports session" promise from the description without claiming calendar sync. |
-| 6 | Profile / safety / support | `ProfileScreen` | Shows the Privacy / Terms / Support links and the Delete-account affordance — visible proof of the §9 review-notes claims. |
+| 1 | `01-discovery-gym-partners.png` | `DiscoveryScreen` filtered to Gym | The core loop — sport-specific partner discovery with the "Connect" CTA. Most likely to convert. |
+| 2 | `02-matches-message-previews.png` | `MatchesScreen` | Mutual-interest match list with chat previews so the conversion path from match to chat is obvious. |
+| 3 | `03-chat-confirmed-session.png` | `ChatScreen` with a confirmed session card | Shows the 1:1 chat surface AND the confirmed session card so the booking flow is visible without leaving chat. |
+| 4 | `04-events-sessions.png` | `EventsScreen` (Upcoming + Pending) | The single home for sessions — Upcoming sessions and Pending proposals. Demonstrates the "plan your next sports session" promise from §4. |
+| 5 | `05-propose-session-form.png` | `BookingComposerScreen` (Propose a session) | Shows the date / time / venue proposal form so the screenshot story walks all the way through the proposal flow. |
+| 6 | `08-profile-legal-account.png` | `ProfileScreen` legal + account block | Privacy / Terms / Support links and the Delete-account affordance — visible proof of the §9 review-notes claims for App Review §5.1.1(v). |
 
 Capture guidance:
 
@@ -347,6 +348,7 @@ For the device-class capture mechanics (iPhone 16 Pro Max 6.9", iPhone
 | R2 | Privacy / Terms / Support pages reachable over HTTPS | Done on Netlify — see §8 URL table. All four routes return `200 OK` HTML over HTTPS today. |
 | R3 | Mobile EAS env values for legal/support URLs | `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_SUPPORT_URL` pinned on EAS `preview` and `production`. Verify with `eas env:list --environment {preview,production}`. |
 | R4 | Real-iPhone tap-test of in-app legal/support links | PASS, 2026-05-05 — recorded in `RELEASE_GATE_CHECKLIST.md` §4.6. All five links opened the expected Netlify pages, no "link unavailable" alert, no 404, no crash. |
+| R5 | Final local iOS screenshot package | PASS, 2026-05-06 — six PNGs prepared in `docs/release/screenshots/ios/` in the §11 order. Local package only — App Store Connect upload remains PENDING (see Remaining item 4). |
 
 ### Remaining
 
@@ -355,7 +357,7 @@ For the device-class capture mechanics (iPhone 16 Pro Max 6.9", iPhone
 | 1 | Apple Developer Team ID | Apple-side setup | Operator (after Apple Developer Program enrollment). |
 | 2 | App Store Connect App ID | Apple-side setup | Operator (after ASC app record creation). |
 | 3 | Final app icon + splash artwork (replace Step 5 placeholders) | Design | Designer; replaces the placeholder PNGs in `apps/mobile/assets/`. |
-| 4 | Final App Store screenshots per device class | Design + dated device run | Designer + tester. Surface list and capture guidance in §11. |
+| 4 | App Store Connect screenshot upload (per device class) | Apple-side upload | Operator. Local package is prepared in `docs/release/screenshots/ios/` (six PNGs in §11 order). Per-device-class resolution sets and the actual ASC upload remain pending — see `APP_STORE_SUBMISSION.md` §9 for the iPhone 16 Pro Max 6.9" / iPhone 14 Plus 6.5" capture matrix. |
 | 5 | App Privacy Label confirmation against actual SDK behavior | Privacy review | Operator (see `APP_PRIVACY_LABEL_DRAFT.md`). |
 | 6 | Reviewer demo account credentials (in ASC, never in repo) | Seed data | Operator + backend owner. Depends on `apps/api/scripts/seed_review_data.py` landing first. |
 | 7 | Final review-notes copy pasted into ASC | Operator | Operator (paste from §9; substitute the live URLs in lockstep with §8). |
