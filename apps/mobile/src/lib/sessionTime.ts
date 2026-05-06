@@ -140,6 +140,52 @@ export function firstWeekdayOfMonth(year: number, month: number): number {
 }
 
 /**
+ * Cell rendered by the month-grid calendar.
+ *
+ * `date` / `day` are populated for real day cells. They're absent on
+ * leading blanks (before day 1) and trailing blanks (padding the last
+ * row to a full 7).
+ */
+export interface MonthGridCell {
+  key: string;
+  date?: DateString;
+  day?: number;
+}
+
+/**
+ * Build the Sunday-first month grid for the given (year, month).
+ *
+ * Layout invariants:
+ *   * Output length is a multiple of 7 (full rows only — no half rows).
+ *   * Leading blanks reserve cells from Sunday up to the column before
+ *     day 1: ``leading == firstWeekdayOfMonth(year, month)``.
+ *   * Day cells are inserted in order from 1 .. daysInMonth.
+ *   * Trailing blanks pad the last row to 7 so weekly stripes/today
+ *     markers don't get a "stepping" look between months.
+ *
+ * Why this is its own helper: pinning the column position (e.g. May 1
+ * 2026 lands at index 5 = Friday in a Sunday-first layout) is what keeps
+ * the on-device picker from drifting by a column. Inlined inside the
+ * component the math is harder to regression-test.
+ */
+export function buildMonthGrid(year: number, month: number): MonthGridCell[] {
+  const leading = firstWeekdayOfMonth(year, month);
+  const total = daysInMonth(year, month);
+  const out: MonthGridCell[] = [];
+  for (let i = 0; i < leading; i++) {
+    out.push({ key: `lead-${i}` });
+  }
+  for (let day = 1; day <= total; day++) {
+    const d = new Date(year, month, day);
+    out.push({ key: `day-${day}`, date: toDateString(d), day });
+  }
+  while (out.length % 7 !== 0) {
+    out.push({ key: `trail-${out.length}` });
+  }
+  return out;
+}
+
+/**
  * String-compare check for "is this date strictly before today (local)".
  *
  * Uses YYYY-MM-DD lexicographic comparison rather than `Date` math because

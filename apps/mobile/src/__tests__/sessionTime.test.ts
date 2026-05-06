@@ -6,6 +6,7 @@
  */
 
 import {
+  buildMonthGrid,
   combineToLocalDate,
   computeValidationError,
   dateOptions,
@@ -323,5 +324,62 @@ describe('shiftMonth', () => {
   it('handles multi-month steps', () => {
     expect(shiftMonth(2026, 5, 6)).toEqual({ year: 2026, month: 11 });
     expect(shiftMonth(2026, 5, 12)).toEqual({ year: 2027, month: 5 });
+  });
+});
+
+// ─── Calendar grid (Sunday-first column placement) ──────────────────────────
+//
+// Pin the column positions of specific days so a future regression in the
+// offset/leading-blanks math (the iPhone Propose-a-session calendar drift
+// where May 1 2026 was rendering off Friday) trips a deterministic test
+// rather than only showing up on a real device.
+//
+// Layout contract: WEEKDAY_LABELS = ['S','M','T','W','T','F','S']
+// Column index: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat.
+
+describe('buildMonthGrid (Sunday-first column placement)', () => {
+  it('places May 1 2026 under the Friday column (index 5)', () => {
+    // May 1 2026 is a Friday. With 5 leading blanks, day 1 lands at
+    // index 5; day 2 at index 6 (Saturday); day 3 at index 7 (the
+    // Sunday cell of the next row).
+    const grid = buildMonthGrid(2026, 4); // month is 0-indexed
+    expect(grid[5]).toMatchObject({ day: 1, date: '2026-05-01' });
+    expect(grid[6]).toMatchObject({ day: 2, date: '2026-05-02' });
+    expect(grid[7]).toMatchObject({ day: 3, date: '2026-05-03' });
+    expect(grid[11]).toMatchObject({ day: 7, date: '2026-05-07' });
+
+    // Leading 5 cells must be blanks, NOT day cells. A column shift in
+    // the offset math typically manifests as a day landing in the
+    // leading-blank zone — assert explicitly.
+    for (let i = 0; i < 5; i++) {
+      expect(grid[i].date).toBeUndefined();
+      expect(grid[i].day).toBeUndefined();
+    }
+
+    // Bottom row pads to a full 7 cells; total length is a multiple of 7.
+    expect(grid.length % 7).toBe(0);
+  });
+
+  it('places June 1 2026 under the Monday column (index 1)', () => {
+    // June 1 2026 is a Monday — single leading blank (Sunday).
+    const grid = buildMonthGrid(2026, 5);
+    expect(grid[0].date).toBeUndefined();
+    expect(grid[1]).toMatchObject({ day: 1, date: '2026-06-01' });
+    expect(grid[7]).toMatchObject({ day: 7, date: '2026-06-07' });
+  });
+
+  it('places February 1 2026 under the Sunday column (index 0)', () => {
+    // Feb 1 2026 is a Sunday — zero leading blanks.
+    const grid = buildMonthGrid(2026, 1);
+    expect(grid[0]).toMatchObject({ day: 1, date: '2026-02-01' });
+    expect(grid[6]).toMatchObject({ day: 7, date: '2026-02-07' });
+  });
+
+  it('emits exactly daysInMonth day-cells in order', () => {
+    const grid = buildMonthGrid(2026, 4); // May 2026, 31 days
+    const dayCells = grid.filter((c) => c.day !== undefined);
+    expect(dayCells.map((c) => c.day)).toEqual(
+      Array.from({ length: 31 }, (_, i) => i + 1)
+    );
   });
 });

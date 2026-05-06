@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
+  buildMonthGrid,
   combineToLocalDate,
   daysInMonth,
-  firstWeekdayOfMonth,
   formatDateLabel,
   isPastDate,
   monthLabel,
@@ -14,7 +14,19 @@ import {
 } from '../lib/sessionTime';
 import { colors, radii, spacing, typography } from '../theme';
 
+// Sunday-first labels. Index 0 == Sunday, matching JavaScript's
+// `Date.getDay()` and `firstWeekdayOfMonth`. The grid offset and the
+// header MUST share this convention or May 1 2026 (Friday) drifts off
+// its real column. See `buildMonthGrid` for the offset rule.
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+// 7 columns share the row evenly. Using a percentage flex-basis keeps
+// the weekday header row and the day-cell rows on the SAME column
+// geometry regardless of container width — `justifyContent:
+// 'space-between'` with fixed-width children was distributing leftover
+// horizontal slack independently per row on real iPhones, which shifted
+// day cells one column off the matching header label.
+const COLUMN_FLEX_BASIS = `${100 / 7}%` as const;
 
 export interface CalendarPickerProps {
   /** Currently-selected date — drives initial visible month + selection ring. */
@@ -45,26 +57,13 @@ export function CalendarPicker({ selected, onSelect, now = new Date() }: Calenda
   const todayStr = useMemo(() => toDateString(now), [now]);
   const selectedStr = selected;
 
-  // Build the grid cells: leading blanks + each day of month + trailing blanks
-  // so the grid is a clean N rows of 7. Trailing blanks are optional but
-  // they keep the layout from "stepping" between months.
-  const cells = useMemo(() => {
-    const leading = firstWeekdayOfMonth(visibleYear, visibleMonth);
-    const total = daysInMonth(visibleYear, visibleMonth);
-    const out: Array<{ key: string; date?: DateString; day?: number }> = [];
-    for (let i = 0; i < leading; i++) {
-      out.push({ key: `lead-${i}` });
-    }
-    for (let day = 1; day <= total; day++) {
-      const d = new Date(visibleYear, visibleMonth, day);
-      out.push({ key: `day-${day}`, date: toDateString(d), day });
-    }
-    // Pad to a multiple of 7 so the bottom row is always full-width.
-    while (out.length % 7 !== 0) {
-      out.push({ key: `trail-${out.length}` });
-    }
-    return out;
-  }, [visibleYear, visibleMonth]);
+  // Build the grid cells via the pure helper so the offset (May 1 2026 ->
+  // Friday in Sunday-first) is regression-tested independently of the
+  // component renderer.
+  const cells = useMemo(
+    () => buildMonthGrid(visibleYear, visibleMonth),
+    [visibleYear, visibleMonth]
+  );
 
   const handlePrevMonth = () => {
     const next = shiftMonth(visibleYear, visibleMonth, -1);
@@ -144,22 +143,31 @@ export function CalendarPicker({ selected, onSelect, now = new Date() }: Calenda
               accessibilityState={{ disabled: isPast, selected: isSelected }}
               style={({ pressed }) => [
                 styles.cell,
-                styles.dayCell,
-                isToday && !isSelected && styles.dayCellToday,
-                isSelected && styles.dayCellSelected,
                 pressed && !isPast && styles.pressed,
               ]}
             >
-              <Text
+              {/* The cell takes 1/7 of row width for column alignment with
+                  the header. The inner pill stays a fixed 40x40 round
+                  shape so the today / selected indicators remain a
+                  perfect circle on every screen size. */}
+              <View
                 style={[
-                  styles.dayText,
-                  isToday && !isSelected && styles.dayTextToday,
-                  isSelected && styles.dayTextSelected,
-                  isPast && styles.dayTextPast,
+                  styles.dayPill,
+                  isToday && !isSelected && styles.dayPillToday,
+                  isSelected && styles.dayPillSelected,
                 ]}
               >
-                {cell.day}
-              </Text>
+                <Text
+                  style={[
+                    styles.dayText,
+                    isToday && !isSelected && styles.dayTextToday,
+                    isSelected && styles.dayTextSelected,
+                    isPast && styles.dayTextPast,
+                  ]}
+                >
+                  {cell.day}
+                </Text>
+              </View>
             </Pressable>
           );
         })}
@@ -168,7 +176,7 @@ export function CalendarPicker({ selected, onSelect, now = new Date() }: Calenda
   );
 }
 
-const CELL_SIZE = 40;
+const CELL_HEIGHT = 40;
 const ROW_GAP = 4;
 
 const styles = StyleSheet.create({
@@ -206,35 +214,37 @@ const styles = StyleSheet.create({
   },
   weekHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingVertical: spacing.xs,
   },
   weekHeaderText: {
     ...typography.bodySmall,
     color: colors.textTertiary,
-    width: CELL_SIZE,
+    flexBasis: COLUMN_FLEX_BASIS,
     textAlign: 'center',
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
     rowGap: ROW_GAP,
   },
   cell: {
-    width: CELL_SIZE,
-    height: CELL_SIZE,
-  },
-  dayCell: {
+    flexBasis: COLUMN_FLEX_BASIS,
+    height: CELL_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: CELL_SIZE / 2,
   },
-  dayCellToday: {
+  dayPill: {
+    width: CELL_HEIGHT,
+    height: CELL_HEIGHT,
+    borderRadius: CELL_HEIGHT / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayPillToday: {
     borderWidth: 1,
     borderColor: colors.brand,
   },
-  dayCellSelected: {
+  dayPillSelected: {
     backgroundColor: colors.brand,
   },
   dayText: {
