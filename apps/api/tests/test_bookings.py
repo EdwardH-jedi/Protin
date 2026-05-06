@@ -493,3 +493,111 @@ async def test_proposer_cannot_decline_own_booking(client: AsyncClient) -> None:
 
     r = await client.post(f"/bookings/{booking_id}/decline", headers=_auth(token_a))
     assert r.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# match_id query filter — drives the chat-side "session proposal in this
+# match" surface in mobile. Adding a filter beats client-side filtering by
+# bandwidth and keeps the participant gate enforced at the SQL layer.
+# ---------------------------------------------------------------------------
+
+
+async def test_list_bookings_filters_by_match_id(client: AsyncClient) -> None:
+    """Two matches owned by the same user; ?match_id= scopes to one match only."""
+    token_a, uid_a = await _register(client, "book_mfilter_a@example.com")
+    token_b, uid_b = await _register(client, "book_mfilter_b@example.com")
+    token_c, uid_c = await _register(client, "book_mfilter_c@example.com")
+
+    match_ab = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+    match_ac = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_c, uid_c)
+
+    create_ab = await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_ab},
+        headers=_auth(token_a),
+    )
+    booking_ab = create_ab.json()["id"]
+    await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_ac},
+        headers=_auth(token_a),
+    )
+
+    # Without the filter, A sees both bookings.
+    r_all = await client.get("/bookings", headers=_auth(token_a))
+    assert r_all.json()["total"] == 2
+
+    # Filtered to match_ab, A sees exactly the AB booking.
+    r_ab = await client.get(
+        f"/bookings?match_id={match_ab}", headers=_auth(token_a)
+    )
+    assert r_ab.status_code == 200
+    body = r_ab.json()
+    assert body["total"] == 1
+    assert body["items"][0]["id"] == booking_ab
+    assert body["items"][0]["match_id"] == match_ab
+
+
+async def test_list_bookings_match_filter_does_not_leak_to_non_participant(
+    client: AsyncClient,
+) -> None:
+    """A non-participant filtering by an arbitrary match_id sees 0 bookings.
+
+    Pins the participant gate at the SQL layer so a curious caller can't
+    discover bookings on a match they have no role in.
+    """
+    token_a, uid_a = await _register(client, "book_mleak_a@example.com")
+    token_b, uid_b = await _register(client, "book_mleak_b@example.com")
+    token_c, _ = await _register(client, "book_mleak_c@example.com")
+
+    match_ab = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+    await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_ab},
+        headers=_auth(token_a),
+    )
+
+    r = await client.get(f"/bookings?match_id={match_ab}", headers=_auth(token_c))
+    assert r.status_code == 200
+    assert r.json()["total"] == 0
+
+
+async def test_list_bookings_match_filter_combines_with_status(
+    client: AsyncClient,
+) -> None:
+    """match_id + status compose: only proposed bookings in this match."""
+    token_a, uid_a = await _register(client, "book_mstatus_a@example.com")
+    token_b, uid_b = await _register(client, "book_mstatus_b@example.com")
+    match_ab = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    # Two bookings on the same match: one stays proposed, one gets confirmed.
+    r1 = await client.post(
+        "/bookings",
+        json={
+            **_BOOKING_PAYLOAD,
+            "match_id": match_ab,
+            "starts_at": "2030-04-01T09:00:00Z",
+            "ends_at": "2030-04-01T10:00:00Z",
+        },
+        headers=_auth(token_a),
+    )
+    proposed_id = r1.json()["id"]
+    r2 = await client.post(
+        "/bookings",
+        json={
+            **_BOOKING_PAYLOAD,
+            "match_id": match_ab,
+            "starts_at": "2030-04-02T09:00:00Z",
+            "ends_at": "2030-04-02T10:00:00Z",
+        },
+        headers=_auth(token_a),
+    )
+    confirmed_id = r2.json()["id"]
+    await client.post(f"/bookings/{confirmed_id}/confirm", headers=_auth(token_b))
+
+    r = await client.get(
+        f"/bookings?match_id={match_ab}&status=proposed", headers=_auth(token_a)
+    )
+    body = r.json()
+    assert body["total"] == 1
+    assert body["items"][0]["id"] == proposed_id

@@ -28,6 +28,27 @@ jest.mock('../lib/api', () => ({
   BASE_URL: 'http://localhost:8000',
 }));
 
+// ─── URL-aware mockApiGet helper ──────────────────────────────────────────────
+// ChatScreen now hits two GETs in parallel: /matches/{id}/messages and
+// /bookings?match_id=.... Existing tests pre-date the bookings fetch and
+// only mock messages. Default the bookings response to an empty list so
+// older tests keep passing without per-test boilerplate; tests that care
+// about proposals override via the URL-aware setter below.
+const emptyListResponse = { items: [], total: 0, limit: 50, offset: 0 };
+function setupMessagesAndBookingsMock(opts: {
+  messages?: { items: unknown[]; total: number; limit: number; offset: number };
+  bookings?: { items: unknown[]; total: number; limit: number; offset: number };
+} = {}) {
+  const messagesResp = opts.messages ?? { items: [], total: 0, limit: 100, offset: 0 };
+  const bookingsResp = opts.bookings ?? emptyListResponse;
+  mockApiGet.mockImplementation((url: string) => {
+    if (typeof url === 'string' && url.startsWith('/bookings')) {
+      return Promise.resolve(bookingsResp);
+    }
+    return Promise.resolve(messagesResp);
+  });
+}
+
 // ─── Mock auth store ──────────────────────────────────────────────────────────
 
 jest.mock('../stores/auth', () => ({
@@ -75,6 +96,23 @@ jest.mock('../components/Screen', () => {
     Screen: ({ children }: { children: React.ReactNode }) => <View>{children}</View>,
   };
 });
+
+// ─── Mock @react-navigation/native ────────────────────────────────────────────
+// ChatScreen now calls useFocusEffect to refetch proposals when the user
+// returns from BookingComposer. The default test tree has no NavigationContainer,
+// so stub the hook to fire its callback once on mount and treat any returned
+// cleanup as the unmount handler.
+
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: (cb: () => void | (() => void)) => {
+    const React = require('react');
+    React.useEffect(() => {
+      const cleanup = cb();
+      return typeof cleanup === 'function' ? cleanup : undefined;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+  },
+}));
 
 // ─── Mock react-native-safe-area-context ──────────────────────────────────────
 // ChatScreen now reads insets.bottom directly to pad the composer above the
@@ -507,7 +545,9 @@ describe('ChatScreen', () => {
     await act(async () => {
       fireEvent.press(getByText('Try again'));
     });
-    expect(mockApiGet).toHaveBeenCalledTimes(2);
+    // Each fetchMessages now drives two GETs in parallel (messages + bookings).
+    // Initial mount = 2 calls; retry tap = 2 more = 4 total.
+    expect(mockApiGet).toHaveBeenCalledTimes(4);
   });
 
   // ── Send message ───────────────────────────────────────────────────────────
@@ -1077,6 +1117,181 @@ describe('ChatScreen', () => {
       expect(alertSpy.mock.calls[2][1]).toBe('Network down');
       // Failure must not navigate the user away — they stay in the chat to retry.
       expect(navigation.goBack).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Session proposal card ──────────────────────────────────────────────────
+
+  describe('session proposal cards', () => {
+    function makeProposal(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'booking-1',
+        matchId: 'match-1',
+        proposerId: 'partner-456',
+        partnerId: 'me-123',
+        sport: 'gym',
+        startsAt: '2026-04-09T09:00:00Z',
+        endsAt: '2026-04-09T10:00:00Z',
+        location: 'Bondi gym',
+        notes: null,
+        status: 'proposed',
+        createdAt: '2026-04-08T08:30:00Z',
+        updatedAt: '2026-04-08T08:30:00Z',
+        partner: { displayName: 'Sarah' },
+        venue: null,
+        ...overrides,
+      };
+    }
+
+    it('renders a proposed-card with Accept/Decline when the receiver opens chat', async () => {
+      setupMessagesAndBookingsMock({
+        bookings: { items: [makeProposal()], total: 1, limit: 50, offset: 0 },
+      });
+      const { findByText, getByLabelText } = render(
+        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      // Title appears + Accept/Decline buttons rendered for the receiver.
+      await findByText('Session proposal');
+      expect(getByLabelText('Accept session proposal')).toBeTruthy();
+      expect(getByLabelText('Decline session proposal')).toBeTruthy();
+    });
+
+    it('shows Awaiting confirmation and no Accept button for the proposer', async () => {
+      // Flip proposer/partner so the signed-in user is the proposer.
+      setupMessagesAndBookingsMock({
+        bookings: {
+          items: [makeProposal({ proposerId: 'me-123', partnerId: 'partner-456' })],
+          total: 1,
+          limit: 50,
+          offset: 0,
+        },
+      });
+      const { findByText, queryByLabelText } = render(
+        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      await findByText('Session proposal sent');
+      await findByText('Awaiting confirmation');
+      expect(queryByLabelText('Accept session proposal')).toBeNull();
+      expect(queryByLabelText('Decline session proposal')).toBeNull();
+    });
+
+    it('renders the confirmed state for both participants without action buttons', async () => {
+      setupMessagesAndBookingsMock({
+        bookings: {
+          items: [makeProposal({ status: 'confirmed' })],
+          total: 1,
+          limit: 50,
+          offset: 0,
+        },
+      });
+      const { findByText, queryByLabelText } = render(
+        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      await findByText('Session confirmed');
+      expect(queryByLabelText('Accept session proposal')).toBeNull();
+      expect(queryByLabelText('Decline session proposal')).toBeNull();
+    });
+
+    it('renders the declined state without action buttons', async () => {
+      setupMessagesAndBookingsMock({
+        bookings: {
+          items: [makeProposal({ status: 'declined' })],
+          total: 1,
+          limit: 50,
+          offset: 0,
+        },
+      });
+      const { findByText, queryByLabelText } = render(
+        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      await findByText('Session declined');
+      expect(queryByLabelText('Accept session proposal')).toBeNull();
+    });
+
+    it('Accept calls /bookings/:id/confirm and updates the card to confirmed', async () => {
+      setupMessagesAndBookingsMock({
+        bookings: { items: [makeProposal()], total: 1, limit: 50, offset: 0 },
+      });
+      mockApiPost.mockResolvedValueOnce({
+        ...makeProposal(),
+        status: 'confirmed',
+      });
+      const { findByText, getByLabelText } = render(
+        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      await findByText('Session proposal');
+      await act(async () => {
+        fireEvent.press(getByLabelText('Accept session proposal'));
+      });
+      expect(mockApiPost).toHaveBeenCalledWith('/bookings/booking-1/confirm', {});
+      await findByText('Session confirmed');
+    });
+
+    it('Decline calls /bookings/:id/decline and updates the card to declined', async () => {
+      setupMessagesAndBookingsMock({
+        bookings: { items: [makeProposal()], total: 1, limit: 50, offset: 0 },
+      });
+      mockApiPost.mockResolvedValueOnce({
+        ...makeProposal(),
+        status: 'declined',
+      });
+      const { findByText, getByLabelText } = render(
+        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      await findByText('Session proposal');
+      await act(async () => {
+        fireEvent.press(getByLabelText('Decline session proposal'));
+      });
+      expect(mockApiPost).toHaveBeenCalledWith('/bookings/booking-1/decline', {});
+      await findByText('Session declined');
+    });
+
+    it('shows a friendly error if accept fails and keeps the card pending', async () => {
+      setupMessagesAndBookingsMock({
+        bookings: { items: [makeProposal()], total: 1, limit: 50, offset: 0 },
+      });
+      mockApiPost.mockRejectedValueOnce(new Error('Server down'));
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      const { findByText, getByLabelText } = render(
+        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      await findByText('Session proposal');
+      await act(async () => {
+        fireEvent.press(getByLabelText('Accept session proposal'));
+      });
+      // The Alert title is the friendly headline; the Card stays in proposed
+      // state so the user can retry.
+      expect(alertSpy).toHaveBeenCalled();
+      expect(alertSpy.mock.calls[0][0]).toBe("Couldn't update this session.");
+      await findByText('Session proposal');
+      alertSpy.mockRestore();
+    });
+
+    it('renders no proposal card when /bookings is empty', async () => {
+      setupMessagesAndBookingsMock();
+      const { queryByText } = render(
+        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      // Wait for any fetch settling; assert NO card text appears.
+      await waitFor(() => {
+        expect(queryByText('Session proposal')).toBeNull();
+        expect(queryByText('Session proposal sent')).toBeNull();
+      });
+    });
+
+    it('navigates to BookingDetail when the card is tapped', async () => {
+      setupMessagesAndBookingsMock({
+        bookings: { items: [makeProposal()], total: 1, limit: 50, offset: 0 },
+      });
+      const navigation = makeNavigation();
+      const { findByLabelText } = render(
+        <ChatScreen route={makeRoute() as any} navigation={navigation as any} />
+      );
+      const card = await findByLabelText('Open session proposal');
+      fireEvent.press(card);
+      expect(navigation.navigate).toHaveBeenCalledWith('BookingDetail', {
+        bookingId: 'booking-1',
+      });
     });
   });
 });

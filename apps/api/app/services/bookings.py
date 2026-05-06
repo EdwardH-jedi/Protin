@@ -183,14 +183,21 @@ async def list_bookings(
     limit: int = 20,
     offset: int = 0,
     statuses: list[str] | None = None,
+    match_id: UUID | None = None,
 ) -> BookingListResponse:
+    # Participant gate stays at the SQL layer so a non-participant filtering
+    # by match_id can never see another match's bookings — the backend
+    # remains source-of-truth for visibility regardless of mobile filters.
     participant_filter = or_(
         Booking.proposer_id == current_user_id,
         Booking.partner_id == current_user_id,
     )
-    base_where = participant_filter
+    where_clauses = [participant_filter]
     if statuses is not None:
-        base_where = and_(participant_filter, Booking.status.in_(statuses))
+        where_clauses.append(Booking.status.in_(statuses))
+    if match_id is not None:
+        where_clauses.append(Booking.match_id == match_id)
+    base_where = and_(*where_clauses)
     stmt = select(Booking).where(base_where).order_by(Booking.starts_at.asc()).offset(offset).limit(limit)
     bookings = list((await db.execute(stmt)).scalars().all())
 
