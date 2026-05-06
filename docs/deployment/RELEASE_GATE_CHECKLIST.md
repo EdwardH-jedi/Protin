@@ -397,6 +397,41 @@ images — Auth/Login and Onboarding screens were considered for the
 search-results carousel but cut so the visible story leads directly
 with the core loop (Discover → Match → Chat → Events).
 
+### 4.12 App Store metadata copy review
+
+A full sweep of the App Store text fields — App Store name and
+subtitle, promotional text, description, keywords, category
+recommendation, age rating, URLs, review notes, demo-account
+placeholders, privacy-label notes, screenshot checklist, and the
+remaining open-items table — landed on 2026-05-06. The promotional
+text (§2) and description (§4) in `APP_STORE_METADATA.md` now
+explicitly reference the shipped session-proposal flow and the
+Events tab; the review-notes walkthrough (§9) extends through
+propose → Accept/Decline → Events. The keyword string is unchanged
+(no v1-hidden-feature terms). The submission doc
+(`APP_STORE_SUBMISSION.md` §7-9 and §12) was rewritten to defer to
+the metadata doc for review-notes / description / keywords / lineup
+and dropped its earlier swipe / Add-to-Calendar / push-notifications
+copy so the two docs are in lockstep.
+
+| Check | Owner | Evidence required | Status / date |
+|---|---|---|---|
+| App name / subtitle / promo coherent and v1-safe | release owner | `APP_STORE_METADATA.md` §1-3 | [x] PASS — 2026-05-06 |
+| Description reflects the actual v1 surfaces (no swipe / no calendar / no push / no tournaments / no rank / no group events / no dating framing) | release owner | `APP_STORE_METADATA.md` §4 | [x] PASS — 2026-05-06 |
+| Keyword string has no unsupported feature terms | release owner | `APP_STORE_METADATA.md` §5 | [x] PASS — 2026-05-06 |
+| Age rating consistent at 17+ across all four release docs | release owner | grep across `APP_STORE_METADATA.md` §7, `APP_STORE_SUBMISSION.md` §5, `APPLE_TESTFLIGHT_PREP.md` §4.3, this file (no conflicting `12+` claim) | [x] PASS — 2026-05-06 |
+| URLs match the live Netlify host and the EAS env values | release owner | `APP_STORE_METADATA.md` §8 + `APPLE_TESTFLIGHT_PREP.md` §4.8 | [x] PASS — 2026-05-06 |
+| Review notes walkthrough covers session proposal + Events | release owner | `APP_STORE_METADATA.md` §9 | [x] PASS — 2026-05-06 |
+| `APP_STORE_SUBMISSION.md` defers to the metadata doc rather than carrying conflicting copy | release owner | submission doc §7 / §8 / §9 / §12 | [x] PASS — 2026-05-06 |
+| Privacy label confirmed against actual SDK behaviour | operator | `APP_PRIVACY_LABEL_DRAFT.md` validated against shipped SDKs | [ ] PENDING |
+| Reviewer demo account credentials available in App Store Connect (NEVER in repo) | operator | ASC App Review Information panel populated | [ ] PENDING |
+| Final age-rating questionnaire completed in App Store Connect | operator | ASC age-rating result captured | [ ] PENDING |
+
+The text content is finalized as far as the repo can take it. ASC
+upload, the privacy nutrition label, and the reviewer demo account
+remain Apple-side setup items tracked in §5 of this doc and §12 of
+`APP_STORE_METADATA.md`.
+
 ---
 
 ## 5. Apple-Side Setup Required

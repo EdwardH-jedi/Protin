@@ -26,12 +26,14 @@ without touching app code.
 
 ## 2. Promotional text (≤170 chars)
 
-> SportsGang helps you find players, chat, and plan sports sessions in
-> one place.
+> SportsGang helps you find players, chat, and plan sports sessions —
+> and keep track of confirmed sessions in Events.
 
-96 characters. The promotional text field can be updated after release
+131 characters. The promotional text field can be updated after release
 without a new build, so this is the "live" line a future operator can
-swap as needed.
+swap as needed. The Events callout reflects the shipped Events tab
+(Upcoming + Pending sessions); do not reword it back to imply
+calendar sync or push reminders.
 
 ## 3. Short positioning line
 
@@ -55,9 +57,11 @@ SportsGang is for people who'd rather play than scroll.
 Set up your profile in a few taps: pick the sport you play, your
 level, and the suburb you train in. Browse other players who share
 your sports interests, connect with the ones you'd like to play
-with, and chat one-to-one to agree on a time and a place to meet.
-SportsGang covers gym, golf, tennis, and running, with more on the
-way.
+with, and chat one-to-one. From the chat, propose a session with a
+date, a time, and a court or venue from the in-app list — the other
+player can accept or decline, and once it's confirmed you'll see it
+in the Events tab alongside any pending proposals. SportsGang covers
+gym, golf, tennis, and running, with more on the way.
 
 Your control is built in. Report or block any user from inside a
 chat. Delete your account at any time from the Profile screen — your
@@ -114,8 +118,15 @@ sports,fitness,gym,golf,tennis,running,players,chat,social,training
   keyword field must not signal one (Apple's review will downrank or
   reject mismatched positioning).
 - **No v1-hidden features.** Do not add `tournament`, `leaderboard`,
-  `rank`, `calendar`, `push`, `nearby`, `events`, or `subscription`. None
-  of those ship in the user-visible v1 surface.
+  `rank`, `calendar`, `push`, `nearby`, or `subscription`. None of those
+  ship in the user-visible v1 surface.
+- **`events` is intentionally still excluded** even though the Events
+  tab is now shipped (it lists the user's own Upcoming + Pending
+  sessions). The keyword `events` invites confusion with public events
+  / open chat events / group events, none of which exist in v1, so
+  keeping it out of the comma string avoids signalling a feature the
+  app doesn't have. The Events tab is named in §4 description and §11
+  screenshot captions where the surrounding context disambiguates it.
 
 ## 6. Category recommendation (v1 finalized)
 
@@ -243,11 +254,19 @@ To exercise the core flow:
    Review Information panel.
 2. Complete onboarding.
 3. From Discovery, connect with a player you'd like to play with.
-4. Open the Chat tab and exchange a message with the connected
-   player to agree on a time and a place.
-5. Safety controls: from a chat, tap the header overflow to Report
+4. Open the chat with a connected player and exchange a message.
+5. From the chat, tap "+ Session" and propose a session — pick a
+   date, time, and a court or venue from the in-app list. The card
+   appears in the chat as "Awaiting confirmation" for the proposer.
+6. Sign in as the other test account: the same chat now shows
+   "Session proposal" with Accept / Decline buttons. Accepting moves
+   the card to "Session confirmed" for both participants.
+7. Open the Events tab to confirm the session appears under
+   Upcoming sessions; pending proposals (still awaiting a partner's
+   reply) appear under Pending proposals.
+8. Safety controls: from a chat, tap the header overflow to Report
    or Block the other user — both are wired end-to-end.
-6. Account control: from the Profile screen, tap "Delete my account"
+9. Account control: from the Profile screen, tap "Delete my account"
    to hard-delete the account, profile, and chat history.
 
 The Privacy, Terms, and Support pages are linked directly from the
@@ -349,6 +368,7 @@ For the device-class capture mechanics (iPhone 16 Pro Max 6.9", iPhone
 | R3 | Mobile EAS env values for legal/support URLs | `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_SUPPORT_URL` pinned on EAS `preview` and `production`. Verify with `eas env:list --environment {preview,production}`. |
 | R4 | Real-iPhone tap-test of in-app legal/support links | PASS, 2026-05-05 — recorded in `RELEASE_GATE_CHECKLIST.md` §4.6. All five links opened the expected Netlify pages, no "link unavailable" alert, no 404, no crash. |
 | R5 | Final local iOS screenshot package | PASS, 2026-05-06 — six PNGs prepared in `docs/release/screenshots/ios/` in the §11 order. Local package only — App Store Connect upload remains PENDING (see Remaining item 4). |
+| R6 | App Store metadata copy review | PASS, 2026-05-06 — full pass over §1 identity, §2 promo (now references Events), §4 description (includes session proposal + court/venue + Accept/Decline + Events), §5 keywords (no badminton / push / calendar / tournament / rank / dating / nearby — `events` intentionally still excluded), §7 age rating (consistent 17+ across this file, `APP_STORE_SUBMISSION.md` §5, and `APPLE_TESTFLIGHT_PREP.md` §4.3), §8 URLs (Netlify host pinned), §9 review-notes walkthrough (extended through proposal + Events). `APP_STORE_SUBMISSION.md` §7 review-notes block, §8 description / keywords drafts, §9 screenshot lineup, and §12 rejection-recovery row that referenced "push notification flows" all replaced with pointers / cleaned copy so the two docs stay in lockstep. ASC submission itself remains PENDING (see Remaining items 4, 6, 7). |
 
 ### Remaining
 

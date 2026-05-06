@@ -180,84 +180,35 @@ A seed script belongs in `apps/api/scripts/seed_review_data.py`. **This script d
 
 ## 7. Review notes (paste verbatim)
 
-```
-TEST ACCOUNT
-------------
-Email: review-tester@protin.app
-Password: [paste-at-submission-time]
+The canonical v1 review-notes block lives in
+`docs/release/APP_STORE_METADATA.md` §9. Paste that block verbatim
+into the App Store Connect "Notes" field. The metadata doc is kept
+in lockstep with the actual shipped flows (Discovery → Connect →
+Chat → propose a session → Accept/Decline → Events tab → safety
+controls → delete-account); the older version that lived here used
+swipe / Add-to-Calendar / push framing that no longer matches the v1
+build.
 
-GETTING STARTED
----------------
-1. Open the app - you'll see a splash, then the login screen.
-2. Tap "Log in" and use the credentials above.
-3. The account is already onboarded. You'll land on the Discovery feed.
-
-WHAT TO TRY
------------
-- Discovery: swipe through users. "Like", "Pass", and "Save" are the actions.
-- Matches tab: you have pre-seeded mutual matches. Tap any to chat or propose a booking.
-- Bookings: one booking is awaiting your confirmation. Tap it to confirm,
-  decline, or see the calendar integration option (iOS calendar permission
-  is requested on first tap of "Add to Calendar").
-- Profile tab: view your profile, identity preferences, sport profiles, and
-  the "Delete my account" action at the bottom.
-
-SIGN IN WITH APPLE
-------------------
-Also available on the login screen. If you use it, the app creates or
-links a new account - the test data above is tied to the email/password
-account, so Apple sign-in will show an empty state.
-
-PUSH NOTIFICATIONS
-------------------
-Push tokens are per-device. Seeded accounts will not send you real pushes
-during review. All push flows are covered by unit tests in the repo.
-
-DATA DELETION
--------------
-Profile -> "Delete my account" removes the test account and all of its
-data. If you delete, the credentials above will no longer work.
-
-CONTACT
--------
-[your-email@domain] - happy to provide clarification within 1 business day.
-```
+Paste credentials into the App Store Connect "App Review
+Information" panel only — never into this repo, this file, or the
+review-notes block itself (see §6 Required test data).
 
 ---
 
 ## 8. Marketing metadata
 
-| Field | Character limit | Guidance |
+| Field | Character limit | Source of truth |
 |---|---|---|
-| Promotional Text | 170 | Editable without a new build - use for time-sensitive messaging. Skip for launch. |
-| Description | 4000 | Draft below |
-| Keywords | 100 (comma-separated) | Draft: `workout partner,gym buddy,golf partner,fitness,training,matchmaking,sydney,tennis,running,accountability` |
+| Promotional Text | 170 | `APP_STORE_METADATA.md` §2 (editable without a new build). |
+| Description | 4000 | `APP_STORE_METADATA.md` §4. The canonical v1 description there reflects the shipped flows: discovery → connect → chat → propose a session with court/venue → Accept/Decline → Events tab → Privacy/Terms/Support. The earlier draft that lived here used "Protin" branding, swipe/like/pass/save framing, and Google Calendar copy that no longer match v1; do not use it. |
+| Keywords | 100 (comma-separated) | `APP_STORE_METADATA.md` §5. The earlier draft that lived here (`workout partner,gym buddy,…,matchmaking,…`) carried dating-app vocabulary (`matchmaking`) and is superseded. |
 | Support URL | - | `https://sportgang.netlify.app/support/` — live on Netlify (`apps/web/site/support/index.html`). Required field; same address must align with the App Review Contact email once a real `support@` mailbox exists. |
 | Marketing URL | - | `https://sportgang.netlify.app/` — optional in ASC; the Netlify-hosted home page is reachable today, so it can be supplied. Replace with a custom domain if/when one is pinned. |
 
-### Description draft
-
-```
-Protin helps you find a workout partner who actually turns up.
-
-- Match by sport. Gym, golf, tennis, or running - add as many as you like,
-  and tell us your level, preferred times, and where you train.
-- Swipe to like, pass, or save. When you and someone else both like each
-  other, you match.
-- Chat when you match. Real-time messaging, no read receipts, no tracking.
-- Book a session. Propose a time, your partner confirms, and if you link
-  Google Calendar we'll drop it straight onto your schedule.
-- Sydney-first. We match people in the same city so sessions are actually
-  possible. More cities coming.
-
-Protin does not do background checks. Meet in public places and use
-common sense. You must be 18 or over to use Protin.
-
-Sign in with Apple or email. Delete your account any time from the
-profile screen.
-```
-
-(Edit to your voice before submission.)
+The metadata doc is the single source of truth for App Store text;
+this submission doc only carries the field-by-field ASC submission
+mechanics. If the two ever diverge, treat `APP_STORE_METADATA.md` as
+canonical and update this file in lockstep.
 
 ---
 
@@ -273,12 +224,21 @@ Required sizes for the 2024+ App Store:
 
 ### Suggested screenshot lineup (6 screenshots in this order - Apple shows the first 3 in search results)
 
-1. **Discovery feed** - three partner cards visible, caption overlay: "Find a workout partner by sport."
-2. **A match + chat** - match celebration screen or a chat with 2 messages and the "Propose booking" CTA visible. Caption: "Chat. Plan. Train."
-3. **Booking detail, confirmed** - booking card showing sport, date, time, location, and the "Add to Calendar" button. Caption: "Booked in. See you at the gym."
-4. **Onboarding step 3 (sport setup)** - the sport picker with gym/golf/tennis/running chips visible. Caption: "Gym, golf, tennis, or running."
-5. **Profile screen** - your own profile with identity preferences and sport profiles filled in. Caption: "Your profile, your preferences."
-6. **Sign in screen** - email/password fields with the Sign in with Apple button below (iOS-only, rendered via `expo-apple-authentication`). Caption (small): "Private sign-in. Delete any time."
+The final v1 screenshot package is committed at
+`docs/release/screenshots/ios/`; surface choices and captions are
+defined in `APP_STORE_METADATA.md` §11. The lineup below mirrors
+that single source of truth and replaces an earlier draft that
+referenced an "Add to Calendar" booking detail and a sign-in
+screenshot — neither of which is in the final v1 package.
+
+1. `01-discovery-gym-partners.png` — `DiscoveryScreen` filtered to Gym. The core loop; first impression in the search-results card.
+2. `02-matches-message-previews.png` — `MatchesScreen`. Mutual-interest match list with chat previews so the conversion path from match to chat is obvious.
+3. `03-chat-confirmed-session.png` — `ChatScreen` with a confirmed session card. Shows the 1:1 chat surface AND the confirmed session card.
+4. `04-events-sessions.png` — `EventsScreen`. Upcoming sessions and Pending proposals in one tab.
+5. `05-propose-session-form.png` — `BookingComposerScreen` (Propose a session). Date / time / venue picker.
+6. `08-profile-legal-account.png` — `ProfileScreen`. Privacy / Terms / Support links and the Delete-account affordance. Visible proof of the §7 review-notes claims for App Review §5.1.1(v).
+
+Per-device-class capture (iPhone 16 Pro Max 6.9", iPhone 14 Plus 6.5") at the resolutions in the table above is still PENDING — the local PNGs are a single capture set, not the per-device variants ASC requires.
 
 ### How to capture
 
@@ -330,7 +290,7 @@ Review takes 24-48h. Common first-round rejections for this app category:
 | 5.1.1(v) - no in-app account deletion | Confirm the Delete button is visible and actually calls `DELETE /auth/me`. It's wired - this shouldn't happen. |
 | 5.1.1(c) - missing Sign in with Apple | Confirm the button renders on iOS builds. It's `Platform.OS === 'ios'`-gated. |
 | 2.1 - app crashes on review | Sentry should capture the trace. Check Sentry dashboard first, then TestFlight crash logs. |
-| 4.2 - minimum functionality / feels like a web wrapper | Protin is native; this shouldn't apply. If it does, emphasise the booking + push notification flows in review notes. |
+| 4.2 - minimum functionality / feels like a web wrapper | The app is a native React Native build; this shouldn't apply. If it does, point reviewers at the in-app session-proposal flow (Discovery → Chat → propose with court/venue → Accept/Decline → Events) so the multi-screen native UX is clear. Do NOT cite push notifications or calendar sync — those are not v1 marketing claims. |
 | 5.1.2 - mismatched privacy answers vs actual data collection | Re-check section 4 against the privacy policy. |
 
 If rejected, respond via Resolution Center with a concrete fix plan + ETA. Do not argue. Fix, rebuild, resubmit.
