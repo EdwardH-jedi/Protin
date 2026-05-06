@@ -37,13 +37,30 @@ function resolveApiUrl() {
 }
 
 // Native Firebase config handling.
+//
 // - Local dev (Expo Go, missing files): silently omit so `expo config` /
 //   `expo start` keep working without the real Google Services files.
-// - Staging / production EAS builds: throw at config-eval so a build can
-//   never silently ship without the Firebase credentials it needs.
-// "Strict" is detected via APP_ENV (local|staging|production) — the repo's
-// existing convention — and EAS_BUILD_PROFILE, which EAS sets automatically
-// (`preview` is our staging profile per eas.json).
+// - EAS builds: each platform's config file is enforced ONLY when that
+//   platform is actually being built AND Firebase is opted-in for the
+//   platform. v1 does not wire any Firebase plugin (no
+//   `@react-native-firebase/*`, no Firebase plist or json on disk), so
+//   the default is "Firebase not required" — keeping the original
+//   strict-throw behavior would have failed every EAS production build
+//   on a missing Android file even when only iOS was being built.
+//
+// "Strict" is detected via APP_ENV (local|staging|production) and via
+// EAS_BUILD_PROFILE (EAS sets it to the chosen profile name; `preview` is
+// our staging profile per eas.json). Platform is detected via
+// EAS_BUILD_PLATFORM, which EAS sets to "ios" or "android" on the build
+// worker. Inside an EAS-driven local config eval, EAS_BUILD_PLATFORM is
+// usually unset; treat that as "no platform context" and don't enforce
+// per-platform Firebase files (the matching `eas build --platform <p>`
+// will set it on the build worker and re-trigger the check correctly).
+//
+// To re-arm the strict throw once Firebase actually lands in v2, set
+// `EXPO_FIREBASE_REQUIRED=true` in the relevant EAS profile env. Default
+// is off so v1 production iOS builds aren't blocked on a Firebase file
+// the v1 code never reads.
 function isStrictBuild() {
   const appEnv = process.env.APP_ENV;
   const easProfile = process.env.EAS_BUILD_PROFILE;
@@ -55,16 +72,32 @@ function isStrictBuild() {
   );
 }
 
-function resolveGoogleServicesFile(relativePath) {
+function isFirebaseRequired() {
+  return process.env.EXPO_FIREBASE_REQUIRED === "true";
+}
+
+function shouldEnforceFirebaseFor(platform) {
+  if (!isStrictBuild()) return false;
+  if (!isFirebaseRequired()) return false;
+  const buildPlatform = process.env.EAS_BUILD_PLATFORM;
+  // No platform context -> local config inspection. Don't enforce; the
+  // real EAS build worker will set EAS_BUILD_PLATFORM and re-check.
+  if (!buildPlatform) return false;
+  return buildPlatform === platform;
+}
+
+function resolveGoogleServicesFile(relativePath, platform) {
   const absolute = path.resolve(__dirname, relativePath);
   if (fs.existsSync(absolute)) {
     return relativePath;
   }
-  if (isStrictBuild()) {
+  if (shouldEnforceFirebaseFor(platform)) {
     throw new Error(
       `Required Firebase config file is missing: ${relativePath}. ` +
-        "Provide it via EAS secrets or commit it before building " +
-        "APP_ENV=staging|production (EAS_BUILD_PROFILE=preview|production)."
+        `Provide it via EAS secrets or commit it before building ` +
+        `EAS_BUILD_PLATFORM=${platform} with ` +
+        `APP_ENV=staging|production (EAS_BUILD_PROFILE=preview|production) ` +
+        `and EXPO_FIREBASE_REQUIRED=true.`
     );
   }
   return undefined;
@@ -72,10 +105,12 @@ function resolveGoogleServicesFile(relativePath) {
 
 module.exports = () => {
   const androidGoogleServicesFile = resolveGoogleServicesFile(
-    "./google-services.json"
+    "./google-services.json",
+    "android"
   );
   const iosGoogleServicesFile = resolveGoogleServicesFile(
-    "./GoogleService-Info.plist"
+    "./GoogleService-Info.plist",
+    "ios"
   );
 
   return {
