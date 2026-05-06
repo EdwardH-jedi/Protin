@@ -1,4 +1,14 @@
-# Protin - App Store submission checklist
+# SportsGang - App Store submission checklist
+
+> **Public brand vs. technical identifier note.** The App Store
+> Connect *public* app record name is **SportsGang** (the inner `s`
+> is intentional). The technical identifiers used by the build path
+> — slug `protin`, iOS bundle identifier `com.edh1223.protin`,
+> Android package `com.edh1223.protin`, npm workspaces `@protin/*`,
+> EAS project `@edwardh1234/protin` — remain unchanged for v1 and
+> are intentionally distinct from the public brand. References to
+> "Protin" in this file appearing in technical contexts (bundle ID,
+> SKU prefix, internal/legacy naming) are correct as written.
 
 > **Scope note.** This document is the **metadata / template reference**
 > for the App Store Connect submission forms (field values, reviewer-notes
@@ -43,7 +53,7 @@ Split between what the repo already supports today (no engineering work needed) 
 - `apps/mobile/assets/` does not yet exist in the repo. `app.config.js` directly references `./assets/notification-icon.png` (under the `expo-notifications` plugin) - `eas build` fails on a missing path. App icon, splash image, and Android adaptive-icon foreground are not currently referenced in `app.config.js`, so Expo would fall back to template defaults that will not pass App Store visual review; add them (and the matching `ios.icon`, `android.adaptiveIcon`, `splash.image` keys) before the first production build.
 - `apps/api/scripts/seed_review_data.py` does not exist. The review test account + two seed accounts + a pending booking (see section 6) depend on it.
 - `apps/mobile/eas.json` still contains `REPLACE_WITH_APP_STORE_CONNECT_APP_ID` and `REPLACE_WITH_APPLE_TEAM_ID` - replace both before `eas submit`.
-- Hosted URLs for the legal docs are **live** on Netlify at `https://sportgang.netlify.app/{privacy,terms,support}/`, and the matching `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, and `EXPO_PUBLIC_SUPPORT_URL` values are pinned on the EAS `preview` and `production` environments (verify with `eas env:list --environment {preview,production}`). Same values also live in the env example files (`apps/mobile/.env.example`, `apps/mobile/.env.staging.example`, `.env.example`) for local Expo runs. Remaining: a dated real-device tap-through of all five in-app legal/support links — see `docs/deployment/APPLE_TESTFLIGHT_PREP.md` §4.8.
+- Hosted URLs for the legal docs are **live** on Netlify at `https://sportgang.netlify.app/{privacy,terms,support}/`, and the matching `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, and `EXPO_PUBLIC_SUPPORT_URL` values are pinned on the EAS `preview` and `production` environments (verify with `eas env:list --environment {preview,production}`). Same values also live in the env example files (`apps/mobile/.env.example`, `apps/mobile/.env.staging.example`, `.env.example`) for local Expo runs. **Privacy / Terms / Support real-device tap-through: PASS — 2026-05-05** (operator-confirmed on iPhone via Expo Go; recorded in `docs/deployment/RELEASE_GATE_CHECKLIST.md` §4.6 and `docs/deployment/APPLE_TESTFLIGHT_PREP.md` §4.8). The same tap-through must be re-run against the actual signed TestFlight build before submission — that re-run remains PENDING.
 - Fly secrets: `APPLE_CLIENT_ID=com.edh1223.protin`, `SECRET_KEY`, `FIELD_ENCRYPTION_KEY`. Without these the staging / production API refuses to boot and the `/auth/apple` endpoint returns 503.
 - Screenshots at both required iPhone sizes (section 9), 6 per size.
 - Apple Developer Program enrolment + ASC account (section Prerequisites).
@@ -67,10 +77,10 @@ Subscriptions / in-app purchases are **not** implemented. Do not select any IAP 
 | Field | Value |
 |---|---|
 | Platform | iOS |
-| Name | **Protin** |
+| Name (public ASC display name) | **SportsGang** — the public App Store/ASC app record name. The mobile config (`apps/mobile/app.config.js` `expo.name`) already reads `SportsGang`. |
 | Primary language | English (Australia) |
-| Bundle ID | `com.edh1223.protin` (must match `apps/mobile/app.config.js`) |
-| SKU | `protin-ios-1` (internal; any unique string) |
+| Bundle ID | `com.edh1223.protin` — technical identifier; must match `apps/mobile/app.config.js`. Intentionally distinct from the public brand. |
+| SKU | `protin-ios-1` (internal; any unique string). Internal-only; never user-visible. |
 | User access | Full access (default) |
 
 After creation, save the generated **ASC App ID** into `apps/mobile/eas.json` -> `submit.production.ios.ascAppId`.
@@ -81,9 +91,9 @@ After creation, save the generated **ASC App ID** into `apps/mobile/eas.json` ->
 
 | Field | Value / guidance |
 |---|---|
-| Subtitle (30 chars) | `[Find a workout partner]` - iterate on copy; this is shown under the app name |
-| Category - Primary | **Health & Fitness** (product-direction fit; "Social Networking" is viable but draws more review scrutiny) |
-| Category - Secondary | **Sports** |
+| Subtitle (30 chars) | See `APP_STORE_METADATA.md` §1 — `Find your next game` (19 chars) is the v1-finalized value; do not iterate without re-aligning the metadata doc. |
+| Category - Primary | **Sports** — aligned with `APP_STORE_METADATA.md` §6 ("Built around the game, not the profile" positioning; the keyword set leads with `sports,fitness,...`). Earlier draft on this row read "Health & Fitness"; that has been withdrawn because the app does not track workouts, count steps, or log sessions — it helps people find each other to play. |
+| Category - Secondary | **Social Networking** — aligned with `APP_STORE_METADATA.md` §6. The 1:1 chat plus the player discovery surface is the social-networking layer that justifies the report / block / delete-account safety controls. |
 | Content Rights | No - app does not contain, show, or access third-party content |
 | Age Rating | See section 5 below - answer the questionnaire to generate |
 
