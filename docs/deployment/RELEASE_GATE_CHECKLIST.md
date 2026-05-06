@@ -151,8 +151,13 @@ Subsections 4.1 through 4.5 rest on this summary.
 - **Mobile typecheck is clean** (`tsc --noEmit`) after the shared-types
   alignment that consolidates auth/onboarding/profile types with
   `@protin/shared-types`.
-- **No real-iPhone verification has been performed.** Every row in
-  sections 4.1 through 4.5 that requires a device run is `[ ]`.
+- **No real-iPhone verification has been performed for sections 4.1
+  through 4.5.** Every row in those subsections that requires a device
+  run is `[ ]`.
+- **Real-iPhone verification HAS been performed for sections 4.6
+  through 4.10** — legal/support links, chat ownership, account
+  switching for chat QA, session proposal cards, Accept/Decline, and
+  the Events tab. See those subsections for dated evidence.
 - **No live staging URL has been probed.** Backend reachability from
   outside the Docker network, HTTPS health, and reviewer-account login
   against a live host are open.
@@ -161,7 +166,8 @@ Subsections 4.1 through 4.5 rest on this summary.
 
 The per-subsection notes under 4.1 through 4.5 describe which test file
 backs each priority area. They do not add new verification claims beyond
-this summary.
+this summary. Subsections 4.6 through 4.10 record device runs that have
+been performed.
 
 ### 4.1 Auth / account lifecycle
 
@@ -267,6 +273,103 @@ crashing the app. Detailed checklist + failure triage live in
 | No 404 on any loaded page | mobile | operator-confirmed PASS | [x] PASS — 2026-05-05 |
 | App does not crash; user can return to the app after opening a link | mobile | operator-confirmed PASS | [x] PASS — 2026-05-05 |
 
+### 4.7 Chat ownership and account switching (real iPhone)
+
+The chat ownership regression that landed messages on the wrong side of
+the conversation when the same device switched accounts is fixed. On
+2026-05-06 the operator ran a two-account Chris/Sarah message exchange
+on a real iPhone via Expo Go against the local API. Behind the fix is
+a versioned auth-op guard in `apps/mobile/src/stores/auth.ts` that
+drops stale `/auth/me` results from a prior login when a logout or new
+login has already moved the device on; the chat-bubble ownership check
+now compares strict `senderId === currentUserId`. Backend Codex review
+confirmed `messages.sender_id` persists per-bearer-token and is
+unaffected by mobile state.
+
+| Check | Owner | Evidence required | Status / date |
+|---|---|---|---|
+| Two-account Chris/Sarah message exchange completes without error | mobile | operator-confirmed PASS via Expo Go / local API | [x] PASS — 2026-05-06 |
+| Messages sent by the current user render right / neon | mobile | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+| Messages from the partner render left / dark | mobile | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+| Account switching no longer flips every message to "current user" rendering | mobile | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+| Backend `messages.sender_id` matches the bearer used at POST time | api | Codex direct DB check confirming sender_id per token | [x] PASS — 2026-05-06 |
+| Deterministic Chris/Sarah local seed reset script exists | api | `apps/api/scripts/reset_chris_sarah_chat_seed.py` (commit `553adda`) | [x] PASS — 2026-05-06 |
+
+Key commits backing this row: `77d92f8` (chat message ownership
+alignment), `c0a5dce` (hydrate auth user after login), `10fd959` (auth
+account switching token state), `553adda` (Chris/Sarah seed reset
+script). This row covers chat-QA-only account switching; full auth
+lifecycle on device (Apple sign-in, session restore across kill+launch,
+etc.) remains tracked under section 4.1 and is still `[ ]`.
+
+### 4.8 Session proposal in chat (Accept / Decline)
+
+Session/court proposals now appear in chat as a card. The proposer
+sees `Session proposal sent` + `Awaiting confirmation`; the receiver
+sees the proposal details with **Accept** and **Decline** buttons.
+Tapping either calls the existing `POST /bookings/{id}/{confirm,decline}`
+FSM endpoints. Tested on 2026-05-06 on a real iPhone via Expo Go.
+
+| Check | Owner | Evidence required | Status / date |
+|---|---|---|---|
+| Proposer can send a court/session proposal from chat composer | mobile | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+| Proposer sees an `Awaiting confirmation` card in the chat timeline | mobile | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+| Receiver sees the proposal card with sport, date/time, venue/location, and Accept/Decline buttons | mobile | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+| Accept transitions the card to `Session confirmed` for both participants on refresh/focus | mobile + api | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+| BookingDetail screen reachable from the card and shows confirmed details | mobile | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+| Decline drops the card from the active proposed state without affecting unrelated history | mobile + api | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+
+Key commits backing this row: `b079880` (show session proposals in
+chat). The chat surface intentionally hides cancelled bookings in v1
+and shows declined as a terminal pill; broader booking lifecycle
+checks (no-show / completion / mid-flight cancel) are not part of
+this row.
+
+### 4.9 Events tab
+
+A fourth bottom tab (`Events`) was added between Matches and Profile.
+It surfaces both upcoming confirmed sessions and pending proposals
+fed by `GET /bookings`. Verified on 2026-05-06 on a real iPhone via
+Expo Go.
+
+| Check | Owner | Evidence required | Status / date |
+|---|---|---|---|
+| Bottom tabs render in order Discover · Matches · Events · Profile | mobile | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+| Events tab is visible and selectable | mobile | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+| `Upcoming sessions` section shows a confirmed future session with the correct sport / date / time / venue / partner | mobile | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+| `Pending proposals` section shows an in-flight proposal (incoming or outgoing) with the matching state | mobile | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+| Tab uses the SportsGang dark / neon style consistent with other tabs | mobile | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+| No push notification permission prompt fires on the Events tab | mobile | operator-confirmed PASS — no system prompt observed | [x] PASS — 2026-05-06 |
+| No calendar permission / sync prompt fires on the Events tab | mobile | operator-confirmed PASS — no system prompt observed | [x] PASS — 2026-05-06 |
+| Discover, Matches, and Profile tabs still reachable and unbroken | mobile | operator-confirmed PASS | [x] PASS — 2026-05-06 |
+| Profile Legal / Support / Logout / Delete account controls remain reachable after Events tab insertion | mobile | not separately reconfirmed after Events tab landed | [ ] PENDING — final visual recheck on real iPhone |
+
+Key commits backing this row: `ac10c67` (add events tab for
+sessions), `b71951d` (Profile Upcoming sessions card). Profile-tab
+account-control reachability has not been explicitly retapped after
+the tab insertion; treat as pending until a dated tap-through is
+captured. The runtime regression tests in
+`apps/mobile/src/__tests__/ProfileScreen.test.tsx` cover the rendering
+of those controls but do not constitute a device run.
+
+### 4.10 Propose-a-session calendar alignment
+
+The custom date picker in the BookingComposer "Propose a session"
+flow had drifted column positions on real iPhones (May 1 2026 was
+landing off the Friday header). The fix swaps the `space-between`
+layout for a deterministic 1/7 flex-basis column geometry and pins
+the day-cell positions via a `buildMonthGrid` helper covered by jest.
+
+| Check | Owner | Evidence required | Status / date |
+|---|---|---|---|
+| `buildMonthGrid(2026, 4)` places May 1 at column index 5 (Friday) | mobile | jest unit + component tests in `apps/mobile/src/__tests__/sessionTime.test.ts` and `CalendarPicker.test.tsx` | [x] PASS — 2026-05-06 |
+| May 2026 day cells visually align under their Sunday-first header columns on a real iPhone | mobile | operator-confirmed visual recheck after the fix | [ ] PENDING — implemented; pending final visual recheck on real iPhone |
+| Selected and today indicators stay attached to the correct date cell | mobile | operator-confirmed visual recheck | [ ] PENDING — implemented; pending final visual recheck on real iPhone |
+
+Key commit backing this row: `56d338b` (fix session calendar weekday
+alignment). The fix has unit and component coverage but the on-device
+visual recheck has not been recorded yet.
+
 ---
 
 ## 5. Apple-Side Setup Required
@@ -313,6 +416,20 @@ known-absent repo artifacts, and Apple-side unknowns live.
 | Reviewer-usable staging environment not confirmed live | "Backend exists" is not "a reviewer can sign in and see seeded data". No deployed staging URL has been probed; backend tests are green but reachability from outside the Docker network is unknown | Gate 1, Gate 2, Gate 3 | infra | Captured green health run plus reviewer account login on staging |
 | Real-device verification not performed | Sections 4.1 through 4.5 rows that require a real-iPhone run cannot be checked without one. The Current verification state summary in section 4 records what backend-only evidence exists today | Gate 2, Gate 3 | mobile + release owner | A dated device run per section 4 row, captured by owner |
 | Two pre-existing backend test baseline failures | `apps/api/tests/test_auth.py::test_get_me_with_no_token_returns_401` asserts `== 403` but the stack returns `401` for missing credentials. `apps/api/tests/test_health.py::test_health_db_failure_does_not_crash` asserts `== 200` but `apps/api/app/main.py` returns `503` when any check is not `"ok"`. Both fail against current app behavior and keep the backend test suite off a clean-green baseline | Gate 1 (noise), Gate 3 (clean-suite evidence for review) | api | Fix each assertion to match current behavior in a separate slice, or adjust the production code if the intent is different |
+
+### 6.2 Non-blocking follow-ups from 2026-05-06 device QA
+
+These came out of the real-device QA pass for sections 4.7-4.10 and
+are tracked here so they don't get lost. None of them block the gates
+above; each is a polish or hygiene item to pick up in a separate slice.
+
+| Item | Notes | Affected gate | Owner |
+|---|---|---|---|
+| Events Accept / Decline error body still surfaces raw `Error.message` on some failure paths | Alert title is the friendly `Couldn't update this session.` headline (S2), but the body falls through to `err.message` for some networking failures. Map to a friendly fallback in `apps/mobile/src/screens/events/EventsScreen.tsx` and `apps/mobile/src/screens/chat/ChatScreen.tsx` | Polish (none) | mobile |
+| Events tab navigation tests do not assert exact tab order | `RootNavigator.test.tsx` mocks the tab navigator via a generic `Screen` stub; the four-tab order is enforced only by reading `RootNavigator.tsx`. Add a focused assertion that `Discovery → Matches → Events → Profile` is the registered order | Polish (none) | mobile |
+| `apps/mobile/src/lib/sessions.ts` lacks direct unit tests | The helper is exercised indirectly via `EventsScreen.test.tsx` and `ProfileScreen.test.tsx`, but past / declined / cancelled / malformed payload filtering would benefit from a dedicated unit-test file | Polish (none) | mobile |
+| ProfileScreen Upcoming-sessions tests still log React `act(...)` warnings | Tests pass but the focused fetch fires a state update outside an awaited `act` in some cases. Wrap the relevant `mockFetchProfile`/upcoming fetcher chains in `act` to silence | Polish (none) | mobile |
+| Untracked `apps/web/claude_design/` and `findstr` debris in workspace | Local hygiene only — neither is staged in any commit on `release/v1`; they appear in `git status --short` and should either be committed to a branch or removed from the worktree | Polish (none) | release owner |
 
 ---
 

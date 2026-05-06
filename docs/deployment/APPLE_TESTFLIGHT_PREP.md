@@ -205,6 +205,14 @@ None of these can be `configured`. Each needs a dated run, an owner, and a
 pass / fail note in `RELEASE_GATE_CHECKLIST.md` section 4 before the matching
 Apple / TestFlight gate passes.
 
+A second batch of device runs HAS been recorded for the chat ownership
+fix, account-switching-for-chat, session proposal cards, Accept /
+Decline, and the Events tab. Those are tracked under
+`RELEASE_GATE_CHECKLIST.md` sections 4.7-4.10 with dated 2026-05-06
+evidence. Calendar weekday alignment ships with unit + component
+coverage but the on-device visual recheck remains pending in section
+4.10.
+
 ---
 
 ### 4.8 Legal/support URL verification
