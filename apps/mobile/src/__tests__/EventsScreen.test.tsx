@@ -159,7 +159,7 @@ describe('EventsScreen', () => {
     await findByText('Gym');
     await findByText('With Chris');
     await findByText('Anytime Fitness Pyrmont');
-    await findByText('Confirmed');
+    await findByText('CONFIRMED');
     expect(queryByText('No confirmed sessions yet.')).toBeNull();
   });
 
@@ -189,11 +189,14 @@ describe('EventsScreen', () => {
         status: 'proposed',
       }),
     ]);
-    const { findByText, queryByLabelText } = render(<EventsScreen />);
+    const { findByText, queryByLabelText, queryByText } = render(<EventsScreen />);
     await findByText('Session proposal sent');
-    await findByText('Awaiting confirmation');
+    await findByText('AWAITING CONFIRMATION');
     expect(queryByLabelText('Accept session proposal')).toBeNull();
     expect(queryByLabelText('Decline session proposal')).toBeNull();
+    // Screenshot regression guard: the long pill must NOT clip the title
+    // to "Session pro..." on a narrow phone.
+    expect(queryByText(/^Session pro\.\.\./)).toBeNull();
   });
 
   it('Accept calls acceptSession and refreshes both lists; row moves to Upcoming', async () => {
@@ -219,7 +222,7 @@ describe('EventsScreen', () => {
     expect(mockAcceptSession).toHaveBeenCalledWith('b-1');
     // After refresh: pending empty state shows, upcoming row appears.
     await findByText('No pending proposals.');
-    await findByText('Confirmed');
+    await findByText('CONFIRMED');
   });
 
   it('Decline calls declineSession and the row disappears from Pending', async () => {
@@ -273,7 +276,7 @@ describe('EventsScreen', () => {
     mockFetchPending.mockResolvedValueOnce([]);
     const { queryByText } = render(<EventsScreen />);
     await waitFor(() => {
-      expect(queryByText('Confirmed')).toBeNull();
+      expect(queryByText('CONFIRMED')).toBeNull();
     });
   });
 

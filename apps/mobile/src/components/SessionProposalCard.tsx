@@ -97,7 +97,7 @@ export function SessionProposalCard({
   if (status === 'proposed') {
     if (isProposer) {
       title = 'Session proposal sent';
-      pillText = 'Awaiting confirmation';
+      pillText = 'AWAITING CONFIRMATION';
       pillColor = colors.textSecondary;
     } else {
       title = 'Session proposal';
@@ -105,11 +105,11 @@ export function SessionProposalCard({
     }
   } else if (status === 'confirmed') {
     title = 'Session confirmed';
-    pillText = 'Confirmed';
+    pillText = 'CONFIRMED';
     pillColor = colors.success;
   } else if (status === 'declined') {
     title = 'Session declined';
-    pillText = 'Declined';
+    pillText = 'DECLINED';
     pillColor = colors.error;
   } else {
     // Defensive default — older or unknown statuses just render as "Session"
@@ -127,16 +127,20 @@ export function SessionProposalCard({
       accessibilityLabel={`Open ${title.toLowerCase()}`}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
-      <View style={styles.headerRow}>
-        <Text style={styles.title} numberOfLines={1}>
-          {title}
-        </Text>
-        {pillText ? (
+      {/* Title gets its own row at full width — keeping the title and the
+          status pill on the same line was forcing "Session proposal" to
+          truncate to "Session pro..." on screenshot-narrow phones because
+          the long "AWAITING CONFIRMATION" pill ate the row width. */}
+      <Text style={styles.title}>{title}</Text>
+      {pillText ? (
+        <View style={styles.statusRow}>
           <View style={[styles.statusPill, { borderColor: pillColor }]}>
-            <Text style={[styles.statusPillText, { color: pillColor }]}>{pillText}</Text>
+            <Text style={[styles.statusPillText, { color: pillColor }]}>
+              {pillText}
+            </Text>
           </View>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
 
       <View style={styles.detailBlock}>
@@ -212,20 +216,20 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.xs,
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
   title: {
     ...typography.h3,
-    flexShrink: 1,
     color: colors.textPrimary,
   },
   subtitle: {
     ...typography.body,
     color: colors.textSecondary,
+  },
+  // Status pill row sits on its own line so "AWAITING CONFIRMATION" never
+  // squeezes the title. `alignItems: 'flex-start'` keeps the pill at its
+  // intrinsic width — it never stretches to fill the row.
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   statusPill: {
     borderWidth: 1,
@@ -235,6 +239,7 @@ const styles = StyleSheet.create({
   },
   statusPillText: {
     ...typography.label,
+    letterSpacing: 0.6,
   },
   detailBlock: {
     paddingTop: spacing.xs,

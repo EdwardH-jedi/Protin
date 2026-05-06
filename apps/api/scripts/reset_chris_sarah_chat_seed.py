@@ -100,9 +100,14 @@ DEFAULT_SUSPICIOUS_IDS: tuple[UUID, ...] = (
 )
 
 CANONICAL_SEED_MESSAGES: list[tuple[UUID, str]] = [
+    # Screenshot-safe back-and-forth: Chris opens, Sarah confirms timing,
+    # Chris suggests a venue. Replaces an earlier sequence whose final
+    # line ("Saturday morning works for me.") read as a closer rather
+    # than a CTA, and the parallel-suspicious-user match's "Lets find a
+    # court" (no apostrophe) that was leaking into screenshots.
     (CHRIS_ID, "Want to train this weekend?"),
-    (SARAH_ID, "Let's plan a session."),
-    (CHRIS_ID, "Saturday morning works for me."),
+    (SARAH_ID, "This Saturday works for me"),
+    (CHRIS_ID, "Let's find a court"),
 ]
 
 PROTECTED_USER_IDS: frozenset[UUID] = frozenset({CHRIS_ID, SARAH_ID})

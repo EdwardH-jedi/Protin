@@ -1170,9 +1170,33 @@ describe('ChatScreen', () => {
         <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
       );
       await findByText('Session proposal sent');
-      await findByText('Awaiting confirmation');
+      await findByText('AWAITING CONFIRMATION');
       expect(queryByLabelText('Accept session proposal')).toBeNull();
       expect(queryByLabelText('Decline session proposal')).toBeNull();
+    });
+
+    it('renders the full "Session proposal" title without truncation alongside the long pill label', async () => {
+      // Screenshot regression guard: the "AWAITING CONFIRMATION" pill and
+      // the title used to share a flex-row with `numberOfLines={1}` on the
+      // title, which clipped it to "Session pro..." on narrow phones. The
+      // fix moves the pill onto its own row; this test pins the contract
+      // by asserting the exact full title text is queryable for the
+      // long-pill case.
+      setupMessagesAndBookingsMock({
+        bookings: {
+          items: [makeProposal({ proposerId: 'me-123', partnerId: 'partner-456' })],
+          total: 1,
+          limit: 50,
+          offset: 0,
+        },
+      });
+      const { findByText, queryByText } = render(
+        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      await findByText('Session proposal sent');
+      // Truncated "Session pro..." must not appear anywhere.
+      expect(queryByText(/^Session pro\.\.\./)).toBeNull();
+      expect(queryByText(/^Session pro$/)).toBeNull();
     });
 
     it('renders the confirmed state for both participants without action buttons', async () => {

@@ -539,7 +539,7 @@ describe('ProfileScreen', () => {
       await findByText('No confirmed sessions yet.');
     });
 
-    it('renders a confirmed future session with sport, partner, and Confirmed pill', async () => {
+    it('renders a confirmed future session with sport, partner, and CONFIRMED pill', async () => {
       mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
       setBookingsResponse([makeBooking()]);
       const { findByText, queryByText } = render(<ProfileScreen />);
@@ -548,7 +548,9 @@ describe('ProfileScreen', () => {
       await findByText('Gym');
       await findByText('With Chris');
       await findByText('Anytime Fitness Pyrmont');
-      await findByText('Confirmed');
+      // The pill text was promoted to all-caps for the screenshot polish
+      // pass so it visually reads as a status badge rather than a sentence.
+      await findByText('CONFIRMED');
       // Empty-state copy must NOT render when a session exists.
       expect(queryByText('No confirmed sessions yet.')).toBeNull();
     });

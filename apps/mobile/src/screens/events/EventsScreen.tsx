@@ -250,7 +250,7 @@ function UpcomingRow({
         <Text style={styles.upcomingSport}>{sport}</Text>
         <View style={[styles.statusPill, { borderColor: colors.success }]}>
           <Text style={[styles.statusPillText, { color: colors.success }]}>
-            Confirmed
+            CONFIRMED
           </Text>
         </View>
       </View>
@@ -351,6 +351,7 @@ const styles = StyleSheet.create({
   },
   statusPillText: {
     ...typography.label,
+    letterSpacing: 0.6,
   },
   pressed: { opacity: 0.65 },
 });
