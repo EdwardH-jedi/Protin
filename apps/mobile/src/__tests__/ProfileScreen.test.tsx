@@ -40,6 +40,17 @@ jest.mock('@react-navigation/native', () => ({
     reset: mockReset,
     getParent: mockGetParent,
   }),
+  // ProfileScreen calls useFocusEffect to refetch upcoming sessions when
+  // the user returns to the Profile tab. Stub fires the callback once on
+  // mount and treats any returned cleanup as the unmount handler.
+  useFocusEffect: (cb: () => void | (() => void)) => {
+    const React = require('react');
+    React.useEffect(() => {
+      const cleanup = cb();
+      return typeof cleanup === 'function' ? cleanup : undefined;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+  },
 }));
 
 // ─── Mock auth store ──────────────────────────────────────────────────────────
@@ -479,6 +490,135 @@ describe('ProfileScreen', () => {
       const { queryByText, getByText } = render(<ProfileScreen />);
       await waitFor(() => getByText('Profile not set up'));
       expect(queryByText('Sports reputation')).toBeNull();
+    });
+  });
+
+  // ── Upcoming sessions ──────────────────────────────────────────────────────
+  //
+  // Section pins what the receiver sees AFTER accepting a chat proposal:
+  // the session lands here, future-only, with status pinned to Confirmed.
+  // Pending and declined bookings stay in chat (S2) and must NOT leak into
+  // this surface.
+
+  describe('Upcoming sessions section', () => {
+    function makeBooking(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'booking-99',
+        matchId: 'match-7',
+        proposerId: 'partner-1',
+        partnerId: 'me-1',
+        sport: 'gym',
+        startsAt: '2099-04-09T09:00:00Z',
+        endsAt: '2099-04-09T10:00:00Z',
+        location: 'Anytime Fitness Pyrmont',
+        notes: null,
+        status: 'confirmed',
+        createdAt: '2099-04-08T08:30:00Z',
+        updatedAt: '2099-04-08T08:30:00Z',
+        partner: { displayName: 'Chris' },
+        venue: null,
+        ...overrides,
+      };
+    }
+
+    function setBookingsResponse(items: unknown[]) {
+      mockApiGet.mockImplementation((url: string) => {
+        if (typeof url === 'string' && url.startsWith('/bookings')) {
+          return Promise.resolve({ items, total: items.length, limit: 50, offset: 0 });
+        }
+        // Anything else returns the legacy default the rest of the suite uses.
+        return Promise.resolve({ connected: false });
+      });
+    }
+
+    it('renders the empty state when there are no confirmed sessions', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      setBookingsResponse([]);
+      const { findByText } = render(<ProfileScreen />);
+      await findByText('Upcoming sessions');
+      await findByText('No confirmed sessions yet.');
+    });
+
+    it('renders a confirmed future session with sport, partner, and Confirmed pill', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      setBookingsResponse([makeBooking()]);
+      const { findByText, queryByText } = render(<ProfileScreen />);
+      await findByText('Upcoming sessions');
+      // Sport, partner, location, and status pill must all surface.
+      await findByText('Gym');
+      await findByText('With Chris');
+      await findByText('Anytime Fitness Pyrmont');
+      await findByText('Confirmed');
+      // Empty-state copy must NOT render when a session exists.
+      expect(queryByText('No confirmed sessions yet.')).toBeNull();
+    });
+
+    it('navigates to BookingDetail when a row is tapped', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      setBookingsResponse([makeBooking()]);
+      const { findByLabelText } = render(<ProfileScreen />);
+      const row = await findByLabelText(
+        'Open upcoming gym session with Chris'
+      );
+      await act(async () => {
+        fireEvent.press(row);
+      });
+      expect(mockNavigate).toHaveBeenCalledWith('BookingDetail', {
+        bookingId: 'booking-99',
+      });
+    });
+
+    it('filters out past confirmed sessions client-side', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      // endsAt sits in the past — backend may still order it ASC, but the
+      // mobile must drop it before rendering.
+      setBookingsResponse([
+        makeBooking({
+          id: 'booking-past',
+          startsAt: '2000-01-01T09:00:00Z',
+          endsAt: '2000-01-01T10:00:00Z',
+        }),
+      ]);
+      const { findByText, queryByText } = render(<ProfileScreen />);
+      await findByText('No confirmed sessions yet.');
+      expect(queryByText('With Chris')).toBeNull();
+    });
+
+    it('does not render proposed or declined bookings even if returned', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      // Defensive: even if a future code path mistakenly issues a wider
+      // status query, the row-rendering filter must reject anything that
+      // isn't confirmed/accepted.
+      setBookingsResponse([
+        makeBooking({ id: 'b-prop', status: 'proposed' }),
+        makeBooking({ id: 'b-decl', status: 'declined' }),
+      ]);
+      const { findByText, queryByText } = render(<ProfileScreen />);
+      await findByText('No confirmed sessions yet.');
+      expect(queryByText('With Chris')).toBeNull();
+    });
+
+    it('queries /bookings with the confirmed status filter', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      setBookingsResponse([]);
+      render(<ProfileScreen />);
+      await waitFor(() => {
+        expect(mockApiGet).toHaveBeenCalledWith(
+          '/bookings?status=confirmed&limit=50'
+        );
+      });
+    });
+
+    it('does not show calendar sync or push notification copy in this section', async () => {
+      // Pin the v1 scope: Upcoming is read-only and does not surface
+      // hidden surfaces (no calendar / push / reminder copy).
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      setBookingsResponse([makeBooking()]);
+      const { findByText, queryByText } = render(<ProfileScreen />);
+      await findByText('Upcoming sessions');
+      expect(queryByText(/calendar/i)).toBeNull();
+      expect(queryByText(/notification/i)).toBeNull();
+      expect(queryByText(/reminder/i)).toBeNull();
     });
   });
 });

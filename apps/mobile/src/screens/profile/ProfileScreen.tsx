@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { Screen } from '../../components/Screen';
@@ -19,12 +19,42 @@ import { sportLabel, useProfileStore } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { RootStackParamList } from '../../navigation/types';
 
+// ─── Upcoming sessions ───────────────────────────────────────────────────────
+//
+// v1 surface for "what did I just confirm?" — sits on the existing Profile
+// card stack so we don't add a new bottom tab. Reuses GET /bookings's
+// existing `status` filter (so no backend change here) and client-filters
+// to future starts so a session that already happened drops off without
+// any timezone math on the server.
+
+interface UpcomingSession {
+  id: string;
+  matchId: string;
+  proposerId: string;
+  partnerId: string;
+  sport: string;
+  startsAt: string;
+  endsAt: string;
+  location: string | null;
+  status: string;
+  partner: { displayName: string };
+  venue?: { name: string; area?: string | null; address?: string | null } | null;
+}
+
+interface UpcomingSessionListResponse {
+  items: UpcomingSession[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export function ProfileScreen() {
   const { logout } = useAuthStore();
   const { profile, sportProfiles, fetchProfile } = useProfileStore();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [upcoming, setUpcoming] = useState<UpcomingSession[]>([]);
   // Local guard so a double-tap or repeat confirmation cannot fire
   // DELETE /auth/me twice. Also blocks Log out while a delete is mid-flight.
   // A ref (not state) is required because Alert button onPress callbacks close
@@ -43,6 +73,41 @@ export function ProfileScreen() {
       })
       .finally(() => setIsLoading(false));
   }, [fetchProfile]);
+
+  // Pull confirmed bookings on mount AND on every tab-focus so a brand-new
+  // accept (driven from chat) shows up the moment the user navigates back
+  // to Profile. Failure is silent: Upcoming is a secondary surface and the
+  // rest of the screen must keep rendering even if /bookings is down.
+  const fetchUpcoming = useCallback(async () => {
+    try {
+      const res = await api.get<UpcomingSessionListResponse>(
+        '/bookings?status=confirmed&limit=50'
+      );
+      const nowMs = Date.now();
+      // Backend orders by starts_at ASC, but already-past confirmed sessions
+      // would appear at the top — drop them client-side. v1: keep this in the
+      // mobile so the API stays generic for other surfaces (BookingDetail
+      // history, future "Past sessions" view).
+      const futureOnly = res.items.filter(
+        (b) =>
+          (b.status === 'confirmed' || b.status === 'accepted') &&
+          new Date(b.endsAt).getTime() > nowMs
+      );
+      setUpcoming(futureOnly);
+    } catch {
+      setUpcoming([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchUpcoming();
+  }, [fetchUpcoming]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void fetchUpcoming();
+    }, [fetchUpcoming])
+  );
 
   // Reset the root stack to AuthEntry. RootNavigator's auth-state effect also
   // forces this when `token` transitions to null, but we keep this explicit
@@ -202,6 +267,29 @@ export function ProfileScreen() {
         ) : null}
 
         <View style={styles.cardStack}>
+          {/* Upcoming sessions — confirmed bookings only, sorted earliest
+              first. Pending proposals stay in chat (S2); declined and past
+              sessions are filtered out so the section stays a calm, simple
+              "what's actually happening next" surface. */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Upcoming sessions</Text>
+            {upcoming.length === 0 ? (
+              <Text style={styles.upcomingEmpty}>No confirmed sessions yet.</Text>
+            ) : (
+              <View style={styles.upcomingList}>
+                {upcoming.map((s) => (
+                  <UpcomingSessionRow
+                    key={s.id}
+                    session={s}
+                    onPress={() =>
+                      navigation.navigate('BookingDetail', { bookingId: s.id })
+                    }
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+
           {/* Legal */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Legal</Text>
@@ -256,6 +344,75 @@ export function ProfileScreen() {
         </View>
       </ScrollView>
     </Screen>
+  );
+}
+
+function formatUpcomingDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function formatUpcomingTimeRange(startsAt: string, endsAt: string): string {
+  const opts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
+  return `${new Date(startsAt).toLocaleTimeString(undefined, opts)}–${new Date(
+    endsAt
+  ).toLocaleTimeString(undefined, opts)}`;
+}
+
+function upcomingVenueLine(s: UpcomingSession): string | null {
+  if (s.venue?.name) {
+    const where = s.venue.address ?? s.venue.area;
+    return where ? `${s.venue.name} · ${where}` : s.venue.name;
+  }
+  return s.location?.trim() ? s.location : null;
+}
+
+/**
+ * Compact row inside the Upcoming sessions card. Tap → BookingDetail
+ * (where the existing Cancel / Mark completed / Record no-show actions
+ * live; this row deliberately does NOT duplicate them).
+ */
+function UpcomingSessionRow({
+  session,
+  onPress,
+}: {
+  session: UpcomingSession;
+  onPress: () => void;
+}) {
+  const sport = sportLabel(session.sport);
+  const date = formatUpcomingDate(session.startsAt);
+  const time = formatUpcomingTimeRange(session.startsAt, session.endsAt);
+  const venue = upcomingVenueLine(session);
+  const partnerName = session.partner.displayName || 'Partner';
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Open upcoming ${sport.toLowerCase()} session with ${partnerName}`}
+      style={({ pressed }) => [styles.upcomingRow, pressed && styles.pressed]}
+    >
+      <View style={styles.upcomingRowHeader}>
+        <Text style={styles.upcomingSport}>{sport}</Text>
+        <View style={[styles.statusPill, { borderColor: colors.success }]}>
+          <Text style={[styles.statusPillText, { color: colors.success }]}>
+            Confirmed
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.upcomingWhen}>
+        {date} · {time}
+      </Text>
+      {venue ? (
+        <Text style={styles.upcomingVenue} numberOfLines={2}>
+          {venue}
+        </Text>
+      ) : null}
+      <Text style={styles.upcomingPartner}>With {partnerName}</Text>
+    </Pressable>
   );
 }
 
@@ -432,6 +589,55 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.brand,
     fontWeight: '600',
+  },
+
+  // Upcoming sessions
+  upcomingEmpty: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+  upcomingList: {
+    gap: spacing.sm,
+  },
+  upcomingRow: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.inputBackground,
+    borderRadius: radii.md,
+    gap: 2,
+  },
+  upcomingRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: 2,
+  },
+  upcomingSport: {
+    ...typography.bodyLarge,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  upcomingWhen: {
+    ...typography.body,
+    color: colors.textPrimary,
+  },
+  upcomingVenue: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+  upcomingPartner: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
+  },
+  statusPill: {
+    borderWidth: 1,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  statusPillText: {
+    ...typography.label,
   },
 
   // Integrations
