@@ -92,8 +92,15 @@ function resolveGoogleServicesFile(relativePath, platform) {
     return relativePath;
   }
   if (shouldEnforceFirebaseFor(platform)) {
+    // Platform-prefixed message so an engineer reading a build log
+    // immediately sees which platform's Firebase config is missing
+    // and that the requirement is scoped to that platform's
+    // production-like EAS builds — not, for example, an iOS build
+    // accidentally tripping on an absent Android JSON.
+    const platformLabel = platform === "ios" ? "iOS" : "Android";
     throw new Error(
-      `Required Firebase config file is missing: ${relativePath}. ` +
+      `Required ${platformLabel} Firebase config file is missing: ${relativePath}. ` +
+        `This is only required for ${platformLabel} production-like EAS builds. ` +
         `Provide it via EAS secrets or commit it before building ` +
         `EAS_BUILD_PLATFORM=${platform} with ` +
         `APP_ENV=staging|production (EAS_BUILD_PROFILE=preview|production) ` +
