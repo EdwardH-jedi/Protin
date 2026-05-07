@@ -1,0 +1,100 @@
+# =============================================================================
+# Docker build-context excludes for the SportsGang / Protin monorepo.
+#
+# The Fly build context is the repo root (see fly.toml at the root +
+# apps/api/Dockerfile's `apps/api/...` COPY paths). Everything below is
+# evaluated against that root.
+#
+# Rules of thumb:
+# - exclude generated, per-developer, or per-host artifacts that would
+#   bloat the build context or break the cache;
+# - exclude every secret-bearing file (.env*, certs, tokens) so they
+#   physically cannot land inside an image layer;
+# - DO NOT exclude apps/api/uv.lock, apps/api/pyproject.toml,
+#   apps/api/app/, apps/api/worker.py, apps/api/alembic.ini, or
+#   apps/api/alembic/ -- the Dockerfile copies each of those by name.
+# =============================================================================
+
+
+# --- Python --------------------------------------------------------------
+**/__pycache__
+**/*.py[cod]
+**/*.pyo
+**/.venv
+**/.env
+**/.env.staging
+**/.env.production
+
+
+# --- Node ----------------------------------------------------------------
+**/node_modules
+
+
+# --- SSL certificates (generated locally; never commit) -------------------
+**/infra/nginx/certs/*.crt
+**/infra/nginx/certs/*.key
+**/infra/nginx/certs/*.pem
+
+
+# --- Expo / React Native -------------------------------------------------
+**/.expo
+**/.expo-shared
+**/dist
+**/web-build
+
+
+# --- Misc ----------------------------------------------------------------
+**/resume
+**/.DS_Store
+
+
+# --- Claude Code per-developer state (do not commit) ---------------------
+**/.claude/settings.local.json
+**/.claude/scheduled_tasks.lock
+
+
+# --- Codex Stop-hook review reports (generated) --------------------------
+**/reviews
+
+
+# --- Claude Code run archive (per-developer local; README only tracked) --
+**/runs/*
+!**/runs/README.md
+
+
+# --- Claude Code hook state (session -> run-file mapping) ----------------
+**/.claude/tmp
+
+
+# --- Local development artifacts (per-developer / per-host) --------------
+**/apps/api/.venv_win
+**/apps/api/media
+**/references
+
+
+# --- ruff / pytest caches ------------------------------------------------
+.ruff_cache/**/*
+apps/api/.pytest_cache/**/*
+apps/api/.ruff_cache/**/*
+
+
+# --- apps/mobile build outputs (Expo / pytest) ---------------------------
+apps/mobile/**/.expo
+apps/mobile/**/.expo-shared
+apps/mobile/**/dist
+apps/mobile/**/web-build
+apps/mobile/.pytest_cache/**/*
+
+
+# --- apps/web build outputs ----------------------------------------------
+apps/web/**/node_modules
+apps/web/**/dist
+apps/web/**/.vite
+apps/web/**/*.local
+apps/web/**/.DS_Store
+
+
+# --- Fly metadata --------------------------------------------------------
+# fly.toml is read by flyctl, not by the image; keep it out of the
+# build context so it can't leak into a layer.
+fly.toml
