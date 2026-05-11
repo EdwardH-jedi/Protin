@@ -115,4 +115,11 @@ describe('SafetyCenterScreen', () => {
     fireEvent.press(getByLabelText('Back'));
     expect(navigation.goBack).toHaveBeenCalled();
   });
+
+  it('renders a Manage blocked users entry that navigates to BlockedUsers', () => {
+    const { getByLabelText, navigation } = renderScreen();
+    const entry = getByLabelText('Manage blocked users');
+    fireEvent.press(entry);
+    expect(navigation.navigate).toHaveBeenCalledWith('BlockedUsers');
+  });
 });

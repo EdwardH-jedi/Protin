@@ -9,11 +9,16 @@
 
 import { api } from './api';
 
-interface BlockResponse {
+export interface BlockResponse {
   id: string;
   blockerId: string;
   blockedId: string;
   createdAt: string;
+}
+
+export interface BlockListResponse {
+  items: BlockResponse[];
+  total: number;
 }
 
 /**
@@ -22,4 +27,20 @@ interface BlockResponse {
  */
 export async function blockUser(blockedUserId: string): Promise<BlockResponse> {
   return api.post<BlockResponse>(`/blocks/${blockedUserId}`);
+}
+
+/**
+ * List users the caller has blocked. Backend returns `{ items, total }`;
+ * each item is the directional block row (blocker -> blocked).
+ */
+export async function listBlockedUsers(): Promise<BlockListResponse> {
+  return api.get<BlockListResponse>('/blocks');
+}
+
+/**
+ * Unblock a previously blocked user. Backend returns 204; the helper
+ * resolves to void.
+ */
+export async function unblockUser(blockedUserId: string): Promise<void> {
+  return api.delete<void>(`/blocks/${blockedUserId}`);
 }

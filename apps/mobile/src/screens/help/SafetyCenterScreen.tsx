@@ -58,6 +58,22 @@ export function SafetyCenterScreen({ navigation }: SafetyCenterScreenProps) {
             Blocked users are restricted from supported interactions such as
             joining your games where supported.
           </Text>
+          <Pressable
+            onPress={() => navigation.navigate('BlockedUsers')}
+            accessibilityRole="button"
+            accessibilityLabel="Manage blocked users"
+            style={({ pressed }) => [
+              styles.manageButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.manageButtonText}>
+              Manage blocked users
+            </Text>
+            <Text style={styles.manageButtonSub}>
+              Manage people you've blocked.
+            </Text>
+          </Pressable>
         </Section>
 
         <Section title="No-show policy">
@@ -167,6 +183,24 @@ const styles = StyleSheet.create({
   body: {
     ...typography.body,
     color: colors.textSecondary,
+  },
+  manageButton: {
+    marginTop: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.brand,
+    backgroundColor: 'transparent',
+  },
+  manageButtonText: {
+    ...typography.button,
+    color: colors.brand,
+  },
+  manageButtonSub: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
+    marginTop: 2,
   },
   pressed: { opacity: 0.65 },
 });

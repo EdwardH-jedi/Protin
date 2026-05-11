@@ -32,6 +32,7 @@ import { AttendanceCheckScreen } from '../screens/battles/AttendanceCheckScreen'
 import { PublicProfileScreen } from '../screens/profile/PublicProfileScreen';
 import { HonorGuideScreen } from '../screens/help/HonorGuideScreen';
 import { SafetyCenterScreen } from '../screens/help/SafetyCenterScreen';
+import { BlockedUsersScreen } from '../screens/safety/BlockedUsersScreen';
 
 import { registerForPushNotifications, configureForegroundHandler } from '../lib/notifications';
 import { useAuthStore } from '../stores/auth';
@@ -257,6 +258,11 @@ export function RootNavigator() {
         <Stack.Screen
           name="SafetyCenter"
           component={SafetyCenterScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="BlockedUsers"
+          component={BlockedUsersScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>
