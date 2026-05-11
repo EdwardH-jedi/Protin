@@ -6,7 +6,9 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.safety import Block, Report
+from app.models.event import Event, EventParticipant
+from app.models.safety import REPORT_TARGET_TYPES, Block, Report
+from app.models.user import User
 from app.schemas.safety import (
     BlockListResponse,
     BlockResponse,
@@ -25,17 +27,93 @@ async def create_report(
     reporter_id: UUID,
     req: CreateReportRequest,
 ) -> ReportResponse:
-    if reporter_id == req.reported_user_id:
+    target_type = req.target_type
+    if target_type not in REPORT_TARGET_TYPES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Cannot report yourself.",
+            detail=f"Invalid target_type: {target_type}",
         )
 
+    target_user_id: UUID | None = None
+    target_event_id: UUID | None = None
+
+    if target_type == "user":
+        if req.reported_user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="reported_user_id is required for user reports",
+            )
+        if req.target_event_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="target_event_id must be null for user reports",
+            )
+        if reporter_id == req.reported_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Cannot report yourself.",
+            )
+        target_user = (
+            await db.execute(select(User).where(User.id == req.reported_user_id))
+        ).scalar_one_or_none()
+        if target_user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Reported user not found",
+            )
+        target_user_id = req.reported_user_id
+    else:  # target_type == "event"
+        if req.target_event_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="target_event_id is required for event reports",
+            )
+        target_event = (
+            await db.execute(select(Event).where(Event.id == req.target_event_id))
+        ).scalar_one_or_none()
+        if target_event is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Reported event not found",
+            )
+        # Private-event hide-as-404: outsiders must not distinguish a
+        # real private event from an unknown id by submitting a report.
+        if (
+            target_event.visibility == "private"
+            and reporter_id != target_event.host_user_id
+        ):
+            active = (
+                await db.execute(
+                    select(EventParticipant.id).where(
+                        EventParticipant.event_id == target_event.id,
+                        EventParticipant.user_id == reporter_id,
+                        EventParticipant.status == "joined",
+                    )
+                )
+            ).first()
+            if active is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Reported event not found",
+                )
+        if reporter_id == target_event.host_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Cannot report your own event.",
+            )
+        target_event_id = req.target_event_id
+
+    # Status is server-controlled. New rows always begin "submitted";
+    # the API never accepts a client-supplied status, so a public
+    # report can never be created as already-actioned.
     report = Report(
         reporter_id=reporter_id,
-        reported_id=req.reported_user_id,
+        target_type=target_type,
+        reported_id=target_user_id,
+        target_event_id=target_event_id,
         reason=req.reason,
         context=req.context,
+        status="submitted",
     )
     db.add(report)
     await db.commit()

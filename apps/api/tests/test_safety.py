@@ -16,6 +16,7 @@ from app.main import app
 
 from app.models import match, profile, user, chat, booking  # noqa: F401
 from app.models import google_calendar, notification, safety  # noqa: F401
+from app.models import event  # noqa: F401  — needed for the target_event_id FK
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 _engine = create_async_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
@@ -301,3 +302,145 @@ async def test_list_my_reports_empty_response_shape(client: AsyncClient) -> None
     assert r.status_code == 200
     body = r.json()
     assert body == {"items": [], "total": 0}
+
+
+# ---------------------------------------------------------------------------
+# V1.1 contract: target_type / target_event_id / status are server-controlled
+# ---------------------------------------------------------------------------
+
+
+from datetime import datetime, timedelta, timezone  # noqa: E402
+
+
+def _event_payload(**overrides) -> dict:
+    body = {
+        "title": "Friendly hoops",
+        "sport": "basketball",
+        "mode": "casual",
+        "starts_at": (
+            datetime.now(tz=timezone.utc) - timedelta(hours=1)
+        ).isoformat(),
+        "location_text": "Bondi Court",
+        "capacity": 10,
+        "visibility": "public",
+    }
+    body.update(overrides)
+    return body
+
+
+async def test_new_reports_default_to_submitted(client: AsyncClient) -> None:
+    token_a, _ = await _register(client, "rep_default_a@example.com")
+    _, uid_b = await _register(client, "rep_default_b@example.com")
+    r = await client.post(
+        "/reports",
+        json={"reported_user_id": uid_b, "reason": "harassment"},
+        headers=_auth(token_a),
+    )
+    assert r.status_code == 201
+    body = r.json()
+    assert body["status"] == "submitted"
+    assert body["target_type"] == "user"
+    assert body["target_event_id"] is None
+
+
+async def test_public_create_report_cannot_set_actioned(
+    client: AsyncClient,
+) -> None:
+    """
+    The CreateReportRequest schema does NOT expose status, so a client
+    that sends one must be ignored and the row must still default to
+    'submitted'. Belt and braces against a future leak.
+    """
+    token_a, _ = await _register(client, "rep_actioned_a@example.com")
+    _, uid_b = await _register(client, "rep_actioned_b@example.com")
+    r = await client.post(
+        "/reports",
+        json={
+            "reported_user_id": uid_b,
+            "reason": "harassment",
+            "status": "actioned",  # ignored by the schema
+        },
+        headers=_auth(token_a),
+    )
+    assert r.status_code == 201
+    assert r.json()["status"] == "submitted"
+
+
+async def test_event_report_create(client: AsyncClient) -> None:
+    host_tok, _ = await _register(client, "rep_evt_host@example.com")
+    reporter_tok, _ = await _register(client, "rep_evt_reporter@example.com")
+    created = await client.post(
+        "/events", json=_event_payload(), headers=_auth(host_tok)
+    )
+    event_id = created.json()["id"]
+
+    r = await client.post(
+        "/reports",
+        json={
+            "target_type": "event",
+            "target_event_id": event_id,
+            "reason": "unsafe_behavior",
+        },
+        headers=_auth(reporter_tok),
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["target_type"] == "event"
+    assert body["target_event_id"] == event_id
+    assert body["reported_id"] is None
+    assert body["status"] == "submitted"
+
+
+async def test_event_report_unknown_event_404(client: AsyncClient) -> None:
+    token, _ = await _register(client, "rep_evt_unknown@example.com")
+    r = await client.post(
+        "/reports",
+        json={
+            "target_type": "event",
+            "target_event_id": "00000000-0000-0000-0000-000000000abc",
+            "reason": "fraud_or_scam",
+        },
+        headers=_auth(token),
+    )
+    assert r.status_code == 404
+
+
+async def test_cannot_report_own_event(client: AsyncClient) -> None:
+    host_tok, _ = await _register(client, "rep_own_evt@example.com")
+    created = await client.post(
+        "/events", json=_event_payload(), headers=_auth(host_tok)
+    )
+    event_id = created.json()["id"]
+    r = await client.post(
+        "/reports",
+        json={
+            "target_type": "event",
+            "target_event_id": event_id,
+            "reason": "fraud_or_scam",
+        },
+        headers=_auth(host_tok),
+    )
+    assert r.status_code == 422
+
+
+async def test_event_report_user_target_mismatch_rejected(
+    client: AsyncClient,
+) -> None:
+    """target_type=user must omit target_event_id."""
+    host_tok, _ = await _register(client, "rep_mix_host@example.com")
+    other_tok, other_uid = await _register(client, "rep_mix_other@example.com")
+    created = await client.post(
+        "/events", json=_event_payload(), headers=_auth(host_tok)
+    )
+    event_id = created.json()["id"]
+    r = await client.post(
+        "/reports",
+        json={
+            "target_type": "user",
+            "reported_user_id": other_uid,
+            "target_event_id": event_id,
+            "reason": "harassment",
+        },
+        headers=_auth(host_tok),
+    )
+    assert r.status_code == 422
