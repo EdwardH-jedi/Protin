@@ -1,0 +1,553 @@
+"""Event create / list / detail / join / leave tests using in-memory SQLite."""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from typing import AsyncGenerator
+from unittest.mock import AsyncMock
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from app.db.base import Base
+from app.db.redis import get_redis
+from app.db.session import get_db
+from app.main import app
+from app.models import (  # noqa: F401  — populate Base.metadata
+    booking,
+    chat,
+    event,
+    match,
+    profile,
+    rank,
+    safety,
+    tournament,
+    user,
+    venue,
+)
+
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+_engine = create_async_engine(
+    TEST_DATABASE_URL, connect_args={"check_same_thread": False}
+)
+_TestSession = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
+
+
+@pytest.fixture(scope="module", autouse=True)
+async def create_tables():
+    async with _engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    async with _engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+
+async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with _TestSession() as session:
+        yield session
+
+
+async def _override_get_redis() -> AsyncGenerator:
+    mock = AsyncMock()
+    mock.ping = AsyncMock(return_value=True)
+    mock.aclose = AsyncMock()
+    yield mock
+
+
+@pytest.fixture
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_redis] = _override_get_redis
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        yield ac
+    app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+async def _register(client: AsyncClient, email: str) -> tuple[str, str]:
+    r = await client.post(
+        "/auth/register", json={"email": email, "password": "password123"}
+    )
+    token = r.json()["access_token"]
+    me = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    return token, me.json()["id"]
+
+
+def _auth(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _payload(**overrides) -> dict:
+    starts_at = (
+        datetime.now(tz=timezone.utc) + timedelta(days=7)
+    ).isoformat()
+    body = {
+        "title": "Bondi pickup hoops",
+        "sport": "basketball",
+        "mode": "casual",
+        "starts_at": starts_at,
+        "location_text": "Bondi Beach Court",
+        "capacity": 10,
+        "visibility": "public",
+        "description": "Casual run, all welcome",
+    }
+    body.update(overrides)
+    return body
+
+
+async def _wipe_events() -> None:
+    from sqlalchemy import delete
+
+    from app.models.event import Event, EventParticipant
+
+    async with _TestSession() as db:
+        await db.execute(delete(EventParticipant))
+        await db.execute(delete(Event))
+        await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+
+async def test_list_requires_auth(client: AsyncClient) -> None:
+    r = await client.get("/events")
+    assert r.status_code in (401, 403)
+
+
+async def test_create_requires_auth(client: AsyncClient) -> None:
+    r = await client.post("/events", json=_payload())
+    assert r.status_code in (401, 403)
+
+
+async def test_detail_requires_auth(client: AsyncClient) -> None:
+    r = await client.get("/events/00000000-0000-0000-0000-000000000000")
+    assert r.status_code in (401, 403)
+
+
+async def test_join_requires_auth(client: AsyncClient) -> None:
+    r = await client.post("/events/00000000-0000-0000-0000-000000000000/join")
+    assert r.status_code in (401, 403)
+
+
+async def test_leave_requires_auth(client: AsyncClient) -> None:
+    r = await client.post("/events/00000000-0000-0000-0000-000000000000/leave")
+    assert r.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
+# Create
+# ---------------------------------------------------------------------------
+
+
+async def test_create_event_returns_detail(client: AsyncClient) -> None:
+    await _wipe_events()
+    token, uid = await _register(client, "evt_create@example.com")
+
+    r = await client.post("/events", json=_payload(), headers=_auth(token))
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["title"] == "Bondi pickup hoops"
+    assert body["sport"] == "basketball"
+    assert body["mode"] == "casual"
+    assert body["status"] == "open"
+    assert body["host_user_id"] == uid
+    # Host auto-joins.
+    assert body["participant_count"] == 1
+    assert body["has_joined"] is True
+    assert body["host"]["id"] == uid
+
+
+async def test_create_event_capacity_must_be_positive(client: AsyncClient) -> None:
+    await _wipe_events()
+    token, _ = await _register(client, "evt_cap0@example.com")
+
+    r = await client.post(
+        "/events", json=_payload(capacity=0), headers=_auth(token)
+    )
+    assert r.status_code == 422
+
+
+async def test_create_event_rejects_private_for_now(client: AsyncClient) -> None:
+    await _wipe_events()
+    token, _ = await _register(client, "evt_private@example.com")
+
+    r = await client.post(
+        "/events", json=_payload(visibility="private"), headers=_auth(token)
+    )
+    assert r.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# List
+# ---------------------------------------------------------------------------
+
+
+async def test_list_returns_open_events(client: AsyncClient) -> None:
+    await _wipe_events()
+    token, _ = await _register(client, "evt_list@example.com")
+    create = await client.post(
+        "/events", json=_payload(title="Soccer kickabout", sport="soccer"), headers=_auth(token)
+    )
+    assert create.status_code == 201
+
+    r = await client.get("/events", headers=_auth(token))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total"] == 1
+    assert body["items"][0]["title"] == "Soccer kickabout"
+    assert body["items"][0]["sport"] == "soccer"
+
+
+async def test_list_filters_by_sport(client: AsyncClient) -> None:
+    await _wipe_events()
+    token, _ = await _register(client, "evt_list_sport@example.com")
+    await client.post("/events", json=_payload(sport="tennis", title="T"), headers=_auth(token))
+    await client.post("/events", json=_payload(sport="golf", title="G"), headers=_auth(token))
+
+    r = await client.get("/events?sport=tennis", headers=_auth(token))
+    assert r.status_code == 200
+    items = r.json()["items"]
+    assert len(items) == 1
+    assert items[0]["sport"] == "tennis"
+
+
+async def test_list_filters_by_mode(client: AsyncClient) -> None:
+    await _wipe_events()
+    token, _ = await _register(client, "evt_list_mode@example.com")
+    await client.post("/events", json=_payload(mode="ranked", title="R"), headers=_auth(token))
+    await client.post("/events", json=_payload(mode="casual", title="C"), headers=_auth(token))
+
+    r = await client.get("/events?mode=ranked", headers=_auth(token))
+    assert r.status_code == 200
+    items = r.json()["items"]
+    assert len(items) == 1
+    assert items[0]["mode"] == "ranked"
+
+
+# ---------------------------------------------------------------------------
+# Detail
+# ---------------------------------------------------------------------------
+
+
+async def test_detail_returns_participants(client: AsyncClient) -> None:
+    await _wipe_events()
+    token_a, _uid_a = await _register(client, "evt_detail_a@example.com")
+    token_b, _uid_b = await _register(client, "evt_detail_b@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(token_a))
+    event_id = created.json()["id"]
+
+    r = await client.post(f"/events/{event_id}/join", headers=_auth(token_b))
+    assert r.status_code == 200
+
+    r = await client.get(f"/events/{event_id}", headers=_auth(token_a))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["participant_count"] == 2
+    assert body["spots_left"] == 8
+    assert len(body["participants"]) == 2
+
+
+async def test_detail_unknown_event_returns_404(client: AsyncClient) -> None:
+    token, _ = await _register(client, "evt_404@example.com")
+    r = await client.get(
+        "/events/00000000-0000-0000-0000-000000000999", headers=_auth(token)
+    )
+    assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Join
+# ---------------------------------------------------------------------------
+
+
+async def test_join_increments_participant_count(client: AsyncClient) -> None:
+    await _wipe_events()
+    token_a, _ = await _register(client, "evt_join_a@example.com")
+    token_b, _ = await _register(client, "evt_join_b@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(token_a))
+    event_id = created.json()["id"]
+
+    r = await client.post(f"/events/{event_id}/join", headers=_auth(token_b))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["participant_count"] == 2
+    assert body["has_joined"] is True
+    assert body["status"] == "open"
+
+
+async def test_cannot_join_twice_returns_409(client: AsyncClient) -> None:
+    await _wipe_events()
+    token_a, _ = await _register(client, "evt_dup_a@example.com")
+    token_b, _ = await _register(client, "evt_dup_b@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(token_a))
+    event_id = created.json()["id"]
+
+    r1 = await client.post(f"/events/{event_id}/join", headers=_auth(token_b))
+    assert r1.status_code == 200
+    r2 = await client.post(f"/events/{event_id}/join", headers=_auth(token_b))
+    assert r2.status_code == 409
+
+
+async def test_host_cannot_join_twice(client: AsyncClient) -> None:
+    """Host is auto-joined on create — explicit join must 409."""
+    await _wipe_events()
+    token, _ = await _register(client, "evt_host_dup@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(token))
+    event_id = created.json()["id"]
+
+    r = await client.post(f"/events/{event_id}/join", headers=_auth(token))
+    assert r.status_code == 409
+
+
+async def test_capacity_enforced_and_status_flips_to_full(client: AsyncClient) -> None:
+    await _wipe_events()
+    a_tok, _ = await _register(client, "evt_cap_a@example.com")
+    b_tok, _ = await _register(client, "evt_cap_b@example.com")
+    c_tok, _ = await _register(client, "evt_cap_c@example.com")
+
+    created = await client.post(
+        "/events", json=_payload(capacity=2), headers=_auth(a_tok)
+    )
+    event_id = created.json()["id"]
+    # Host already filled slot 1; B fills slot 2 — flips to full.
+    fill = await client.post(f"/events/{event_id}/join", headers=_auth(b_tok))
+    assert fill.status_code == 200
+    assert fill.json()["status"] == "full"
+
+    third = await client.post(f"/events/{event_id}/join", headers=_auth(c_tok))
+    assert third.status_code == 422
+    assert "full" in third.json()["detail"].lower()
+
+
+# ---------------------------------------------------------------------------
+# Leave
+# ---------------------------------------------------------------------------
+
+
+async def test_leave_after_join_decrements_count(client: AsyncClient) -> None:
+    await _wipe_events()
+    a_tok, _ = await _register(client, "evt_leave_a@example.com")
+    b_tok, _ = await _register(client, "evt_leave_b@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(a_tok))
+    event_id = created.json()["id"]
+
+    await client.post(f"/events/{event_id}/join", headers=_auth(b_tok))
+    r = await client.post(f"/events/{event_id}/leave", headers=_auth(b_tok))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["participant_count"] == 1
+    assert body["has_joined"] is False
+
+
+async def test_full_to_open_round_trip(client: AsyncClient) -> None:
+    await _wipe_events()
+    a_tok, _ = await _register(client, "evt_cycle_a@example.com")
+    b_tok, _ = await _register(client, "evt_cycle_b@example.com")
+
+    created = await client.post(
+        "/events", json=_payload(capacity=2), headers=_auth(a_tok)
+    )
+    event_id = created.json()["id"]
+
+    fill = await client.post(f"/events/{event_id}/join", headers=_auth(b_tok))
+    assert fill.json()["status"] == "full"
+
+    left = await client.post(f"/events/{event_id}/leave", headers=_auth(b_tok))
+    assert left.status_code == 200
+    assert left.json()["status"] == "open"
+    assert left.json()["participant_count"] == 1
+
+
+async def test_cannot_leave_when_not_joined(client: AsyncClient) -> None:
+    await _wipe_events()
+    a_tok, _ = await _register(client, "evt_noleave_a@example.com")
+    b_tok, _ = await _register(client, "evt_noleave_b@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(a_tok))
+    event_id = created.json()["id"]
+
+    r = await client.post(f"/events/{event_id}/leave", headers=_auth(b_tok))
+    assert r.status_code == 404
+
+
+async def test_rejoin_after_leave(client: AsyncClient) -> None:
+    """Re-activates the soft-left row instead of creating a duplicate."""
+    await _wipe_events()
+    a_tok, _ = await _register(client, "evt_rejoin_a@example.com")
+    b_tok, _ = await _register(client, "evt_rejoin_b@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(a_tok))
+    event_id = created.json()["id"]
+
+    await client.post(f"/events/{event_id}/join", headers=_auth(b_tok))
+    await client.post(f"/events/{event_id}/leave", headers=_auth(b_tok))
+    rejoin = await client.post(f"/events/{event_id}/join", headers=_auth(b_tok))
+    assert rejoin.status_code == 200
+    assert rejoin.json()["participant_count"] == 2
+    assert rejoin.json()["has_joined"] is True
+
+
+async def test_host_cannot_leave_own_event(client: AsyncClient) -> None:
+    """
+    Host cannot orphan their own event until a cancel / transfer-host
+    flow exists. The host participant row must stay active and the
+    participant count must not change.
+    """
+    await _wipe_events()
+    host_tok, host_uid = await _register(client, "evt_host_leave@example.com")
+    other_tok, _ = await _register(client, "evt_host_leave_b@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+
+    # Pull in a second participant so the count check has signal.
+    await client.post(f"/events/{event_id}/join", headers=_auth(other_tok))
+
+    r = await client.post(f"/events/{event_id}/leave", headers=_auth(host_tok))
+    assert r.status_code == 409
+    assert "host cannot leave" in r.json()["detail"].lower()
+
+    detail = await client.get(f"/events/{event_id}", headers=_auth(host_tok))
+    body = detail.json()
+    assert body["host_user_id"] == host_uid
+    assert body["has_joined"] is True  # host still active
+    assert body["participant_count"] == 2
+    participant_ids = {p["user_id"] for p in body["participants"]}
+    assert host_uid in participant_ids
+
+
+# ---------------------------------------------------------------------------
+# Private event visibility
+# ---------------------------------------------------------------------------
+
+
+async def _seed_private_event(
+    *, host_user_id: str, title: str = "Friends only"
+) -> str:
+    """
+    Seed a private event directly via the ORM — the public POST /events
+    rejects visibility='private' for now, so we go around it to verify
+    the defensive read-side guard still holds.
+    """
+    from uuid import UUID, uuid4
+
+    from app.models.event import Event, EventParticipant
+
+    async with _TestSession() as db:
+        e = Event(
+            id=uuid4(),
+            host_user_id=UUID(host_user_id),
+            title=title,
+            sport="basketball",
+            mode="casual",
+            starts_at=datetime.now(tz=timezone.utc) + timedelta(days=7),
+            location_text="Bondi Court",
+            capacity=10,
+            visibility="private",
+            status="open",
+        )
+        db.add(e)
+        await db.flush()
+        # Host auto-joins, same as the public create path.
+        db.add(
+            EventParticipant(
+                event_id=e.id,
+                user_id=UUID(host_user_id),
+                status="joined",
+            )
+        )
+        await db.commit()
+        return str(e.id)
+
+
+async def test_private_event_hidden_from_non_participant(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, host_uid = await _register(client, "evt_priv_host@example.com")
+    outsider_tok, _ = await _register(client, "evt_priv_outsider@example.com")
+    event_id = await _seed_private_event(host_user_id=host_uid)
+
+    r = await client.get(f"/events/{event_id}", headers=_auth(outsider_tok))
+    # Hide rather than 403 so non-participants can't probe for existence.
+    assert r.status_code == 404
+
+
+async def test_private_event_visible_to_host(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, host_uid = await _register(client, "evt_priv_host_self@example.com")
+    event_id = await _seed_private_event(host_user_id=host_uid)
+
+    r = await client.get(f"/events/{event_id}", headers=_auth(host_tok))
+    assert r.status_code == 200
+    assert r.json()["visibility"] == "private"
+
+
+async def test_private_event_visible_to_active_participant(
+    client: AsyncClient,
+) -> None:
+    from uuid import UUID
+
+    from app.models.event import EventParticipant
+
+    await _wipe_events()
+    host_tok, host_uid = await _register(client, "evt_priv_host_p@example.com")
+    member_tok, member_uid = await _register(
+        client, "evt_priv_member@example.com"
+    )
+    event_id = await _seed_private_event(host_user_id=host_uid)
+
+    # Inject the member as a joined participant. POST /events/{id}/join
+    # works for private rows too (the join service doesn't gate on
+    # visibility yet), but bypassing it keeps this test focused on the
+    # read-side guard.
+    async with _TestSession() as db:
+        db.add(
+            EventParticipant(
+                event_id=UUID(event_id),
+                user_id=UUID(member_uid),
+                status="joined",
+            )
+        )
+        await db.commit()
+
+    r = await client.get(f"/events/{event_id}", headers=_auth(member_tok))
+    assert r.status_code == 200
+    assert r.json()["has_joined"] is True
+
+
+async def test_private_event_join_blocked_for_outsider(client: AsyncClient) -> None:
+    """
+    Closes the read-via-join bypass: outsider who knows the private
+    event ID must not be able to join, otherwise they become an active
+    participant and re-pass the detail-side 404 check.
+    """
+    await _wipe_events()
+    host_tok, host_uid = await _register(client, "evt_priv_join_host@example.com")
+    outsider_tok, _ = await _register(client, "evt_priv_join_out@example.com")
+    event_id = await _seed_private_event(host_user_id=host_uid)
+
+    # Confirm starting state — only the host is active.
+    before = await client.get(f"/events/{event_id}", headers=_auth(host_tok))
+    assert before.status_code == 200
+    assert before.json()["participant_count"] == 1
+
+    r = await client.post(f"/events/{event_id}/join", headers=_auth(outsider_tok))
+    # Same hide-as-404 behavior as the detail-side guard.
+    assert r.status_code == 404
+
+    # The outsider must not have become an active participant.
+    after = await client.get(f"/events/{event_id}", headers=_auth(host_tok))
+    body = after.json()
+    assert body["participant_count"] == 1
+    participant_ids = {p["user_id"] for p in body["participants"]}
+    assert participant_ids == {host_uid}
+
+    # And the outsider still cannot read the detail (the bypass is closed).
+    detail = await client.get(f"/events/{event_id}", headers=_auth(outsider_tok))
+    assert detail.status_code == 404

@@ -135,3 +135,15 @@ export type {
   TournamentDetail,
   TournamentListResponse,
 } from './tournament';
+
+export type {
+  EventMode,
+  EventVisibility,
+  EventStatus,
+  EventHost,
+  EventSummary,
+  EventParticipantSummary,
+  EventDetail,
+  EventListResponse,
+  CreateEventRequest,
+} from './event';

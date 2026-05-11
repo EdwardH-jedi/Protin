@@ -25,6 +25,9 @@ import { BookingComposerScreen } from '../screens/bookings/BookingComposerScreen
 import { BookingDetailScreen } from '../screens/bookings/BookingDetailScreen';
 import { ReportScreen } from '../screens/safety/ReportScreen';
 import { TournamentDetailScreen } from '../screens/tournaments/TournamentDetailScreen';
+import { BattlesScreen } from '../screens/battles/BattlesScreen';
+import { BattleDetailScreen } from '../screens/battles/BattleDetailScreen';
+import { CreateBattleScreen } from '../screens/battles/CreateBattleScreen';
 
 import { registerForPushNotifications, configureForegroundHandler } from '../lib/notifications';
 import { useAuthStore } from '../stores/auth';
@@ -216,6 +219,21 @@ export function RootNavigator() {
           name="TournamentDetail"
           component={TournamentDetailScreen}
           options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Battles"
+          component={BattlesScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="BattleDetail"
+          component={BattleDetailScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="CreateBattle"
+          component={CreateBattleScreen}
+          options={{ animation: 'slide_from_bottom' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

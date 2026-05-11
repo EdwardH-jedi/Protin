@@ -1,3 +1,4 @@
+from app.models.event import Event, EventParticipant
 from app.models.profile import IdentityPreferences, ProfilePhoto, SportProfile, UserProfile
 from app.models.rank import HonorEvent, RankEvent
 from app.models.tournament import Tournament, TournamentParticipant
@@ -15,4 +16,6 @@ __all__ = [
     "RankEvent",
     "Tournament",
     "TournamentParticipant",
+    "Event",
+    "EventParticipant",
 ]

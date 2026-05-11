@@ -21,6 +21,9 @@ export type RootStackParamList = {
   Report: { reportedUserId: string; reportedName: string };
   Tournaments: undefined;
   TournamentDetail: { tournamentId: string };
+  Battles: undefined;
+  BattleDetail: { eventId: string };
+  CreateBattle: undefined;
 };
 
 /**
@@ -57,3 +60,7 @@ export type ReportScreenProps = NativeStackScreenProps<RootStackParamList, 'Repo
 
 export type TournamentsScreenProps = NativeStackScreenProps<RootStackParamList, 'Tournaments'>;
 export type TournamentDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'TournamentDetail'>;
+
+export type BattlesScreenProps = NativeStackScreenProps<RootStackParamList, 'Battles'>;
+export type BattleDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'BattleDetail'>;
+export type CreateBattleScreenProps = NativeStackScreenProps<RootStackParamList, 'CreateBattle'>;

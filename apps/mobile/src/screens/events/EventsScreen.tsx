@@ -156,6 +156,28 @@ export function EventsScreen() {
           <Text style={styles.title}>Events</Text>
         </View>
 
+        {/* ── Battles entry card ──────────────────────────────────────── */}
+        <View style={styles.battlesCardWrap}>
+          <Pressable
+            onPress={() => navigation.navigate('Battles')}
+            accessibilityRole="button"
+            accessibilityLabel="Open Battles"
+            style={({ pressed }) => [
+              styles.battlesCard,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View style={styles.battlesCardText}>
+              <Text style={styles.battlesEyebrow}>THIS WEEK</Text>
+              <Text style={styles.battlesTitle}>Find a battle</Text>
+              <Text style={styles.battlesSub}>
+                Casual or ranked. Join a group game in your area.
+              </Text>
+            </View>
+            <Text style={styles.battlesArrow}>{'→'}</Text>
+          </Pressable>
+        </View>
+
         {/* ── Upcoming sessions ─────────────────────────────────────────── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Upcoming sessions</Text>
@@ -354,4 +376,38 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   pressed: { opacity: 0.65 },
+  battlesCardWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  battlesCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.brand,
+    gap: spacing.md,
+  },
+  battlesCardText: {
+    flex: 1,
+    gap: 2,
+  },
+  battlesEyebrow: {
+    ...typography.label,
+    color: colors.brand,
+  },
+  battlesTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+  },
+  battlesSub: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  battlesArrow: {
+    fontSize: 22,
+    color: colors.brand,
+  },
 });
