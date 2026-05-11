@@ -98,6 +98,19 @@ jest.mock('../hooks/useRankSummary', () => ({
   }),
 }));
 
+// ─── Mock useHonorSummary hook (V1.1) ─────────────────────────────────────────
+// Same isolation pattern as useRankSummary above — the HonorCard component
+// is unit-tested on its own; here we just stub the data path.
+
+jest.mock('../hooks/useHonorSummary', () => ({
+  useHonorSummary: () => ({
+    summary: null,
+    isLoading: false,
+    error: null,
+    refresh: jest.fn(),
+  }),
+}));
+
 // ─── Mock useTournamentsAvailable hook ────────────────────────────────────────
 // The real hook does a one-time GET /tournaments?limit=1 probe. Without a
 // dedicated mock, the trailing setState from that probe fires after the
@@ -469,26 +482,33 @@ describe('ProfileScreen', () => {
   // contract that no rank/honor copy reaches a screenshot frame.
 
   describe('rank summary section (v1: hidden)', () => {
-    it('does not render the rank/honor section when a profile exists', async () => {
+    it('renders the V1.1 Honor card when a profile exists', async () => {
       mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      // Legacy rank summary remains hidden — the booking-based ledger
+      // is no longer surfaced on Profile.
       mockRankSummary = {
         honor: 105,
         sports: [
           { sport: 'tennis', rankPoints: 10, tier: 'Bronze', sessionsCompleted: 2 },
         ],
       };
-      const { queryByText, getByText } = render(<ProfileScreen />);
+      const { findByLabelText, queryByText, getByText } = render(<ProfileScreen />);
       await waitFor(() => getByText('Jordan Lee'));
+      // V1.1 Honor card is present (empty state copy from the stubbed
+      // useHonorSummary returning null is fine).
+      await findByLabelText('Honor card empty');
+      // Legacy rank card stays off the profile screen.
       expect(queryByText('Sports reputation')).toBeNull();
-      expect(queryByText('Honor')).toBeNull();
       expect(queryByText('Bronze')).toBeNull();
-      expect(queryByText('105')).toBeNull();
     });
 
-    it('does not render the rank/honor section when no profile exists', async () => {
+    it('does not render the Honor card when no profile exists', async () => {
       mockProfile = null;
-      const { queryByText, getByText } = render(<ProfileScreen />);
+      const { queryByLabelText, queryByText, getByText } = render(
+        <ProfileScreen />
+      );
       await waitFor(() => getByText('Profile not set up'));
+      expect(queryByLabelText('Honor card empty')).toBeNull();
       expect(queryByText('Sports reputation')).toBeNull();
     });
   });

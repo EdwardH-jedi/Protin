@@ -27,6 +27,7 @@ from app.services.rank import (
 from app.models import (  # noqa: F401
     booking,
     chat,
+    event,
     match,
     profile,
     rank,
@@ -362,3 +363,741 @@ async def test_public_summary_returns_only_safe_fields(client: AsyncClient) -> N
     assert "events" not in body
     assert "no_show_count" not in body
     assert "cancellations" not in body
+
+
+# ---------------------------------------------------------------------------
+# V1.1 Honor / Gang Score — /rank/me and /rank/users/{id}
+# ---------------------------------------------------------------------------
+
+
+from datetime import datetime, timedelta, timezone  # noqa: E402
+from uuid import UUID, uuid4  # noqa: E402
+
+
+async def _wipe_v11_state() -> None:
+    """Reset event / participant / report rows between tests."""
+    from sqlalchemy import delete
+
+    from app.models.event import Event, EventParticipant
+    from app.models.safety import Report
+
+    async with _TestSession() as db:
+        await db.execute(delete(Report))
+        await db.execute(delete(EventParticipant))
+        await db.execute(delete(Event))
+        await db.commit()
+
+
+async def _create_event(
+    *,
+    host_user_id: str,
+    sport: str = "basketball",
+    status_value: str = "open",
+    capacity: int = 10,
+) -> str:
+    from app.models.event import Event
+
+    async with _TestSession() as db:
+        e = Event(
+            id=uuid4(),
+            host_user_id=UUID(host_user_id),
+            title="Test event",
+            sport=sport,
+            mode="casual",
+            starts_at=datetime.now(tz=timezone.utc) + timedelta(days=7),
+            location_text="Bondi Court",
+            capacity=capacity,
+            visibility="public",
+            status=status_value,
+        )
+        db.add(e)
+        await db.commit()
+        return str(e.id)
+
+
+async def _add_participant(
+    *,
+    event_id: str,
+    user_id: str,
+    status_value: str = "joined",
+    attendance_status: str = "pending",
+    host_confirmed: bool = False,
+    self_reported: bool = False,
+) -> None:
+    from app.models.event import EventParticipant
+
+    now = datetime.now(tz=timezone.utc)
+    async with _TestSession() as db:
+        p = EventParticipant(
+            id=uuid4(),
+            event_id=UUID(event_id),
+            user_id=UUID(user_id),
+            status=status_value,
+            attendance_status=attendance_status,
+            attendance_confirmed_by_host_at=now if host_confirmed else None,
+            attendance_self_reported_at=now if self_reported else None,
+        )
+        db.add(p)
+        await db.commit()
+
+
+async def _set_attendance(
+    *,
+    event_id: str,
+    user_id: str,
+    attendance_status: str,
+    host_confirmed: bool = True,
+) -> None:
+    """Update attendance for an existing participant row."""
+    from sqlalchemy import update
+
+    from app.models.event import EventParticipant
+
+    now = datetime.now(tz=timezone.utc)
+    async with _TestSession() as db:
+        await db.execute(
+            update(EventParticipant)
+            .where(
+                EventParticipant.event_id == UUID(event_id),
+                EventParticipant.user_id == UUID(user_id),
+            )
+            .values(
+                attendance_status=attendance_status,
+                attendance_confirmed_by_host_at=now if host_confirmed else None,
+            )
+        )
+        await db.commit()
+
+
+async def _add_report(
+    *,
+    reporter_id: str,
+    reported_id: str,
+    status_value: str = "submitted",
+) -> None:
+    from app.models.safety import Report
+
+    async with _TestSession() as db:
+        r = Report(
+            id=uuid4(),
+            reporter_id=UUID(reporter_id),
+            target_type="user",
+            reported_id=UUID(reported_id),
+            target_event_id=None,
+            reason="harassment",
+            status=status_value,
+        )
+        db.add(r)
+        await db.commit()
+
+
+# --- /rank/me ---------------------------------------------------------------
+
+
+async def test_rank_me_requires_auth(client: AsyncClient) -> None:
+    r = await client.get("/rank/me")
+    assert r.status_code in (401, 403)
+
+
+async def test_rank_me_defaults_for_new_user(client: AsyncClient) -> None:
+    await _wipe_v11_state()
+    token, uid = await _register(client, "h_default@example.com")
+    r = await client.get("/rank/me", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["user_id"] == uid
+    assert body["honor_score"] == 100
+    assert body["honor_level"] == "Regular"
+    assert body["gang_score"] == 0
+    assert body["completed_games_count"] == 0
+    assert body["hosted_games_count"] == 0
+    assert body["no_show_count"] == 0
+    assert body["excused_count"] == 0
+    assert body["pending_count"] == 0
+    assert body["sport_levels"] == []
+    assert "generated_at" in body
+
+
+async def test_host_confirmed_attended_increases_honor_and_gang(
+    client: AsyncClient,
+) -> None:
+    await _wipe_v11_state()
+    _, host_uid = await _register(client, "h_att_host@example.com")
+    token, uid = await _register(client, "h_att_self@example.com")
+    event_id = await _create_event(host_user_id=host_uid, sport="basketball")
+    await _add_participant(
+        event_id=event_id,
+        user_id=uid,
+        attendance_status="attended",
+        host_confirmed=True,
+    )
+
+    r = await client.get("/rank/me", headers=_auth(token))
+    body = r.json()
+    assert body["honor_score"] == 102
+    assert body["gang_score"] == 10
+    assert body["completed_games_count"] == 1
+    sports = body["sport_levels"]
+    assert len(sports) == 1
+    assert sports[0]["sport"] == "basketball"
+    assert sports[0]["xp"] == 10
+    assert sports[0]["level"] == 1
+    assert sports[0]["attended_count"] == 1
+    assert sports[0]["hosted_count"] == 0
+
+
+async def test_self_reported_only_does_not_move_score(client: AsyncClient) -> None:
+    await _wipe_v11_state()
+    _, host_uid = await _register(client, "h_self_host@example.com")
+    token, uid = await _register(client, "h_self_user@example.com")
+    event_id = await _create_event(host_user_id=host_uid)
+    await _add_participant(
+        event_id=event_id,
+        user_id=uid,
+        attendance_status="attended",
+        host_confirmed=False,
+        self_reported=True,
+    )
+
+    r = await client.get("/rank/me", headers=_auth(token))
+    body = r.json()
+    assert body["honor_score"] == 100
+    assert body["gang_score"] == 0
+    assert body["completed_games_count"] == 0
+
+
+async def test_host_confirmed_no_show_penalizes_honor(client: AsyncClient) -> None:
+    await _wipe_v11_state()
+    _, host_uid = await _register(client, "h_ns_host@example.com")
+    token, uid = await _register(client, "h_ns_user@example.com")
+    event_id = await _create_event(host_user_id=host_uid)
+    await _add_participant(
+        event_id=event_id,
+        user_id=uid,
+        attendance_status="no_show",
+        host_confirmed=True,
+    )
+
+    r = await client.get("/rank/me", headers=_auth(token))
+    body = r.json()
+    assert body["honor_score"] == 80
+    assert body["honor_level"] == "Regular"
+    assert body["gang_score"] == 0
+    assert body["no_show_count"] == 1
+
+
+async def test_excused_does_not_penalize(client: AsyncClient) -> None:
+    await _wipe_v11_state()
+    _, host_uid = await _register(client, "h_ex_host@example.com")
+    token, uid = await _register(client, "h_ex_user@example.com")
+    event_id = await _create_event(host_user_id=host_uid)
+    await _add_participant(
+        event_id=event_id,
+        user_id=uid,
+        attendance_status="excused",
+        host_confirmed=True,
+    )
+
+    r = await client.get("/rank/me", headers=_auth(token))
+    body = r.json()
+    assert body["honor_score"] == 100
+    assert body["gang_score"] == 0
+    assert body["excused_count"] == 1
+
+
+async def test_pending_does_not_affect_score(client: AsyncClient) -> None:
+    await _wipe_v11_state()
+    _, host_uid = await _register(client, "h_pd_host@example.com")
+    token, uid = await _register(client, "h_pd_user@example.com")
+    event_id = await _create_event(host_user_id=host_uid)
+    await _add_participant(
+        event_id=event_id,
+        user_id=uid,
+        attendance_status="pending",
+        host_confirmed=False,
+    )
+
+    r = await client.get("/rank/me", headers=_auth(token))
+    body = r.json()
+    assert body["honor_score"] == 100
+    assert body["gang_score"] == 0
+    assert body["pending_count"] == 1
+
+
+async def test_left_participant_does_not_count_as_no_show(
+    client: AsyncClient,
+) -> None:
+    """Left participants without host confirmation must not be a no_show."""
+    await _wipe_v11_state()
+    _, host_uid = await _register(client, "h_lf_host@example.com")
+    token, uid = await _register(client, "h_lf_user@example.com")
+    event_id = await _create_event(host_user_id=host_uid)
+    await _add_participant(
+        event_id=event_id,
+        user_id=uid,
+        status_value="left",
+        attendance_status="pending",
+        host_confirmed=False,
+    )
+
+    r = await client.get("/rank/me", headers=_auth(token))
+    body = r.json()
+    assert body["honor_score"] == 100
+    assert body["no_show_count"] == 0
+
+
+async def test_attendance_change_no_show_to_attended_recomputes(
+    client: AsyncClient,
+) -> None:
+    """Flipping attendance must move the score without double counting."""
+    await _wipe_v11_state()
+    _, host_uid = await _register(client, "h_chg_host@example.com")
+    token, uid = await _register(client, "h_chg_user@example.com")
+    event_id = await _create_event(host_user_id=host_uid)
+    await _add_participant(
+        event_id=event_id,
+        user_id=uid,
+        attendance_status="no_show",
+        host_confirmed=True,
+    )
+
+    first = await client.get("/rank/me", headers=_auth(token))
+    assert first.json()["honor_score"] == 80
+    assert first.json()["no_show_count"] == 1
+
+    await _set_attendance(
+        event_id=event_id,
+        user_id=uid,
+        attendance_status="attended",
+    )
+
+    second = await client.get("/rank/me", headers=_auth(token))
+    body = second.json()
+    assert body["honor_score"] == 102
+    assert body["no_show_count"] == 0
+    assert body["completed_games_count"] == 1
+    assert body["gang_score"] == 10
+
+
+async def test_repeated_reads_are_idempotent(client: AsyncClient) -> None:
+    await _wipe_v11_state()
+    _, host_uid = await _register(client, "h_idem_host@example.com")
+    token, uid = await _register(client, "h_idem_user@example.com")
+    event_id = await _create_event(host_user_id=host_uid)
+    await _add_participant(
+        event_id=event_id,
+        user_id=uid,
+        attendance_status="attended",
+        host_confirmed=True,
+    )
+
+    r1 = (await client.get("/rank/me", headers=_auth(token))).json()
+    r2 = (await client.get("/rank/me", headers=_auth(token))).json()
+    assert r1["honor_score"] == r2["honor_score"]
+    assert r1["gang_score"] == r2["gang_score"]
+    assert r1["completed_games_count"] == r2["completed_games_count"]
+
+
+# --- Host bonus -------------------------------------------------------------
+
+
+async def test_host_gets_hosted_bonus_once_per_event(client: AsyncClient) -> None:
+    await _wipe_v11_state()
+    host_tok, host_uid = await _register(client, "h_host_bonus@example.com")
+    _, a_uid = await _register(client, "h_host_bonus_a@example.com")
+    _, b_uid = await _register(client, "h_host_bonus_b@example.com")
+    event_id = await _create_event(host_user_id=host_uid, sport="soccer")
+
+    # Two non-host participants both attended → host gets ONE +15.
+    await _add_participant(
+        event_id=event_id,
+        user_id=a_uid,
+        attendance_status="attended",
+        host_confirmed=True,
+    )
+    await _add_participant(
+        event_id=event_id,
+        user_id=b_uid,
+        attendance_status="attended",
+        host_confirmed=True,
+    )
+
+    r = await client.get("/rank/me", headers=_auth(host_tok))
+    body = r.json()
+    assert body["hosted_games_count"] == 1
+    assert body["gang_score"] == 15
+    soccer = [s for s in body["sport_levels"] if s["sport"] == "soccer"][0]
+    assert soccer["hosted_count"] == 1
+    assert soccer["xp"] == 5  # +5 hosted, 0 attended (host not in participant aggregate)
+
+
+async def test_host_gets_no_bonus_without_attended_participants(
+    client: AsyncClient,
+) -> None:
+    await _wipe_v11_state()
+    host_tok, host_uid = await _register(client, "h_no_bonus@example.com")
+    _, a_uid = await _register(client, "h_no_bonus_a@example.com")
+    event_id = await _create_event(host_user_id=host_uid)
+    await _add_participant(
+        event_id=event_id,
+        user_id=a_uid,
+        attendance_status="pending",
+        host_confirmed=False,
+    )
+
+    r = await client.get("/rank/me", headers=_auth(host_tok))
+    body = r.json()
+    assert body["hosted_games_count"] == 0
+    assert body["gang_score"] == 0
+
+
+async def test_cancelled_event_does_not_grant_host_bonus(
+    client: AsyncClient,
+) -> None:
+    await _wipe_v11_state()
+    host_tok, host_uid = await _register(client, "h_cxl_host@example.com")
+    _, a_uid = await _register(client, "h_cxl_a@example.com")
+    event_id = await _create_event(
+        host_user_id=host_uid, status_value="cancelled"
+    )
+    await _add_participant(
+        event_id=event_id,
+        user_id=a_uid,
+        attendance_status="attended",
+        host_confirmed=True,
+    )
+
+    r = await client.get("/rank/me", headers=_auth(host_tok))
+    body = r.json()
+    assert body["hosted_games_count"] == 0
+    assert body["gang_score"] == 0
+
+
+# --- Sport XP / level -------------------------------------------------------
+
+
+async def test_sport_xp_and_level_calculation(client: AsyncClient) -> None:
+    """5 attended × 10 XP = 50 XP → level 2."""
+    await _wipe_v11_state()
+    _, host_uid = await _register(client, "h_xp_host@example.com")
+    token, uid = await _register(client, "h_xp_self@example.com")
+    for i in range(5):
+        event_id = await _create_event(
+            host_user_id=host_uid, sport="basketball"
+        )
+        await _add_participant(
+            event_id=event_id,
+            user_id=uid,
+            attendance_status="attended",
+            host_confirmed=True,
+        )
+
+    r = await client.get("/rank/me", headers=_auth(token))
+    sports = r.json()["sport_levels"]
+    assert len(sports) == 1
+    assert sports[0]["xp"] == 50
+    assert sports[0]["level"] == 2
+    assert sports[0]["attended_count"] == 5
+
+
+# --- Reports ---------------------------------------------------------------
+
+
+async def test_submitted_report_does_not_affect_honor(client: AsyncClient) -> None:
+    await _wipe_v11_state()
+    _, reporter_uid = await _register(client, "h_sub_reporter@example.com")
+    token, uid = await _register(client, "h_sub_target@example.com")
+    await _add_report(
+        reporter_id=reporter_uid,
+        reported_id=uid,
+        status_value="submitted",
+    )
+
+    r = await client.get("/rank/me", headers=_auth(token))
+    assert r.json()["honor_score"] == 100
+
+
+async def test_dismissed_report_does_not_affect_honor(client: AsyncClient) -> None:
+    await _wipe_v11_state()
+    _, reporter_uid = await _register(client, "h_dis_reporter@example.com")
+    token, uid = await _register(client, "h_dis_target@example.com")
+    await _add_report(
+        reporter_id=reporter_uid,
+        reported_id=uid,
+        status_value="dismissed",
+    )
+
+    r = await client.get("/rank/me", headers=_auth(token))
+    assert r.json()["honor_score"] == 100
+
+
+async def test_actioned_report_reduces_honor(client: AsyncClient) -> None:
+    await _wipe_v11_state()
+    _, reporter_uid = await _register(client, "h_act_reporter@example.com")
+    token, uid = await _register(client, "h_act_target@example.com")
+    await _add_report(
+        reporter_id=reporter_uid,
+        reported_id=uid,
+        status_value="actioned",
+    )
+
+    r = await client.get("/rank/me", headers=_auth(token))
+    body = r.json()
+    assert body["honor_score"] == 70
+    assert body["honor_level"] == "Rookie"
+
+
+# --- Public summary endpoint ------------------------------------------------
+
+
+async def test_rank_users_public_summary(client: AsyncClient) -> None:
+    await _wipe_v11_state()
+    _, host_uid = await _register(client, "h_pub_host@example.com")
+    token_other, _ = await _register(client, "h_pub_other@example.com")
+    _, target_uid = await _register(client, "h_pub_target@example.com")
+    event_id = await _create_event(host_user_id=host_uid)
+    await _add_participant(
+        event_id=event_id,
+        user_id=target_uid,
+        attendance_status="attended",
+        host_confirmed=True,
+    )
+
+    r = await client.get(
+        f"/rank/users/{target_uid}", headers=_auth(token_other)
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["user_id"] == target_uid
+    assert body["honor_score"] == 102
+    # Public response must NOT leak moderation/event data.
+    forbidden_keys = {"reports", "report", "blocks", "block", "attendance_note"}
+    assert forbidden_keys.isdisjoint(body.keys())
+
+
+async def test_rank_users_unknown_user_404(client: AsyncClient) -> None:
+    token, _ = await _register(client, "h_pub_404@example.com")
+    r = await client.get(
+        "/rank/users/00000000-0000-0000-0000-000000000abc",
+        headers=_auth(token),
+    )
+    assert r.status_code == 404
+
+
+async def test_host_marking_only_self_attended_gets_no_player_credit(
+    client: AsyncClient,
+) -> None:
+    """
+    The host's own auto-joined row must not contribute player credit.
+
+    Reproduces the Codex blocker: a host could mark only themselves
+    attended and farm +2 Honor / +10 Gang / +10 Sport XP. After the
+    fix, the host row is excluded from player aggregates. The hosted
+    bonus also stays off because no NON-host participant attended.
+    """
+    await _wipe_v11_state()
+    host_tok, host_uid = await _register(
+        client, "h_self_only_host@example.com"
+    )
+    event_id = await _create_event(host_user_id=host_uid, sport="basketball")
+    # Host auto-join row, marked attended + host-confirmed.
+    await _add_participant(
+        event_id=event_id,
+        user_id=host_uid,
+        attendance_status="attended",
+        host_confirmed=True,
+    )
+
+    r = await client.get("/rank/me", headers=_auth(host_tok))
+    body = r.json()
+    assert body["honor_score"] == 100
+    assert body["gang_score"] == 0
+    assert body["completed_games_count"] == 0
+    assert body["hosted_games_count"] == 0
+    assert body["sport_levels"] == []
+
+
+async def test_host_self_attendance_plus_non_host_attended(
+    client: AsyncClient,
+) -> None:
+    """
+    With one non-host attended participant, the host receives ONLY the
+    hosted-event bonus — not an additional player credit from their
+    own row.
+    """
+    await _wipe_v11_state()
+    host_tok, host_uid = await _register(
+        client, "h_self_plus_host@example.com"
+    )
+    p_tok, p_uid = await _register(client, "h_self_plus_player@example.com")
+    event_id = await _create_event(host_user_id=host_uid, sport="soccer")
+    # Host's own row attended + confirmed.
+    await _add_participant(
+        event_id=event_id,
+        user_id=host_uid,
+        attendance_status="attended",
+        host_confirmed=True,
+    )
+    # One real non-host participant.
+    await _add_participant(
+        event_id=event_id,
+        user_id=p_uid,
+        attendance_status="attended",
+        host_confirmed=True,
+    )
+
+    host_body = (await client.get("/rank/me", headers=_auth(host_tok))).json()
+    assert host_body["honor_score"] == 100  # no +2 from self row
+    assert host_body["gang_score"] == 15  # hosted bonus only
+    assert host_body["completed_games_count"] == 0
+    assert host_body["hosted_games_count"] == 1
+    # Sport XP from hosted bonus only.
+    sports = host_body["sport_levels"]
+    assert len(sports) == 1
+    assert sports[0]["sport"] == "soccer"
+    assert sports[0]["xp"] == 5
+    assert sports[0]["attended_count"] == 0
+    assert sports[0]["hosted_count"] == 1
+
+    # The non-host participant still earns the normal attended credit.
+    player_body = (await client.get("/rank/me", headers=_auth(p_tok))).json()
+    assert player_body["honor_score"] == 102
+    assert player_body["gang_score"] == 10
+    assert player_body["completed_games_count"] == 1
+
+
+async def test_left_participant_with_no_show_does_not_penalize(
+    client: AsyncClient,
+) -> None:
+    """
+    A user who left an event must not be penalized as a no_show even
+    if the row happens to carry a host-confirmed no_show mark.
+    """
+    await _wipe_v11_state()
+    _, host_uid = await _register(client, "h_left_ns_host@example.com")
+    token, uid = await _register(client, "h_left_ns_user@example.com")
+    event_id = await _create_event(host_user_id=host_uid)
+    # Soft-left row with a no_show + confirmation timestamp.
+    await _add_participant(
+        event_id=event_id,
+        user_id=uid,
+        status_value="left",
+        attendance_status="no_show",
+        host_confirmed=True,
+    )
+
+    r = await client.get("/rank/me", headers=_auth(token))
+    body = r.json()
+    assert body["honor_score"] == 100
+    assert body["no_show_count"] == 0
+    assert body["gang_score"] == 0
+    assert body["sport_levels"] == []
+
+
+async def test_left_attended_non_host_does_not_grant_hosted_bonus(
+    client: AsyncClient,
+) -> None:
+    """
+    Hosted bonus must require an ACTIVE joined non-host attended row.
+
+    If a participant left the event (status='left') but their audit
+    row still carries an attended+host-confirmed mark, that row must
+    NOT qualify the host for the +15 Gang Score / +5 hosted sport XP.
+    """
+    await _wipe_v11_state()
+    host_tok, host_uid = await _register(
+        client, "h_left_attended_host@example.com"
+    )
+    _, p_uid = await _register(client, "h_left_attended_player@example.com")
+    event_id = await _create_event(host_user_id=host_uid, sport="soccer")
+    # Soft-left participant row that still carries attended + host
+    # confirmation — the audit-trail shape from an attendance flip
+    # followed by a leave (or a direct DB mutation).
+    await _add_participant(
+        event_id=event_id,
+        user_id=p_uid,
+        status_value="left",
+        attendance_status="attended",
+        host_confirmed=True,
+    )
+
+    r = await client.get("/rank/me", headers=_auth(host_tok))
+    body = r.json()
+    assert body["honor_score"] == 100
+    assert body["gang_score"] == 0
+    assert body["hosted_games_count"] == 0
+    assert body["sport_levels"] == []
+
+
+async def test_cancelled_event_attended_row_does_not_count(
+    client: AsyncClient,
+) -> None:
+    """
+    A host-confirmed attended row on a cancelled event must not produce
+    Honor, Gang Score, or Sport XP — for the player or for the host.
+    """
+    await _wipe_v11_state()
+    host_tok, host_uid = await _register(
+        client, "h_cxl_attended_host@example.com"
+    )
+    p_tok, p_uid = await _register(
+        client, "h_cxl_attended_player@example.com"
+    )
+    event_id = await _create_event(
+        host_user_id=host_uid, status_value="cancelled"
+    )
+    await _add_participant(
+        event_id=event_id,
+        user_id=p_uid,
+        attendance_status="attended",
+        host_confirmed=True,
+    )
+
+    # Player aggregates are clean.
+    player_body = (await client.get("/rank/me", headers=_auth(p_tok))).json()
+    assert player_body["honor_score"] == 100
+    assert player_body["gang_score"] == 0
+    assert player_body["completed_games_count"] == 0
+    assert player_body["sport_levels"] == []
+
+    # Host hosted-bonus already excludes cancelled (regression: pin it).
+    host_body = (await client.get("/rank/me", headers=_auth(host_tok))).json()
+    assert host_body["honor_score"] == 100
+    assert host_body["gang_score"] == 0
+    assert host_body["hosted_games_count"] == 0
+
+
+async def test_rank_response_does_not_leak_raw_data(client: AsyncClient) -> None:
+    """
+    The HonorSummary schema must contain only the documented sanitized
+    fields — pin this so a future regression that adds reports/blocks to
+    the response trips the test.
+    """
+    await _wipe_v11_state()
+    token, _ = await _register(client, "h_leak@example.com")
+
+    r = await client.get("/rank/me", headers=_auth(token))
+    assert r.status_code == 200
+    body = r.json()
+    allowed_keys = {
+        "user_id",
+        "honor_score",
+        "honor_level",
+        "gang_score",
+        "completed_games_count",
+        "hosted_games_count",
+        "no_show_count",
+        "excused_count",
+        "pending_count",
+        "sport_levels",
+        "generated_at",
+    }
+    assert set(body.keys()) == allowed_keys
+    for sport in body["sport_levels"]:
+        assert set(sport.keys()) == {
+            "sport",
+            "xp",
+            "level",
+            "attended_count",
+            "hosted_count",
+        }

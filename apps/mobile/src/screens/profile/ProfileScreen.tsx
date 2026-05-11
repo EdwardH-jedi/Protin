@@ -11,7 +11,9 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
+import { HonorCard } from '../../components/HonorCard';
 import { Screen } from '../../components/Screen';
+import { useHonorSummary } from '../../hooks/useHonorSummary';
 import { api } from '../../lib/api';
 import { openLegal, PRIVACY_URL, SUPPORT_URL, TERMS_URL } from '../../lib/legal';
 import { useAuthStore } from '../../stores/auth';
@@ -55,6 +57,11 @@ export function ProfileScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [upcoming, setUpcoming] = useState<UpcomingSession[]>([]);
+  const {
+    summary: honorSummary,
+    isLoading: honorLoading,
+    error: honorError,
+  } = useHonorSummary();
   // Local guard so a double-tap or repeat confirmation cannot fire
   // DELETE /auth/me twice. Also blocks Log out while a delete is mid-flight.
   // A ref (not state) is required because Alert button onPress callbacks close
@@ -238,6 +245,12 @@ export function ProfileScreen() {
         {/* Profile content cards — only shown when a profile exists. */}
         {!error && profile ? (
           <View style={styles.cardStack}>
+            <HonorCard
+              summary={honorSummary}
+              isLoading={honorLoading}
+              error={honorError}
+            />
+
             {profile.bio ? (
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>About</Text>

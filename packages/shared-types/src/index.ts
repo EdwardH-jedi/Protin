@@ -110,10 +110,14 @@ export type {
 
 export type {
   ReportReason,
+  ReportTargetType,
+  ReportStatus,
   CreateReportRequest,
   ReportResponse,
+  ReportListResponse,
   BlockResponse,
   BlockListResponse,
+  CreateBlockRequest,
 } from './safety';
 
 export type {
@@ -126,6 +130,9 @@ export type {
   RankTier,
   SportRankSummary,
   RankSummary,
+  HonorLevel,
+  SportLevelSummary,
+  HonorSummary,
 } from './rank';
 
 export type {

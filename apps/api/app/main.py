@@ -126,6 +126,7 @@ app.include_router(notifications.internal_router)
 app.include_router(safety.router)
 app.include_router(venues.router)
 app.include_router(rank.router)
+app.include_router(rank.honor_router)
 app.include_router(tournaments.router)
 app.include_router(events.router)
 

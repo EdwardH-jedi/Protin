@@ -7,6 +7,7 @@
  * sanitized superset.
  */
 
+import type { ISODateString, UUID } from './common';
 import type { Sport } from './sport-profile';
 
 export type RankTier = 'Rookie' | 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
@@ -23,4 +24,39 @@ export interface RankSummary {
   honor: number;
   /** Per-sport positives only; sports without activity are absent. */
   sports: SportRankSummary[];
+}
+
+/**
+ * V1.1 Honor / Gang Score / Sport Level summary.
+ *
+ * Distinct from {@link RankSummary} (legacy booking-driven) — this is
+ * the event-driven view that the Profile/Me Honor card consumes.
+ */
+export type HonorLevel =
+  | 'Rookie'
+  | 'Regular'
+  | 'Trusted'
+  | 'Captain'
+  | 'Legend';
+
+export interface SportLevelSummary {
+  sport: string;
+  xp: number;
+  level: number;
+  attendedCount: number;
+  hostedCount: number;
+}
+
+export interface HonorSummary {
+  userId: UUID;
+  honorScore: number;
+  honorLevel: HonorLevel;
+  gangScore: number;
+  completedGamesCount: number;
+  hostedGamesCount: number;
+  noShowCount: number;
+  excusedCount: number;
+  pendingCount: number;
+  sportLevels: SportLevelSummary[];
+  generatedAt: ISODateString;
 }
