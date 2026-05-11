@@ -29,6 +29,7 @@ import { BattlesScreen } from '../screens/battles/BattlesScreen';
 import { BattleDetailScreen } from '../screens/battles/BattleDetailScreen';
 import { CreateBattleScreen } from '../screens/battles/CreateBattleScreen';
 import { AttendanceCheckScreen } from '../screens/battles/AttendanceCheckScreen';
+import { PublicProfileScreen } from '../screens/profile/PublicProfileScreen';
 
 import { registerForPushNotifications, configureForegroundHandler } from '../lib/notifications';
 import { useAuthStore } from '../stores/auth';
@@ -239,6 +240,11 @@ export function RootNavigator() {
         <Stack.Screen
           name="AttendanceCheck"
           component={AttendanceCheckScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="PublicProfile"
+          component={PublicProfileScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>

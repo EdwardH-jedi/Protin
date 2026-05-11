@@ -11,12 +11,18 @@ import {
   View,
 } from 'react-native';
 
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+import { HonorBadge } from '../../components/HonorBadge';
 import { RankBadge } from '../../components/RankBadge';
 import { Screen } from '../../components/Screen';
 import { useDiscovery, PartnerCard } from '../../hooks/useDiscovery';
 import { useRankSummary } from '../../hooks/useRankSummary';
+import { useUserHonorSummary } from '../../hooks/useUserHonorSummary';
 import { SPORT_LABELS, sportLabel } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
+import type { RootStackParamList } from '../../navigation/types';
 
 /**
  * FlatList key for a partner card.
@@ -157,6 +163,10 @@ interface PartnerCardProps {
   actionInFlight: boolean;
 }
 
+interface PartnerCardViewExtraProps {
+  onOpenProfile: () => void;
+}
+
 function PartnerCardView({
   partner,
   sport,
@@ -165,7 +175,16 @@ function PartnerCardView({
   onSave,
   onViewDetails,
   actionInFlight,
-}: PartnerCardProps) {
+  onOpenProfile,
+}: PartnerCardProps & PartnerCardViewExtraProps) {
+  // Honor badge data — cached + deduped at the lib layer so showing
+  // multiple partners doesn't fan out into per-card requests.
+  const {
+    summary: honorSummary,
+    isLoading: honorLoading,
+    error: honorError,
+  } = useUserHonorSummary({ userId: partner.userId });
+
   return (
     <View style={styles.card}>
       <CardHero
@@ -176,6 +195,23 @@ function PartnerCardView({
       />
 
       <View style={styles.cardBody}>
+        {/* Honor row — hidden on hard error so a network failure isn't
+            mislabelled as "New player". 404/null still falls through. */}
+        {!honorError ? (
+          <View style={styles.honorRow}>
+            <HonorBadge
+              honorLevel={honorSummary?.honorLevel ?? null}
+              honorScore={honorSummary?.honorScore ?? null}
+              isLoading={honorLoading && !honorSummary}
+              accessibilityLabel={
+                honorSummary
+                  ? `${partner.displayName} honor ${honorSummary.honorLevel}`
+                  : `${partner.displayName} honor unavailable`
+              }
+            />
+          </View>
+        ) : null}
+
         {partner.sportProfiles.length > 0 ? (
           <View style={styles.sportBadges}>
             {/* Index suffix defends against a partner record that has
@@ -200,14 +236,24 @@ function PartnerCardView({
             gallery without committing to a like/pass. The accessibility
             label is sport-agnostic so screen readers don't repeat the
             sport context already announced by the card header. */}
-        <Pressable
-          onPress={onViewDetails}
-          accessibilityRole="button"
-          accessibilityLabel="View details"
-          style={({ pressed }) => [styles.viewDetails, pressed && styles.pressed]}
-        >
-          <Text style={styles.viewDetailsText}>View details</Text>
-        </Pressable>
+        <View style={styles.detailRow}>
+          <Pressable
+            onPress={onViewDetails}
+            accessibilityRole="button"
+            accessibilityLabel="View details"
+            style={({ pressed }) => [styles.viewDetails, pressed && styles.pressed]}
+          >
+            <Text style={styles.viewDetailsText}>View details</Text>
+          </Pressable>
+          <Pressable
+            onPress={onOpenProfile}
+            accessibilityRole="button"
+            accessibilityLabel="View profile"
+            style={({ pressed }) => [styles.viewDetails, pressed && styles.pressed]}
+          >
+            <Text style={styles.viewDetailsText}>View profile</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.cardActions}>
           <Pressable
@@ -267,10 +313,25 @@ function PartnerCardView({
 export function DiscoveryScreen() {
   const { partners, isLoading, error, sport, setSport, recordAction, fetchMore } =
     useDiscovery();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [matchVisible, setMatchVisible] = useState(false);
   const [actingOn, setActingOn] = useState<string | null>(null);
   const [previewPartner, setPreviewPartner] = useState<PartnerCard | null>(null);
+
+  const openPublicProfile = useCallback(
+    (partner: PartnerCard) => {
+      navigation.navigate('PublicProfile', {
+        userId: partner.userId,
+        displayName: partner.displayName,
+        suburb: partner.suburb,
+        bio: partner.bio,
+        sports: partner.sportProfiles.map((sp) => sp.sport),
+      });
+    },
+    [navigation]
+  );
 
   function showMatchBanner() {
     setMatchVisible(true);
@@ -304,10 +365,11 @@ export function DiscoveryScreen() {
         onPass={() => handleAction(item.userId, 'pass')}
         onSave={() => handleAction(item.userId, 'save')}
         onViewDetails={() => setPreviewPartner(item)}
+        onOpenProfile={() => openPublicProfile(item)}
         actionInFlight={actingOn === item.userId}
       />
     ),
-    [actingOn, handleAction, sport]
+    [actingOn, handleAction, openPublicProfile, sport]
   );
 
   return (
@@ -870,7 +932,20 @@ const styles = StyleSheet.create({
     color: colors.textInverse,
   },
 
+  // Honor pill row above the sport badges
+  honorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+
   // View details row + preview modal
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    flexWrap: 'wrap',
+  },
   viewDetails: {
     paddingTop: spacing.xs,
     paddingBottom: spacing.xs,

@@ -50,6 +50,30 @@ jest.mock('../hooks/useRankSummary', () => ({
   }),
 }));
 
+// ─── Mock useUserHonorSummary (V1.1 Honor badge on partner cards) ────────────
+
+let mockHonorSummary: { honorLevel: string; honorScore: number } | null = {
+  honorLevel: 'Trusted',
+  honorScore: 118,
+};
+let mockHonorLoading = false;
+let mockHonorError: string | null = null;
+
+jest.mock('../hooks/useUserHonorSummary', () => ({
+  useUserHonorSummary: () => ({
+    summary: mockHonorSummary,
+    isLoading: mockHonorLoading,
+    error: mockHonorError,
+  }),
+}));
+
+// ─── Mock React Navigation hook ──────────────────────────────────────────────
+
+const mockNavigate = jest.fn();
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: () => ({ navigate: mockNavigate }),
+}));
+
 // ─── Mock Screen component ────────────────────────────────────────────────────
 
 jest.mock('../components/Screen', () => {
@@ -108,6 +132,9 @@ const samplePartner: PartnerCard = {
 describe('DiscoveryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockHonorSummary = { honorLevel: 'Trusted', honorScore: 118 };
+    mockHonorLoading = false;
+    mockHonorError = null;
   });
 
   // ── Loading state ──────────────────────────────────────────────────────────
@@ -447,5 +474,56 @@ describe('DiscoveryScreen', () => {
     // cause of the QA confusion (likes for different sports → no match).
     getByText('Gym partners');
     getByText('Sydney');
+  });
+
+  // ── V1.1 Honor surface ─────────────────────────────────────────────────────
+
+  it('renders the Honor badge on the partner card when summary exists', () => {
+    setupDiscovery({ partners: [samplePartner] });
+    const { getByText } = render(<DiscoveryScreen />);
+    getByText('Trusted');
+  });
+
+  it('renders a "New player" fallback when Honor summary is null', () => {
+    mockHonorSummary = null;
+    setupDiscovery({ partners: [samplePartner] });
+    const { getByText } = render(<DiscoveryScreen />);
+    getByText('New player');
+  });
+
+  it('hides the Honor badge on hard error and keeps the card rendered', () => {
+    mockHonorSummary = null;
+    mockHonorError = 'Network down';
+    setupDiscovery({ partners: [samplePartner] });
+    const { getByLabelText, queryByText } = render(<DiscoveryScreen />);
+    // Card is still here (CardHero exposes `${displayName} card` as
+    // the accessibility label).
+    getByLabelText(`${samplePartner.displayName} card`);
+    // Neither the level nor the fallback should render on hard error.
+    expect(queryByText('Trusted')).toBeNull();
+    expect(queryByText('New player')).toBeNull();
+  });
+
+  it('exposes a "View profile" action that navigates to PublicProfile', () => {
+    setupDiscovery({ partners: [samplePartner] });
+    const { getByLabelText } = render(<DiscoveryScreen />);
+    fireEvent.press(getByLabelText('View profile'));
+    expect(mockNavigate).toHaveBeenCalledWith(
+      'PublicProfile',
+      expect.objectContaining({
+        userId: samplePartner.userId,
+        displayName: samplePartner.displayName,
+      })
+    );
+  });
+
+  it('Honor copy does not include popularity / leaderboard / verified / AI moderation', () => {
+    setupDiscovery({ partners: [samplePartner] });
+    const { queryByText } = render(<DiscoveryScreen />);
+    expect(queryByText(/popular/i)).toBeNull();
+    expect(queryByText(/popularity/i)).toBeNull();
+    expect(queryByText(/leaderboard/i)).toBeNull();
+    expect(queryByText(/verified/i)).toBeNull();
+    expect(queryByText(/AI moderation/i)).toBeNull();
   });
 });
