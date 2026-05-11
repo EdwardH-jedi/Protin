@@ -7,12 +7,32 @@ and Calendar event creation are mocked via httpx.
 from __future__ import annotations
 
 import base64
+from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+
+def _future_booking_window(
+    *, days_from_now: int = 7, duration_hours: int = 1
+) -> tuple[str, str]:
+    """
+    Return (starts_at, ends_at) ISO strings safely in the future.
+
+    The Google Calendar tests previously hardcoded May 2026 timestamps,
+    which started failing once that window moved into the past and the
+    bookings endpoint began rejecting the requests. Compute the window
+    relative to "now" so the tests remain stable across calendar dates.
+    """
+    starts = datetime.now(tz=timezone.utc) + timedelta(days=days_from_now)
+    ends = starts + timedelta(hours=duration_hours)
+    # Strip microseconds for cleaner ISO output, then append Z.
+    starts_iso = starts.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    ends_iso = ends.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return starts_iso, ends_iso
 
 from app.db.base import Base
 from app.db.redis import get_redis
@@ -160,17 +180,20 @@ async def test_sync_booking_requires_confirmed_status(client: AsyncClient) -> No
     )
     match_id = r.json()["match_id"]
 
-    # Create booking (status=proposed)
+    # Create booking (status=proposed) with a future-relative window
+    # so /bookings validation does not reject it as past-dated.
+    starts_at, ends_at = _future_booking_window(days_from_now=7)
     book_r = await client.post(
         "/bookings",
         json={
             "match_id": match_id,
             "sport": "gym",
-            "starts_at": "2026-05-01T09:00:00Z",
-            "ends_at": "2026-05-01T10:00:00Z",
+            "starts_at": starts_at,
+            "ends_at": ends_at,
         },
         headers=_auth(token_a),
     )
+    assert book_r.status_code == 201, book_r.text
     booking_id = book_r.json()["id"]
 
     # Try to sync — should fail with 422 (not confirmed)
@@ -197,16 +220,18 @@ async def test_sync_booking_requires_google_connection(client: AsyncClient) -> N
     )
     match_id = r.json()["match_id"]
 
+    starts_at, ends_at = _future_booking_window(days_from_now=8)
     book_r = await client.post(
         "/bookings",
         json={
             "match_id": match_id,
             "sport": "gym",
-            "starts_at": "2026-05-02T09:00:00Z",
-            "ends_at": "2026-05-02T10:00:00Z",
+            "starts_at": starts_at,
+            "ends_at": ends_at,
         },
         headers=_auth(token_a),
     )
+    assert book_r.status_code == 201, book_r.text
     booking_id = book_r.json()["id"]
     # Confirm it
     await client.post(f"/bookings/{booking_id}/confirm", headers=_auth(token_b))
