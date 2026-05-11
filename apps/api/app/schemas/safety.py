@@ -36,3 +36,10 @@ class BlockResponse(BaseModel):
 class BlockListResponse(BaseModel):
     items: list[BlockResponse]
     total: int
+
+
+class ReportListResponse(BaseModel):
+    """Response shape for GET /reports/mine — mirrors BlockListResponse."""
+
+    items: list[ReportResponse]
+    total: int

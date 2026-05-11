@@ -9,6 +9,7 @@ from app.schemas.safety import (
     BlockListResponse,
     BlockResponse,
     CreateReportRequest,
+    ReportListResponse,
     ReportResponse,
 )
 from app.services import safety as safety_service
@@ -26,6 +27,15 @@ async def create_report(
     db: AsyncSession = Depends(get_db),
 ) -> ReportResponse:
     return await safety_service.create_report(db, current_user.id, req)
+
+
+@router.get("/reports/mine", response_model=ReportListResponse)
+async def list_my_reports(
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ReportListResponse:
+    """List the caller's submitted reports. Scoped to the authenticated user."""
+    return await safety_service.list_my_reports(db, current_user.id)
 
 
 # ── Blocks ───────────────────────────────────────────────────────────────────

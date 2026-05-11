@@ -11,6 +11,7 @@ from app.schemas.safety import (
     BlockListResponse,
     BlockResponse,
     CreateReportRequest,
+    ReportListResponse,
     ReportResponse,
 )
 
@@ -40,6 +41,23 @@ async def create_report(
     await db.commit()
     await db.refresh(report)
     return ReportResponse.model_validate(report)
+
+
+async def list_my_reports(
+    db: AsyncSession,
+    reporter_id: UUID,
+) -> ReportListResponse:
+    """Return reports created by the caller — never expose others' reports."""
+    stmt = (
+        select(Report)
+        .where(Report.reporter_id == reporter_id)
+        .order_by(Report.created_at.desc())
+    )
+    reports = list((await db.execute(stmt)).scalars().all())
+    return ReportListResponse(
+        items=[ReportResponse.model_validate(r) for r in reports],
+        total=len(reports),
+    )
 
 
 # ---------------------------------------------------------------------------

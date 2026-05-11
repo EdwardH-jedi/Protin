@@ -240,3 +240,64 @@ async def test_blocking_user_also_excluded_from_discovery(client: AsyncClient) -
     r = await client.get("/discovery?sport=gym", headers=_auth(token_a))
     user_ids = [item["user_id"] for item in r.json()["items"]]
     assert uid_b not in user_ids
+
+
+# ---------------------------------------------------------------------------
+# GET /reports/mine
+# ---------------------------------------------------------------------------
+
+
+async def test_list_my_reports_requires_auth(client: AsyncClient) -> None:
+    r = await client.get("/reports/mine")
+    assert r.status_code in (401, 403)
+
+
+async def test_list_my_reports_returns_only_callers_reports(
+    client: AsyncClient,
+) -> None:
+    """Caller sees only reports they submitted — never another user's."""
+    token_a, uid_a = await _register(client, "rep_mine_a@example.com")
+    token_b, uid_b = await _register(client, "rep_mine_b@example.com")
+    _, uid_c = await _register(client, "rep_mine_c@example.com")
+
+    # A reports B and C; B reports A. Caller A must see only the
+    # two reports A submitted; B's report against A must not leak.
+    await client.post(
+        "/reports",
+        json={"reported_user_id": uid_b, "reason": "harassment"},
+        headers=_auth(token_a),
+    )
+    await client.post(
+        "/reports",
+        json={"reported_user_id": uid_c, "reason": "spam"},
+        headers=_auth(token_a),
+    )
+    await client.post(
+        "/reports",
+        json={"reported_user_id": uid_a, "reason": "other"},
+        headers=_auth(token_b),
+    )
+
+    r = await client.get("/reports/mine", headers=_auth(token_a))
+    assert r.status_code == 200
+    body = r.json()
+    assert set(body.keys()) == {"items", "total"}
+    assert body["total"] == 2
+    assert len(body["items"]) == 2
+    # Every item must be authored by the caller; never expose another
+    # reporter's row.
+    assert all(item["reporter_id"] == uid_a for item in body["items"])
+
+    # B sees only their one report; doesn't leak A's two.
+    rb = await client.get("/reports/mine", headers=_auth(token_b))
+    body_b = rb.json()
+    assert body_b["total"] == 1
+    assert body_b["items"][0]["reporter_id"] == uid_b
+
+
+async def test_list_my_reports_empty_response_shape(client: AsyncClient) -> None:
+    token, _ = await _register(client, "rep_mine_empty@example.com")
+    r = await client.get("/reports/mine", headers=_auth(token))
+    assert r.status_code == 200
+    body = r.json()
+    assert body == {"items": [], "total": 0}
