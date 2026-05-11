@@ -30,6 +30,8 @@ import { BattleDetailScreen } from '../screens/battles/BattleDetailScreen';
 import { CreateBattleScreen } from '../screens/battles/CreateBattleScreen';
 import { AttendanceCheckScreen } from '../screens/battles/AttendanceCheckScreen';
 import { PublicProfileScreen } from '../screens/profile/PublicProfileScreen';
+import { HonorGuideScreen } from '../screens/help/HonorGuideScreen';
+import { SafetyCenterScreen } from '../screens/help/SafetyCenterScreen';
 
 import { registerForPushNotifications, configureForegroundHandler } from '../lib/notifications';
 import { useAuthStore } from '../stores/auth';
@@ -245,6 +247,16 @@ export function RootNavigator() {
         <Stack.Screen
           name="PublicProfile"
           component={PublicProfileScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="HonorGuide"
+          component={HonorGuideScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="SafetyCenter"
+          component={SafetyCenterScreen}
           options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>

@@ -37,6 +37,10 @@ export type RootStackParamList = {
     bio?: string;
     sports?: string[];
   };
+  /** Informational explainer for Honor / Gang Score / Sport Levels. */
+  HonorGuide: undefined;
+  /** Informational safety / community-rules explainer. */
+  SafetyCenter: undefined;
 };
 
 /**
@@ -79,3 +83,5 @@ export type BattleDetailScreenProps = NativeStackScreenProps<RootStackParamList,
 export type CreateBattleScreenProps = NativeStackScreenProps<RootStackParamList, 'CreateBattle'>;
 export type AttendanceCheckScreenProps = NativeStackScreenProps<RootStackParamList, 'AttendanceCheck'>;
 export type PublicProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'PublicProfile'>;
+export type HonorGuideScreenProps = NativeStackScreenProps<RootStackParamList, 'HonorGuide'>;
+export type SafetyCenterScreenProps = NativeStackScreenProps<RootStackParamList, 'SafetyCenter'>;

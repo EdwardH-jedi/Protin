@@ -643,4 +643,31 @@ describe('ProfileScreen', () => {
       expect(queryByText(/reminder/i)).toBeNull();
     });
   });
+
+  // ── Guides (Honor Guide + Safety Center) ────────────────────────────────────
+
+  describe('guides', () => {
+    it('renders Honor Guide and Safety Center entries when a profile exists', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      const { findByLabelText } = render(<ProfileScreen />);
+      await findByLabelText('Honor Guide');
+      await findByLabelText('Safety Center');
+    });
+
+    it('navigates to HonorGuide when the Honor Guide entry is pressed', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      const { findByLabelText } = render(<ProfileScreen />);
+      const entry = await findByLabelText('Honor Guide');
+      fireEvent.press(entry);
+      expect(mockNavigate).toHaveBeenCalledWith('HonorGuide');
+    });
+
+    it('navigates to SafetyCenter when the Safety Center entry is pressed', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      const { findByLabelText } = render(<ProfileScreen />);
+      const entry = await findByLabelText('Safety Center');
+      fireEvent.press(entry);
+      expect(mockNavigate).toHaveBeenCalledWith('SafetyCenter');
+    });
+  });
 });

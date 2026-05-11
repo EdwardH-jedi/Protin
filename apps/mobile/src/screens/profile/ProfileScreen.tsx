@@ -303,6 +303,35 @@ export function ProfileScreen() {
             )}
           </View>
 
+          {/* Guides — how Honor works + safety basics */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Guides</Text>
+            <View style={styles.legalList}>
+              <Pressable
+                style={({ pressed }) => [styles.legalRow, pressed && styles.pressed]}
+                onPress={() => navigation.navigate('HonorGuide')}
+                accessibilityRole="link"
+                accessibilityLabel="Honor Guide"
+              >
+                <Text style={styles.legalRowText}>Honor Guide</Text>
+                <Text style={styles.legalRowSubText}>
+                  How Honor, Gang Score, and Sport Levels work
+                </Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.legalRow, pressed && styles.pressed]}
+                onPress={() => navigation.navigate('SafetyCenter')}
+                accessibilityRole="link"
+                accessibilityLabel="Safety Center"
+              >
+                <Text style={styles.legalRowText}>Safety Center</Text>
+                <Text style={styles.legalRowSubText}>
+                  Reports, blocking, and community rules
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+
           {/* Legal */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Legal</Text>
@@ -724,6 +753,11 @@ const styles = StyleSheet.create({
   legalRowText: {
     ...typography.body,
     color: colors.textPrimary,
+  },
+  legalRowSubText: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
+    marginTop: 2,
   },
 
   // Account actions
