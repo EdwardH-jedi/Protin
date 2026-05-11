@@ -80,6 +80,35 @@ export async function leaveEvent(eventId: string): Promise<EventDetail> {
   return api.post<EventDetail>(`/events/${eventId}/leave`);
 }
 
+/**
+ * Host-only: cancel the event. Backend returns the updated EventDetail
+ * with status='cancelled'. Idempotent — calling on an already-cancelled
+ * event returns the current detail without erroring.
+ */
+export async function cancelEvent(eventId: string): Promise<EventDetail> {
+  return api.post<EventDetail>(`/events/${eventId}/cancel`);
+}
+
+/**
+ * Host-only: complete the event. Backend returns status='completed'.
+ * Rejected (422) if called before `starts_at`. Idempotent if already
+ * completed.
+ */
+export async function completeEvent(eventId: string): Promise<EventDetail> {
+  return api.post<EventDetail>(`/events/${eventId}/complete`);
+}
+
+/**
+ * True if the event's `startsAt` is at or before now. Mirrors the
+ * backend time-gate so the mobile UI hides attendance controls before
+ * the game starts.
+ */
+export function eventHasStarted(startsAt: string): boolean {
+  const ts = Date.parse(startsAt);
+  if (Number.isNaN(ts)) return true;
+  return ts <= Date.now();
+}
+
 // ---------------------------------------------------------------------------
 // Attendance
 // ---------------------------------------------------------------------------

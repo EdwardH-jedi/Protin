@@ -77,6 +77,24 @@ async def leave_event(
     return await events_service.leave_event(db, event_id, current_user.id)
 
 
+@router.post("/{event_id}/cancel", response_model=EventDetail)
+async def cancel_event(
+    event_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> EventDetail:
+    return await events_service.cancel_event(db, event_id, current_user.id)
+
+
+@router.post("/{event_id}/complete", response_model=EventDetail)
+async def complete_event(
+    event_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> EventDetail:
+    return await events_service.complete_event(db, event_id, current_user.id)
+
+
 @router.get("/{event_id}/attendance", response_model=AttendanceListResponse)
 async def get_event_attendance(
     event_id: UUID,

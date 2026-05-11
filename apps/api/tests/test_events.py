@@ -86,8 +86,11 @@ def _auth(token: str) -> dict[str, str]:
 
 
 def _payload(**overrides) -> dict:
+    # Default to a `starts_at` slightly in the past so existing
+    # attendance-flow tests pass the new time-eligibility gate. Tests
+    # that need a future event explicitly pass `starts_at` themselves.
     starts_at = (
-        datetime.now(tz=timezone.utc) + timedelta(days=7)
+        datetime.now(tz=timezone.utc) - timedelta(hours=1)
     ).isoformat()
     body = {
         "title": "Bondi pickup hoops",
@@ -101,6 +104,27 @@ def _payload(**overrides) -> dict:
     }
     body.update(overrides)
     return body
+
+
+def _future_starts_at(*, hours: int = 6) -> str:
+    return (datetime.now(tz=timezone.utc) + timedelta(hours=hours)).isoformat()
+
+
+async def _set_event_starts_at(event_id: str, when: datetime) -> None:
+    """Helper for tests that need to push an event into the past."""
+    from uuid import UUID
+
+    from sqlalchemy import update
+
+    from app.models.event import Event
+
+    async with _TestSession() as db:
+        await db.execute(
+            update(Event)
+            .where(Event.id == UUID(event_id))
+            .values(starts_at=when)
+        )
+        await db.commit()
 
 
 async def _wipe_events() -> None:
@@ -1035,3 +1059,348 @@ async def test_private_event_outsider_cannot_self_report_attendance(
         headers=_auth(outsider_tok),
     )
     assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle: cancel / complete + attendance time eligibility
+# ---------------------------------------------------------------------------
+
+
+async def test_host_can_cancel_event(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_cancel_host@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+
+    r = await client.post(f"/events/{event_id}/cancel", headers=_auth(host_tok))
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "cancelled"
+
+
+async def test_non_host_cannot_cancel_event(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_cancel_nh_host@example.com")
+    other_tok, _ = await _register(client, "evt_cancel_nh_other@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+
+    r = await client.post(f"/events/{event_id}/cancel", headers=_auth(other_tok))
+    assert r.status_code == 403
+
+
+async def test_cancel_is_idempotent(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_cancel_idem@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+
+    r1 = await client.post(f"/events/{event_id}/cancel", headers=_auth(host_tok))
+    r2 = await client.post(f"/events/{event_id}/cancel", headers=_auth(host_tok))
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    assert r2.json()["status"] == "cancelled"
+
+
+async def test_completed_event_cannot_be_cancelled(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_cxl_complete@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    complete = await client.post(
+        f"/events/{event_id}/complete", headers=_auth(host_tok)
+    )
+    assert complete.status_code == 200
+    assert complete.json()["status"] == "completed"
+
+    r = await client.post(f"/events/{event_id}/cancel", headers=_auth(host_tok))
+    assert r.status_code == 422
+
+
+async def test_cancelled_event_cannot_be_joined(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_cxl_join_host@example.com")
+    joiner_tok, _ = await _register(client, "evt_cxl_join_other@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/cancel", headers=_auth(host_tok))
+
+    r = await client.post(f"/events/{event_id}/join", headers=_auth(joiner_tok))
+    assert r.status_code == 422
+
+
+async def test_cancelled_event_blocks_attendance_updates(
+    client: AsyncClient,
+) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_cxl_att_host@example.com")
+    p_tok, p_uid = await _register(client, "evt_cxl_att_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+    await client.post(f"/events/{event_id}/cancel", headers=_auth(host_tok))
+
+    host_mark = await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": p_uid, "attendance_status": "attended"},
+        headers=_auth(host_tok),
+    )
+    assert host_mark.status_code == 422
+
+    self_mark = await client.post(
+        f"/events/{event_id}/attendance/self",
+        json={"attendance_status": "attended"},
+        headers=_auth(p_tok),
+    )
+    assert self_mark.status_code == 422
+
+
+# --- Complete ---------------------------------------------------------------
+
+
+async def test_host_can_complete_after_starts_at(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_complete_host@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+
+    r = await client.post(f"/events/{event_id}/complete", headers=_auth(host_tok))
+    assert r.status_code == 200
+    assert r.json()["status"] == "completed"
+
+
+async def test_host_cannot_complete_before_starts_at(
+    client: AsyncClient,
+) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_complete_early@example.com")
+    created = await client.post(
+        "/events",
+        json=_payload(starts_at=_future_starts_at(hours=6)),
+        headers=_auth(host_tok),
+    )
+    event_id = created.json()["id"]
+
+    r = await client.post(f"/events/{event_id}/complete", headers=_auth(host_tok))
+    assert r.status_code == 422
+    assert "before it has started" in r.json()["detail"].lower()
+
+
+async def test_non_host_cannot_complete(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_complete_nh_host@example.com")
+    other_tok, _ = await _register(client, "evt_complete_nh_other@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+
+    r = await client.post(f"/events/{event_id}/complete", headers=_auth(other_tok))
+    assert r.status_code == 403
+
+
+async def test_cancelled_event_cannot_be_completed(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_complete_cxl@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/cancel", headers=_auth(host_tok))
+
+    r = await client.post(f"/events/{event_id}/complete", headers=_auth(host_tok))
+    assert r.status_code == 422
+
+
+async def test_completed_event_cannot_be_joined(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_done_join_host@example.com")
+    joiner_tok, _ = await _register(client, "evt_done_join_other@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/complete", headers=_auth(host_tok))
+
+    r = await client.post(f"/events/{event_id}/join", headers=_auth(joiner_tok))
+    assert r.status_code == 422
+
+
+# --- Attendance time eligibility -------------------------------------------
+
+
+async def test_host_attendance_before_starts_at_rejected(
+    client: AsyncClient,
+) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_att_early_host@example.com")
+    p_tok, p_uid = await _register(client, "evt_att_early_p@example.com")
+    created = await client.post(
+        "/events",
+        json=_payload(starts_at=_future_starts_at(hours=3)),
+        headers=_auth(host_tok),
+    )
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+
+    r = await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": p_uid, "attendance_status": "attended"},
+        headers=_auth(host_tok),
+    )
+    assert r.status_code == 422
+    assert "after the game starts" in r.json()["detail"].lower()
+
+
+async def test_participant_self_attendance_before_starts_at_rejected(
+    client: AsyncClient,
+) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_self_early_host@example.com")
+    p_tok, _ = await _register(client, "evt_self_early_p@example.com")
+    created = await client.post(
+        "/events",
+        json=_payload(starts_at=_future_starts_at(hours=3)),
+        headers=_auth(host_tok),
+    )
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+
+    r = await client.post(
+        f"/events/{event_id}/attendance/self",
+        json={"attendance_status": "attended"},
+        headers=_auth(p_tok),
+    )
+    assert r.status_code == 422
+
+
+async def test_host_attendance_on_completed_event_allowed(
+    client: AsyncClient,
+) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_done_att_host@example.com")
+    p_tok, p_uid = await _register(client, "evt_done_att_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+    await client.post(f"/events/{event_id}/complete", headers=_auth(host_tok))
+
+    r = await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": p_uid, "attendance_status": "attended"},
+        headers=_auth(host_tok),
+    )
+    assert r.status_code == 200
+    assert r.json()["attendance_status"] == "attended"
+
+
+async def test_self_attendance_on_completed_event_allowed(
+    client: AsyncClient,
+) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_done_self_host@example.com")
+    p_tok, _ = await _register(client, "evt_done_self_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+    await client.post(f"/events/{event_id}/complete", headers=_auth(host_tok))
+
+    r = await client.post(
+        f"/events/{event_id}/attendance/self",
+        json={"attendance_status": "attended"},
+        headers=_auth(p_tok),
+    )
+    assert r.status_code == 200
+
+
+# --- Hide-as-404 preserved on cancel/complete ------------------------------
+
+
+async def _seed_private_event_lifecycle(
+    *, host_user_id: str, status_value: str = "open"
+) -> str:
+    from uuid import UUID, uuid4
+
+    from app.models.event import Event, EventParticipant
+
+    async with _TestSession() as db:
+        e = Event(
+            id=uuid4(),
+            host_user_id=UUID(host_user_id),
+            title="Hidden",
+            sport="basketball",
+            mode="casual",
+            starts_at=datetime.now(tz=timezone.utc) - timedelta(hours=1),
+            location_text="Bondi Court",
+            capacity=10,
+            visibility="private",
+            status=status_value,
+        )
+        db.add(e)
+        await db.flush()
+        db.add(
+            EventParticipant(
+                event_id=e.id, user_id=UUID(host_user_id), status="joined"
+            )
+        )
+        await db.commit()
+        return str(e.id)
+
+
+async def test_private_outsider_cannot_cancel(client: AsyncClient) -> None:
+    await _wipe_events()
+    _, host_uid = await _register(client, "evt_priv_cxl_host@example.com")
+    outsider_tok, _ = await _register(client, "evt_priv_cxl_out@example.com")
+    event_id = await _seed_private_event_lifecycle(host_user_id=host_uid)
+
+    r = await client.post(f"/events/{event_id}/cancel", headers=_auth(outsider_tok))
+    assert r.status_code == 404
+
+
+async def test_private_outsider_cannot_complete(client: AsyncClient) -> None:
+    await _wipe_events()
+    _, host_uid = await _register(client, "evt_priv_dn_host@example.com")
+    outsider_tok, _ = await _register(client, "evt_priv_dn_out@example.com")
+    event_id = await _seed_private_event_lifecycle(host_user_id=host_uid)
+
+    r = await client.post(
+        f"/events/{event_id}/complete", headers=_auth(outsider_tok)
+    )
+    assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Hide-as-404 must beat terminal-status 422 on join/leave so a private
+# outsider cannot tell a real cancelled/completed event from an unknown id.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("event_status", ["cancelled", "completed"])
+async def test_private_outsider_join_terminal_event_gets_404_not_422(
+    client: AsyncClient, event_status: str
+) -> None:
+    await _wipe_events()
+    _, host_uid = await _register(
+        client, f"evt_priv_join_terminal_host_{event_status}@example.com"
+    )
+    outsider_tok, _ = await _register(
+        client, f"evt_priv_join_terminal_out_{event_status}@example.com"
+    )
+    event_id = await _seed_private_event_lifecycle(
+        host_user_id=host_uid, status_value=event_status
+    )
+
+    r = await client.post(f"/events/{event_id}/join", headers=_auth(outsider_tok))
+    assert r.status_code == 404, r.text
+
+
+@pytest.mark.parametrize("event_status", ["cancelled", "completed"])
+async def test_private_outsider_leave_terminal_event_gets_404_not_422(
+    client: AsyncClient, event_status: str
+) -> None:
+    await _wipe_events()
+    _, host_uid = await _register(
+        client, f"evt_priv_leave_terminal_host_{event_status}@example.com"
+    )
+    outsider_tok, _ = await _register(
+        client, f"evt_priv_leave_terminal_out_{event_status}@example.com"
+    )
+    event_id = await _seed_private_event_lifecycle(
+        host_user_id=host_uid, status_value=event_status
+    )
+
+    r = await client.post(f"/events/{event_id}/leave", headers=_auth(outsider_tok))
+    assert r.status_code == 404, r.text

@@ -292,20 +292,16 @@ async def join_event(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
 
+    # Hide-as-404 MUST run before any terminal-status 422 so that a
+    # private outsider cannot distinguish "no event with this id" from
+    # "private cancelled/completed event with this id". Mirrors the
+    # get_event / cancel_event / complete_event pattern.
+    await _enforce_private_visibility(db, e, current_user_id)
+
     if e.status in ("cancelled", "completed"):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Cannot join a {e.status} event",
-        )
-
-    # Private events have no invite flow yet, so an outsider with the
-    # ID must not be able to bypass the detail-side 404 by joining
-    # first. Mirror get_event's hide-as-404 behavior. Host is the only
-    # member of a freshly-seeded private event, so we don't need to
-    # check the participant table here.
-    if e.visibility == "private" and current_user_id != e.host_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
 
     if await _active_participant(db, e.id, current_user_id) is not None:
@@ -361,6 +357,12 @@ async def leave_event(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
         )
+
+    # Hide-as-404 MUST run before any terminal-status 422 so that a
+    # private outsider cannot distinguish "no event with this id" from
+    # "private cancelled/completed event with this id". Same pattern as
+    # join_event / get_event.
+    await _enforce_private_visibility(db, e, current_user_id)
 
     if e.status not in _LEAVABLE_STATUSES:
         raise HTTPException(
@@ -533,6 +535,43 @@ def _ensure_attendance_event_mutable(e: Event) -> None:
         )
 
 
+def _utc_now() -> datetime:
+    return datetime.now(tz=timezone.utc)
+
+
+def _event_has_started(e: Event, *, now: datetime | None = None) -> bool:
+    """
+    Return True if the event's ``starts_at`` is at or before *now*.
+
+    Defensive against legacy naive datetimes. Existing schemas store
+    starts_at as ``DateTime(timezone=True)``; if a row predates that
+    convention we treat it as UTC so the comparison still resolves.
+    """
+    if now is None:
+        now = _utc_now()
+    starts = e.starts_at
+    if starts.tzinfo is None:
+        starts = starts.replace(tzinfo=timezone.utc)
+    return starts <= now
+
+
+def _ensure_attendance_time_eligible(e: Event) -> None:
+    """
+    Attendance mutations are gated on the event having started.
+
+    Completed events stay open for host corrections regardless of the
+    clock — by definition they already started. Cancelled events are
+    rejected earlier by ``_ensure_attendance_event_mutable``.
+    """
+    if e.status == "completed":
+        return
+    if not _event_has_started(e):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Attendance opens after the game starts",
+        )
+
+
 async def host_update_attendance(
     db: AsyncSession,
     event_id: UUID,
@@ -551,6 +590,7 @@ async def host_update_attendance(
         )
 
     _ensure_attendance_event_mutable(e)
+    _ensure_attendance_time_eligible(e)
 
     if body.attendance_status not in EVENT_ATTENDANCE_HOST_STATUSES:
         raise HTTPException(
@@ -598,6 +638,7 @@ async def self_report_attendance(
     # pattern as the GET and host-update endpoints.
     await _enforce_private_visibility(db, e, current_user_id)
     _ensure_attendance_event_mutable(e)
+    _ensure_attendance_time_eligible(e)
 
     if body.attendance_status not in EVENT_ATTENDANCE_SELF_STATUSES:
         # Either invalid vocab or no_show (host-only). Returns the same
@@ -629,3 +670,90 @@ async def self_report_attendance(
     )
     name = (await db.execute(name_stmt)).scalar_one_or_none()
     return _entry_for(e.id, participant, name)
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle: cancel / complete
+#
+# Both transitions are host-only. We deliberately do NOT mutate
+# attendance rows when an event is cancelled or completed — the
+# audit trail (who joined, who left, what the host marked) stays
+# intact and the rank service's scoreable filter already excludes
+# rows on cancelled events.
+# ---------------------------------------------------------------------------
+
+
+async def cancel_event(
+    db: AsyncSession, event_id: UUID, current_user_id: UUID
+) -> EventDetail:
+    locked_stmt = select(Event).where(Event.id == event_id).with_for_update()
+    e = (await db.execute(locked_stmt)).scalar_one_or_none()
+    if e is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+
+    # Hide-as-404 for outsiders on private events — same pattern as
+    # join_event so the cancel endpoint can't be used to probe.
+    await _enforce_private_visibility(db, e, current_user_id)
+
+    if current_user_id != e.host_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the host can cancel this event",
+        )
+
+    if e.status == "cancelled":
+        # Idempotent — return the current detail without mutation.
+        return await get_event(db, e.id, current_user_id)
+
+    if e.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cannot cancel a completed event",
+        )
+
+    e.status = "cancelled"
+    await db.commit()
+    await db.refresh(e)
+    return await get_event(db, e.id, current_user_id)
+
+
+async def complete_event(
+    db: AsyncSession, event_id: UUID, current_user_id: UUID
+) -> EventDetail:
+    locked_stmt = select(Event).where(Event.id == event_id).with_for_update()
+    e = (await db.execute(locked_stmt)).scalar_one_or_none()
+    if e is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+
+    await _enforce_private_visibility(db, e, current_user_id)
+
+    if current_user_id != e.host_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the host can complete this event",
+        )
+
+    if e.status == "completed":
+        # Idempotent — host may double-tap or retry.
+        return await get_event(db, e.id, current_user_id)
+
+    if e.status == "cancelled":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cannot complete a cancelled event",
+        )
+
+    if not _event_has_started(e):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cannot complete an event before it has started",
+        )
+
+    e.status = "completed"
+    await db.commit()
+    await db.refresh(e)
+    return await get_event(db, e.id, current_user_id)

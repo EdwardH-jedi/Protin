@@ -16,6 +16,9 @@ import { useUserHonorSummary } from '../../hooks/useUserHonorSummary';
 import {
   type SelfAttendanceStatus,
   attendanceStatusLabel,
+  cancelEvent,
+  completeEvent,
+  eventHasStarted,
   formatEventWhen,
   selfReportAttendance,
   sportLabelForBattle,
@@ -38,6 +41,7 @@ export function BattleDetailScreen({ navigation, route }: BattleDetailScreenProp
     error: hostHonorError,
   } = useUserHonorSummary({ userId: detail?.hostUserId ?? null });
   const [isActing, setIsActing] = useState(false);
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [selfReportSaving, setSelfReportSaving] = useState(false);
   const [selfReportError, setSelfReportError] = useState<string | null>(null);
   const [selfReportSaved, setSelfReportSaved] = useState<SelfAttendanceStatus | null>(
@@ -112,11 +116,81 @@ export function BattleDetailScreen({ navigation, route }: BattleDetailScreenProp
   const isHost = currentUserId !== null && currentUserId === detail.hostUserId;
   // Active joined non-host participant — eligible for self-report.
   const isParticipant = detail.hasJoined && !isHost;
+  // Time gate that mirrors the backend's attendance eligibility:
+  //   - completed events stay open regardless of clock
+  //   - cancelled events are always blocked
+  //   - otherwise we require starts_at <= now
+  const hasStarted = eventHasStarted(detail.startsAt);
+  const attendanceOpen =
+    !isCancelled && (isCompleted || hasStarted);
   // Saved-state reflects only the self-report performed in this
   // session. Persisted attendance is no longer leaked via GET
   // /events/{id} — fetching it back would require a separate
   // /attendance call which is out of scope for this patch.
   const ownAttendanceStatus = selfReportSaved;
+
+  const confirmCancel = () => {
+    if (!eventId || lifecycleBusy) return;
+    Alert.alert(
+      'Cancel this game?',
+      'Players will no longer be able to join.',
+      [
+        { text: 'Keep open', style: 'cancel' },
+        {
+          text: 'Cancel game',
+          style: 'destructive',
+          onPress: () => void runCancel(),
+        },
+      ]
+    );
+  };
+
+  const runCancel = async () => {
+    if (!eventId || lifecycleBusy) return;
+    setLifecycleBusy(true);
+    try {
+      await cancelEvent(eventId);
+      await refresh();
+    } catch (err) {
+      Alert.alert(
+        "Couldn't cancel this game.",
+        err instanceof Error ? err.message : 'Please try again.'
+      );
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  const confirmComplete = () => {
+    if (!eventId || lifecycleBusy) return;
+    Alert.alert(
+      'Complete this game?',
+      'This closes joining and marks the game as finished. You can still adjust attendance.',
+      [
+        { text: 'Not yet', style: 'cancel' },
+        {
+          text: 'Complete game',
+          onPress: () => void runComplete(),
+        },
+      ]
+    );
+  };
+
+  const runComplete = async () => {
+    if (!eventId || lifecycleBusy) return;
+    setLifecycleBusy(true);
+    try {
+      await completeEvent(eventId);
+      await refresh();
+    } catch (err) {
+      Alert.alert(
+        "Couldn't complete this game.",
+        err instanceof Error ? err.message : 'Please try again.'
+      );
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
 
   const handleSelfReport = async (statusValue: SelfAttendanceStatus) => {
     if (selfReportSaving || !eventId) return;
@@ -134,16 +208,20 @@ export function BattleDetailScreen({ navigation, route }: BattleDetailScreenProp
     }
   };
 
-  // Primary CTA selection. Order: Joined → Cancelled/Completed disabled →
-  // Full disabled → Join.
+  // Primary CTA selection. Terminal statuses take priority so a
+  // cancelled or completed event never shows Join/Leave:
+  //   Cancelled / Completed → status badge, no action
+  //   Joined (open/full)    → Leave
+  //   Full (outsider)       → Full
+  //   default               → Join
   let ctaLabel: string = 'Join';
   let ctaState: 'join' | 'joined' | 'full' | 'disabled' = 'join';
-  if (detail.hasJoined) {
-    ctaLabel = 'Joined · Leave';
-    ctaState = 'joined';
-  } else if (isCancelled || isCompleted) {
+  if (isCancelled || isCompleted) {
     ctaLabel = isCancelled ? 'Cancelled' : 'Completed';
     ctaState = 'disabled';
+  } else if (detail.hasJoined) {
+    ctaLabel = 'Joined · Leave';
+    ctaState = 'joined';
   } else if (isFull) {
     ctaLabel = 'Full';
     ctaState = 'full';
@@ -230,7 +308,57 @@ export function BattleDetailScreen({ navigation, route }: BattleDetailScreenProp
           </Text>
         </View>
 
-        {isHost ? (
+        {isHost && !isCancelled && !isCompleted ? (
+          <View style={styles.attendanceSection}>
+            <Text style={styles.sectionLabel}>Host controls</Text>
+            <View style={styles.attendanceButtonRow}>
+              <Pressable
+                onPress={confirmCancel}
+                disabled={lifecycleBusy}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel game"
+                style={({ pressed }) => [
+                  styles.attendanceButton,
+                  styles.attendanceButtonSecondary,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.attendanceButtonSecondaryText}>
+                  Cancel game
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={confirmComplete}
+                disabled={lifecycleBusy || !hasStarted}
+                accessibilityRole="button"
+                accessibilityLabel="Complete game"
+                accessibilityState={{ disabled: !hasStarted }}
+                style={({ pressed }) => [
+                  styles.attendanceButton,
+                  styles.attendanceButtonPrimary,
+                  !hasStarted && styles.attendanceButtonDisabled,
+                  pressed && hasStarted && styles.pressed,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.attendanceButtonPrimaryText,
+                    !hasStarted && styles.attendanceButtonDisabledText,
+                  ]}
+                >
+                  Complete game
+                </Text>
+              </Pressable>
+            </View>
+            {!hasStarted ? (
+              <Text style={styles.attendanceCopy}>
+                You can complete the game once it has started.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {isHost && (attendanceOpen || isCompleted) ? (
           <View style={styles.attendanceSection}>
             <Text style={styles.sectionLabel}>Attendance</Text>
             <Text style={styles.attendanceCopy}>
@@ -252,7 +380,16 @@ export function BattleDetailScreen({ navigation, route }: BattleDetailScreenProp
           </View>
         ) : null}
 
-        {isParticipant ? (
+        {isHost && !attendanceOpen && !isCompleted && !isCancelled ? (
+          <View style={styles.attendanceSection}>
+            <Text style={styles.sectionLabel}>Attendance</Text>
+            <Text style={styles.attendanceCopy}>
+              Attendance opens after the game starts.
+            </Text>
+          </View>
+        ) : null}
+
+        {isParticipant && attendanceOpen ? (
           <View style={styles.attendanceSection}>
             <Text style={styles.sectionLabel}>Did you attend this game?</Text>
             <Text style={styles.attendanceCopy}>
@@ -689,6 +826,12 @@ const styles = StyleSheet.create({
   attendanceButtonSecondaryText: {
     ...typography.button,
     color: colors.brand,
+  },
+  attendanceButtonDisabled: {
+    backgroundColor: colors.border,
+  },
+  attendanceButtonDisabledText: {
+    color: colors.textTertiary,
   },
   attendanceSaved: {
     ...typography.bodySmall,

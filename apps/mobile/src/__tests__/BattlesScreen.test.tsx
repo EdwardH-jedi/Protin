@@ -274,4 +274,24 @@ describe('BattlesScreen', () => {
     // Hard error must NOT be mislabelled as "New player".
     expect(queryByText('New player')).toBeNull();
   });
+
+  // ── Lifecycle status on card ───────────────────────────────────────────
+
+  it('event card shows Cancelled status and hides Join', () => {
+    mockHookState.items = [makeEvent({ status: 'cancelled', hasJoined: false })];
+    const { getByText, queryByText } = render(
+      <BattlesScreen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    getByText('Cancelled');
+    expect(queryByText('Join')).toBeNull();
+  });
+
+  it('event card shows Completed status and hides Join', () => {
+    mockHookState.items = [makeEvent({ status: 'completed', hasJoined: false })];
+    const { getByText, queryByText } = render(
+      <BattlesScreen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    getByText('Completed');
+    expect(queryByText('Join')).toBeNull();
+  });
 });

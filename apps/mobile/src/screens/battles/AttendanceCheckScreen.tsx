@@ -15,6 +15,7 @@ import {
   type AttendanceEntry,
   type AttendanceStatus,
   attendanceStatusLabel,
+  eventHasStarted,
   formatEventWhen,
   sportLabelForBattle,
 } from '../../lib/events';
@@ -62,6 +63,17 @@ export function AttendanceCheckScreen({
     currentUserId !== null &&
     ((detail !== null && detail.hostUserId === currentUserId) ||
       (data !== null && data.hostUserId === currentUserId));
+
+  // Lifecycle gates mirror the backend service:
+  //   - cancelled events freeze attendance entirely
+  //   - future events show "opens after the game starts" copy
+  //   - completed events stay open for corrections regardless of clock
+  const eventStatus = detail?.status ?? null;
+  const isCancelled = eventStatus === 'cancelled';
+  const isCompleted = eventStatus === 'completed';
+  const hasStarted =
+    detail !== null ? eventHasStarted(detail.startsAt) : true;
+  const attendanceOpen = !isCancelled && (isCompleted || hasStarted);
 
   const onPick = useCallback(
     async (participantUserId: string, choice: Choice) => {
@@ -126,7 +138,7 @@ export function AttendanceCheckScreen({
           </View>
         ) : null}
 
-        {viewerIsHost ? (
+        {viewerIsHost && attendanceOpen ? (
           <View style={styles.warningBox}>
             <Text style={styles.warningText}>
               Only mark no-show when the player clearly did not attend.
@@ -161,6 +173,26 @@ export function AttendanceCheckScreen({
             <Text style={styles.emptyTitle}>Host only</Text>
             <Text style={styles.emptyText}>
               Only the event host can mark attendance from here.
+            </Text>
+          </View>
+        ) : isCancelled ? (
+          <View
+            style={styles.centred}
+            accessibilityLabel="Attendance check is cancelled"
+          >
+            <Text style={styles.emptyTitle}>Event cancelled</Text>
+            <Text style={styles.emptyText}>
+              Attendance is no longer available for cancelled games.
+            </Text>
+          </View>
+        ) : !attendanceOpen ? (
+          <View
+            style={styles.centred}
+            accessibilityLabel="Attendance opens after the game starts"
+          >
+            <Text style={styles.emptyTitle}>Not yet</Text>
+            <Text style={styles.emptyText}>
+              Attendance opens after the game starts.
             </Text>
           </View>
         ) : activeItems.length === 0 ? (

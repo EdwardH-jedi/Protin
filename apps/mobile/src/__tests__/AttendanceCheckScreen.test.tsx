@@ -99,7 +99,9 @@ function makeDetail(): EventDetail {
     title: 'Bondi Hoops',
     sport: 'basketball',
     mode: 'casual',
-    startsAt: '2030-06-01T18:00:00Z',
+    // Past startsAt so attendance is open by default for the host
+    // flow; lifecycle-gate tests override with a future timestamp.
+    startsAt: '2020-06-01T18:00:00Z',
     locationText: 'Bondi Court',
     capacity: 10,
     participantCount: 2,
@@ -270,5 +272,38 @@ describe('AttendanceCheckScreen', () => {
     expect(
       queryByText('Only mark no-show when the player clearly did not attend.')
     ).toBeNull();
+  });
+
+  // ── Lifecycle gates ────────────────────────────────────────────────────
+
+  it('blocks host marking controls before the event starts', () => {
+    mockCurrentUserId = 'host-1';
+    mockDetail.detail = { ...makeDetail(), startsAt: '2099-01-01T00:00:00Z' };
+    const { getByLabelText, queryByLabelText } = renderScreen();
+    getByLabelText('Attendance opens after the game starts');
+    expect(queryByLabelText('Mark Chris as Attended')).toBeNull();
+    expect(queryByLabelText('Mark Chris as No-show')).toBeNull();
+  });
+
+  it('blocks host marking controls on a cancelled event', () => {
+    mockCurrentUserId = 'host-1';
+    mockDetail.detail = { ...makeDetail(), status: 'cancelled' };
+    const { getByLabelText, queryByLabelText } = renderScreen();
+    getByLabelText('Attendance check is cancelled');
+    expect(queryByLabelText('Mark Chris as Attended')).toBeNull();
+    expect(queryByLabelText('Mark Chris as No-show')).toBeNull();
+  });
+
+  it('allows host marking controls on a completed event regardless of clock', () => {
+    mockCurrentUserId = 'host-1';
+    // Completed + future startsAt — completed bypasses the time gate.
+    mockDetail.detail = {
+      ...makeDetail(),
+      status: 'completed',
+      startsAt: '2099-01-01T00:00:00Z',
+    };
+    const { getByLabelText } = renderScreen();
+    getByLabelText('Mark Chris as Attended');
+    getByLabelText('Mark Chris as No-show');
   });
 });

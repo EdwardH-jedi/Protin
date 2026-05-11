@@ -30,11 +30,16 @@ jest.mock('../hooks/useEvents', () => ({
   }),
 }));
 
+const mockCancelEvent = jest.fn();
+const mockCompleteEvent = jest.fn();
+
 jest.mock('../lib/events', () => {
   const actual = jest.requireActual('../lib/events');
   return {
     ...actual,
     selfReportAttendance: (...args: unknown[]) => mockSelfReport(...args),
+    cancelEvent: (...args: unknown[]) => mockCancelEvent(...args),
+    completeEvent: (...args: unknown[]) => mockCompleteEvent(...args),
   };
 });
 
@@ -97,7 +102,9 @@ function makeDetail(overrides: Partial<EventDetail> = {}): EventDetail {
     title: 'Bondi Hoops',
     sport: 'basketball',
     mode: 'casual',
-    startsAt: '2030-06-01T18:00:00Z',
+    // Past startsAt so attendance is open by default; lifecycle tests
+    // override with a future timestamp where the gate matters.
+    startsAt: '2020-06-01T18:00:00Z',
     locationText: 'Bondi Court',
     capacity: 10,
     participantCount: 4,
@@ -313,5 +320,121 @@ describe('BattleDetailScreen', () => {
     // Badge is hidden — neither the level nor the fallback should appear.
     expect(queryByText('New player')).toBeNull();
     expect(queryByText('Captain')).toBeNull();
+  });
+
+  // ── Event lifecycle ───────────────────────────────────────────────────
+
+  function stubConfirmingAlert(action: string) {
+    return jest
+      .spyOn(require('react-native').Alert, 'alert')
+      .mockImplementation((...args: unknown[]) => {
+        const buttons = args[2];
+        if (!Array.isArray(buttons)) return;
+        const btn = (
+          buttons as { text: string; onPress?: () => void }[]
+        ).find((b) => b.text === action);
+        btn?.onPress?.();
+      });
+  }
+
+  it('host sees Cancel and Complete CTAs on a started open event', () => {
+    mockCurrentUserId = 'host-1';
+    const { getByLabelText } = renderScreen(makeDetail());
+    getByLabelText('Cancel game');
+    getByLabelText('Complete game');
+  });
+
+  it('Complete CTA is disabled before starts_at', () => {
+    mockCurrentUserId = 'host-1';
+    const { getByLabelText } = renderScreen(
+      makeDetail({ startsAt: '2099-01-01T00:00:00Z' })
+    );
+    const btn = getByLabelText('Complete game');
+    expect(
+      btn.props.accessibilityState?.disabled ?? btn.props.disabled
+    ).toBeTruthy();
+  });
+
+  it('host attendance section is hidden before starts_at', () => {
+    mockCurrentUserId = 'host-1';
+    const { queryByLabelText, getByText } = renderScreen(
+      makeDetail({ startsAt: '2099-01-01T00:00:00Z' })
+    );
+    expect(queryByLabelText('Confirm attendance')).toBeNull();
+    getByText('Attendance opens after the game starts.');
+  });
+
+  it('participant self-attendance is hidden before starts_at', () => {
+    mockCurrentUserId = 'viewer-1';
+    const { queryByText, queryByLabelText } = renderScreen(
+      makeDetail({ hasJoined: true, startsAt: '2099-01-01T00:00:00Z' })
+    );
+    expect(queryByText('Did you attend this game?')).toBeNull();
+    expect(queryByLabelText('Yes, I attended')).toBeNull();
+  });
+
+  it('participant self-attendance is visible after starts_at', () => {
+    mockCurrentUserId = 'viewer-1';
+    const { getByLabelText } = renderScreen(
+      makeDetail({ hasJoined: true })
+    );
+    getByLabelText('Yes, I attended');
+  });
+
+  it('cancelled event hides Join, host controls, and self-attendance', () => {
+    mockCurrentUserId = 'viewer-1';
+    const { queryByLabelText, queryByText } = renderScreen(
+      makeDetail({ status: 'cancelled', hasJoined: true })
+    );
+    expect(queryByLabelText('Join this game')).toBeNull();
+    expect(queryByLabelText('Leave this game')).toBeNull();
+    expect(queryByLabelText('Yes, I attended')).toBeNull();
+    expect(queryByText('Did you attend this game?')).toBeNull();
+  });
+
+  it('completed event allows host attendance correction and participant self-report', () => {
+    mockCurrentUserId = 'host-1';
+    const { getByLabelText } = renderScreen(
+      makeDetail({ status: 'completed' })
+    );
+    getByLabelText('Confirm attendance');
+
+    mockCurrentUserId = 'viewer-1';
+    const second = renderScreen(
+      makeDetail({ status: 'completed', hasJoined: true })
+    );
+    second.getByLabelText('Yes, I attended');
+  });
+
+  it('Cancel game CTA prompts and calls cancelEvent on confirm', async () => {
+    mockCurrentUserId = 'host-1';
+    mockCancelEvent.mockResolvedValueOnce(undefined);
+    const alertSpy = stubConfirmingAlert('Cancel game');
+    const { getByLabelText } = renderScreen(makeDetail());
+    await act(async () => {
+      fireEvent.press(getByLabelText('Cancel game'));
+    });
+    expect(mockCancelEvent).toHaveBeenCalledWith('e1');
+    alertSpy.mockRestore();
+  });
+
+  it('Complete game CTA prompts and calls completeEvent on confirm', async () => {
+    mockCurrentUserId = 'host-1';
+    mockCompleteEvent.mockResolvedValueOnce(undefined);
+    const alertSpy = stubConfirmingAlert('Complete game');
+    const { getByLabelText } = renderScreen(makeDetail());
+    await act(async () => {
+      fireEvent.press(getByLabelText('Complete game'));
+    });
+    expect(mockCompleteEvent).toHaveBeenCalledWith('e1');
+    alertSpy.mockRestore();
+  });
+
+  it('copy never claims instant Honor / AI moderation / leaderboard', () => {
+    mockCurrentUserId = 'host-1';
+    const { queryByText } = renderScreen(makeDetail());
+    expect(queryByText(/AI moderation/i)).toBeNull();
+    expect(queryByText(/leaderboard/i)).toBeNull();
+    expect(queryByText(/instant honor/i)).toBeNull();
   });
 });

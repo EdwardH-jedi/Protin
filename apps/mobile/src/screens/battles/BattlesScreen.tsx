@@ -237,11 +237,19 @@ interface BattleCardProps {
 
 function BattleCard({ event, onPress }: BattleCardProps) {
   const isFull = event.status === 'full' || event.spotsLeft <= 0;
-  const ctaLabel = event.hasJoined
-    ? 'View'
-    : isFull
-      ? 'Full'
-      : 'Join';
+  const isCancelled = event.status === 'cancelled';
+  const isCompleted = event.status === 'completed';
+  // Terminal-state events always show the status label; the detail
+  // screen handles the rest of the lifecycle.
+  const ctaLabel = isCancelled
+    ? 'Cancelled'
+    : isCompleted
+      ? 'Completed'
+      : event.hasJoined
+        ? 'View'
+        : isFull
+          ? 'Full'
+          : 'Join';
 
   // Host honor pill on the card. Cached at the lib layer so duplicate
   // host_user_ids in the list don't fan out into per-card requests.
@@ -303,15 +311,17 @@ function BattleCard({ event, onPress }: BattleCardProps) {
         <View
           style={[
             styles.cta,
-            event.hasJoined && styles.ctaJoined,
-            isFull && !event.hasJoined && styles.ctaFull,
+            event.hasJoined && !isCancelled && !isCompleted && styles.ctaJoined,
+            (isCancelled || isCompleted || (isFull && !event.hasJoined)) &&
+              styles.ctaFull,
           ]}
         >
           <Text
             style={[
               styles.ctaText,
-              event.hasJoined && styles.ctaTextJoined,
-              isFull && !event.hasJoined && styles.ctaTextFull,
+              event.hasJoined && !isCancelled && !isCompleted && styles.ctaTextJoined,
+              (isCancelled || isCompleted || (isFull && !event.hasJoined)) &&
+                styles.ctaTextFull,
             ]}
           >
             {ctaLabel}
