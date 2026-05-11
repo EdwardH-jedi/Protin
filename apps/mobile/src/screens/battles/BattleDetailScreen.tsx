@@ -9,8 +9,10 @@ import {
   View,
 } from 'react-native';
 
+import { HonorBadge } from '../../components/HonorBadge';
 import { Screen } from '../../components/Screen';
 import { useEventDetail } from '../../hooks/useEvents';
+import { useUserHonorSummary } from '../../hooks/useUserHonorSummary';
 import {
   type SelfAttendanceStatus,
   attendanceStatusLabel,
@@ -28,6 +30,13 @@ export function BattleDetailScreen({ navigation, route }: BattleDetailScreenProp
     eventId,
   });
   const currentUserId = useAuthStore((s) => s.user?.id ?? null);
+  // Surface host Honor at the decision point. Cached at the lib layer
+  // so duplicate host_user_ids across the Battle list don't re-fetch.
+  const {
+    summary: hostHonor,
+    isLoading: hostHonorLoading,
+    error: hostHonorError,
+  } = useUserHonorSummary({ userId: detail?.hostUserId ?? null });
   const [isActing, setIsActing] = useState(false);
   const [selfReportSaving, setSelfReportSaving] = useState(false);
   const [selfReportError, setSelfReportError] = useState<string | null>(null);
@@ -187,6 +196,23 @@ export function BattleDetailScreen({ navigation, route }: BattleDetailScreenProp
                 <Text style={styles.hostName}>{detail.host.displayName}</Text>
                 <Text style={styles.hostMeta}>SportsGang host</Text>
               </View>
+              {/*
+                Hide the pill ONLY on a hard error (network/server).
+                404 / null userId flow through as summary=null and
+                render the badge's "New player" fallback.
+              */}
+              {hostHonorError ? null : (
+                <HonorBadge
+                  honorLevel={hostHonor?.honorLevel ?? null}
+                  honorScore={hostHonor?.honorScore ?? null}
+                  isLoading={hostHonorLoading && !hostHonor}
+                  accessibilityLabel={
+                    hostHonor
+                      ? `Host honor ${hostHonor.honorLevel} ${hostHonor.honorScore}`
+                      : 'Host honor unavailable'
+                  }
+                />
+              )}
             </View>
           </View>
         ) : null}

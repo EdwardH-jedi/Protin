@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
+import { HonorBadge } from '../../components/HonorBadge';
 import { Screen } from '../../components/Screen';
 import { useEvents } from '../../hooks/useEvents';
+import { useUserHonorSummary } from '../../hooks/useUserHonorSummary';
 import {
   BATTLE_SPORTS,
   type EventMode,
@@ -241,6 +243,14 @@ function BattleCard({ event, onPress }: BattleCardProps) {
       ? 'Full'
       : 'Join';
 
+  // Host honor pill on the card. Cached at the lib layer so duplicate
+  // host_user_ids in the list don't fan out into per-card requests.
+  const {
+    summary: hostSummary,
+    isLoading: hostHonorLoading,
+    error: hostHonorError,
+  } = useUserHonorSummary({ userId: event.hostUserId });
+
   return (
     <Pressable
       onPress={onPress}
@@ -262,6 +272,30 @@ function BattleCard({ event, onPress }: BattleCardProps) {
       <Text style={styles.cardMetaSecondary} numberOfLines={1}>
         {event.locationText}
       </Text>
+      <View style={styles.cardHonorRow}>
+        <Text style={styles.cardHonorHost} numberOfLines={1}>
+          Host - {event.host?.displayName ?? 'SportsGang host'}
+        </Text>
+        {/*
+          Hide the pill ONLY on a hard error so a network/server
+          failure isn't mislabelled as "New player". 404 and null
+          userId both yield summary=null with error=null and flow
+          through to the badge's "New player" fallback.
+        */}
+        {hostHonorError ? null : (
+          <HonorBadge
+            honorLevel={hostSummary?.honorLevel ?? null}
+            honorScore={hostSummary?.honorScore ?? null}
+            isLoading={hostHonorLoading && !hostSummary}
+            compact
+            accessibilityLabel={
+              hostSummary
+                ? `Host honor ${hostSummary.honorLevel}`
+                : 'Host honor unavailable'
+            }
+          />
+        )}
+      </View>
       <View style={styles.cardFooter}>
         <Text style={styles.cardCount}>
           {event.participantCount}/{event.capacity} in
@@ -417,6 +451,18 @@ const styles = StyleSheet.create({
   cardMetaSecondary: {
     ...typography.body,
     color: colors.textSecondary,
+  },
+  cardHonorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  cardHonorHost: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
+    flexShrink: 1,
   },
   cardFooter: {
     flexDirection: 'row',

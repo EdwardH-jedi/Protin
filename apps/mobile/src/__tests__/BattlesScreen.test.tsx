@@ -27,6 +27,25 @@ jest.mock('../hooks/useEvents', () => ({
   },
 }));
 
+let mockHonorSummary: { honorLevel: string; honorScore: number } | null = {
+  honorLevel: 'Trusted',
+  honorScore: 126,
+};
+let mockHonorLoading = false;
+let mockHonorError: string | null = null;
+const honorCalls: string[] = [];
+
+jest.mock('../hooks/useUserHonorSummary', () => ({
+  useUserHonorSummary: ({ userId }: { userId: string | null }) => {
+    if (userId) honorCalls.push(userId);
+    return {
+      summary: mockHonorSummary,
+      isLoading: mockHonorLoading,
+      error: mockHonorError,
+    };
+  },
+}));
+
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: (cb: () => void | (() => void)) => {
     const React = require('react');
@@ -96,6 +115,10 @@ describe('BattlesScreen', () => {
     jest.clearAllMocks();
     mockHookState = { items: [], isLoading: false, error: null };
     lastHookArgs = {};
+    mockHonorSummary = { honorLevel: 'Trusted', honorScore: 126 };
+    mockHonorLoading = false;
+    mockHonorError = null;
+    honorCalls.length = 0;
   });
 
   it('renders the header and filter chips', () => {
@@ -216,5 +239,39 @@ describe('BattlesScreen', () => {
     getByText('Network down');
     fireEvent.press(getByLabelText('Retry loading battles'));
     expect(mockRefresh).toHaveBeenCalled();
+  });
+
+  // ── Honor badge on event cards ────────────────────────────────────────────
+
+  it('shows the host Honor badge on event cards when summary is available', () => {
+    mockHookState.items = [makeEvent({ hostUserId: 'host-1', title: 'Hoops' })];
+    const { getByText } = render(
+      <BattlesScreen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    getByText('Trusted');
+  });
+
+  it('falls back to "New player" when host honor unavailable', () => {
+    mockHonorSummary = null;
+    mockHookState.items = [makeEvent({ hostUserId: 'host-1' })];
+    const { getByText } = render(
+      <BattlesScreen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    getByText('New player');
+  });
+
+  it('still renders event cards when honor fetch errors', () => {
+    mockHonorSummary = null;
+    mockHonorError = 'Network down';
+    mockHookState.items = [
+      makeEvent({ id: 'e-network', title: 'Still visible' }),
+    ];
+    const { getByText, queryByText } = render(
+      <BattlesScreen navigation={makeNavigation() as any} route={{} as any} />
+    );
+    // Card renders even though honor lookup failed.
+    getByText('Still visible');
+    // Hard error must NOT be mislabelled as "New player".
+    expect(queryByText('New player')).toBeNull();
   });
 });

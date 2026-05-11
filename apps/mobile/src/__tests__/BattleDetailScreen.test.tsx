@@ -38,6 +38,21 @@ jest.mock('../lib/events', () => {
   };
 });
 
+let mockHostHonor: { honorLevel: string; honorScore: number } | null = {
+  honorLevel: 'Captain',
+  honorScore: 170,
+};
+let mockHostHonorLoading = false;
+let mockHostHonorError: string | null = null;
+
+jest.mock('../hooks/useUserHonorSummary', () => ({
+  useUserHonorSummary: () => ({
+    summary: mockHostHonor,
+    isLoading: mockHostHonorLoading,
+    error: mockHostHonorError,
+  }),
+}));
+
 let mockCurrentUserId: string | null = 'viewer-1';
 jest.mock('../stores/auth', () => ({
   useAuthStore: (selector: (s: { user: { id: string } | null }) => unknown) =>
@@ -114,6 +129,9 @@ describe('BattleDetailScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCurrentUserId = 'viewer-1';
+    mockHostHonor = { honorLevel: 'Captain', honorScore: 170 };
+    mockHostHonorLoading = false;
+    mockHostHonorError = null;
   });
 
   it('renders title, location, host, and the no-show warning copy', () => {
@@ -267,5 +285,33 @@ describe('BattleDetailScreen', () => {
       fireEvent.press(getByLabelText('Yes, I attended'));
     });
     await findByText('Network down');
+  });
+
+  // ── Honor badge in host section ────────────────────────────────────────
+
+  it('renders the host Honor badge in the host section', () => {
+    const { getByText } = renderScreen(makeDetail());
+    getByText('Captain');
+    // ASCII hyphen separator (not the middle-dot that mojibakes).
+    getByText('- 170');
+  });
+
+  it('falls back to "New player" when host honor summary is null', () => {
+    mockHostHonor = null;
+    const { getByText } = renderScreen(makeDetail());
+    getByText('New player');
+  });
+
+  it('hides the host Honor badge on hard error (no "New player" leak)', () => {
+    mockHostHonor = null;
+    mockHostHonorError = 'Network down';
+    const { queryByText, getByText } = renderScreen(
+      makeDetail({ title: 'Visible Detail' })
+    );
+    // Screen still renders.
+    getByText('Visible Detail');
+    // Badge is hidden — neither the level nor the fallback should appear.
+    expect(queryByText('New player')).toBeNull();
+    expect(queryByText('Captain')).toBeNull();
   });
 });
