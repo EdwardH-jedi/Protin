@@ -28,6 +28,7 @@ import { TournamentDetailScreen } from '../screens/tournaments/TournamentDetailS
 import { BattlesScreen } from '../screens/battles/BattlesScreen';
 import { BattleDetailScreen } from '../screens/battles/BattleDetailScreen';
 import { CreateBattleScreen } from '../screens/battles/CreateBattleScreen';
+import { AttendanceCheckScreen } from '../screens/battles/AttendanceCheckScreen';
 
 import { registerForPushNotifications, configureForegroundHandler } from '../lib/notifications';
 import { useAuthStore } from '../stores/auth';
@@ -234,6 +235,11 @@ export function RootNavigator() {
           name="CreateBattle"
           component={CreateBattleScreen}
           options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="AttendanceCheck"
+          component={AttendanceCheckScreen}
+          options={{ animation: 'slide_from_right' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

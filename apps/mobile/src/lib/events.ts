@@ -8,11 +8,17 @@
 
 import { api } from './api';
 import type {
+  AttendanceEntry,
+  AttendanceListResponse,
+  AttendanceStatus,
   CreateEventRequest,
   EventDetail,
   EventListResponse,
   EventMode,
   EventSummary,
+  HostAttendanceUpdateRequest,
+  SelfAttendanceRequest,
+  SelfAttendanceStatus,
 } from '@protin/shared-types';
 
 export type {
@@ -23,6 +29,14 @@ export type {
   EventStatus,
   EventSummary,
   EventVisibility,
+  EventParticipantSummary,
+  AttendanceStatus,
+  SelfAttendanceStatus,
+  ParticipantLifecycleStatus,
+  AttendanceEntry,
+  AttendanceListResponse,
+  HostAttendanceUpdateRequest,
+  SelfAttendanceRequest,
 } from '@protin/shared-types';
 
 export interface ListEventsParams {
@@ -64,6 +78,43 @@ export async function joinEvent(eventId: string): Promise<EventDetail> {
 
 export async function leaveEvent(eventId: string): Promise<EventDetail> {
   return api.post<EventDetail>(`/events/${eventId}/leave`);
+}
+
+// ---------------------------------------------------------------------------
+// Attendance
+// ---------------------------------------------------------------------------
+
+export async function getEventAttendance(
+  eventId: string
+): Promise<AttendanceListResponse> {
+  return api.get<AttendanceListResponse>(`/events/${eventId}/attendance`);
+}
+
+export async function hostUpdateAttendance(
+  eventId: string,
+  body: HostAttendanceUpdateRequest
+): Promise<AttendanceEntry> {
+  return api.post<AttendanceEntry>(`/events/${eventId}/attendance`, body);
+}
+
+export async function selfReportAttendance(
+  eventId: string,
+  body: SelfAttendanceRequest
+): Promise<AttendanceEntry> {
+  return api.post<AttendanceEntry>(`/events/${eventId}/attendance/self`, body);
+}
+
+export function attendanceStatusLabel(s: AttendanceStatus): string {
+  switch (s) {
+    case 'pending':
+      return 'Pending';
+    case 'attended':
+      return 'Attended';
+    case 'no_show':
+      return 'No-show';
+    case 'excused':
+      return 'Excused';
+  }
 }
 
 // ---------------------------------------------------------------------------

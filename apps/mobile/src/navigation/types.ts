@@ -24,6 +24,7 @@ export type RootStackParamList = {
   Battles: undefined;
   BattleDetail: { eventId: string };
   CreateBattle: undefined;
+  AttendanceCheck: { eventId: string };
 };
 
 /**
@@ -64,3 +65,4 @@ export type TournamentDetailScreenProps = NativeStackScreenProps<RootStackParamL
 export type BattlesScreenProps = NativeStackScreenProps<RootStackParamList, 'Battles'>;
 export type BattleDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'BattleDetail'>;
 export type CreateBattleScreenProps = NativeStackScreenProps<RootStackParamList, 'CreateBattle'>;
+export type AttendanceCheckScreenProps = NativeStackScreenProps<RootStackParamList, 'AttendanceCheck'>;

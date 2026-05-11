@@ -551,3 +551,487 @@ async def test_private_event_join_blocked_for_outsider(client: AsyncClient) -> N
     # And the outsider still cannot read the detail (the bypass is closed).
     detail = await client.get(f"/events/{event_id}", headers=_auth(outsider_tok))
     assert detail.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Attendance
+# ---------------------------------------------------------------------------
+
+
+def _attendance_for(items: list[dict], user_id: str) -> dict | None:
+    for it in items:
+        if it["participant_user_id"] == user_id:
+            return it
+    return None
+
+
+async def test_attendance_defaults_to_pending_for_host(client: AsyncClient) -> None:
+    """After event create, the host auto-join row is attendance=pending."""
+    await _wipe_events()
+    host_tok, host_uid = await _register(client, "evt_att_host@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+
+    r = await client.get(f"/events/{event_id}/attendance", headers=_auth(host_tok))
+    assert r.status_code == 200
+    body = r.json()
+    entry = _attendance_for(body["items"], host_uid)
+    assert entry is not None
+    assert entry["attendance_status"] == "pending"
+
+
+async def test_attendance_defaults_to_pending_after_join(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_att_p_host@example.com")
+    p_tok, p_uid = await _register(client, "evt_att_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+
+    r = await client.get(f"/events/{event_id}/attendance", headers=_auth(host_tok))
+    body = r.json()
+    entry = _attendance_for(body["items"], p_uid)
+    assert entry is not None
+    assert entry["attendance_status"] == "pending"
+
+
+async def test_host_marks_participant_attended(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_mark_host@example.com")
+    p_tok, p_uid = await _register(client, "evt_mark_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+
+    r = await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": p_uid, "attendance_status": "attended"},
+        headers=_auth(host_tok),
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["participant_user_id"] == p_uid
+    assert body["attendance_status"] == "attended"
+    assert body["attendance_confirmed_by_host_at"] is not None
+
+
+async def test_host_marks_participant_no_show(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_ns_host@example.com")
+    p_tok, p_uid = await _register(client, "evt_ns_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+
+    r = await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": p_uid, "attendance_status": "no_show"},
+        headers=_auth(host_tok),
+    )
+    assert r.status_code == 200
+    assert r.json()["attendance_status"] == "no_show"
+
+
+async def test_host_marks_participant_excused(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_exc_host@example.com")
+    p_tok, p_uid = await _register(client, "evt_exc_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+
+    r = await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": p_uid, "attendance_status": "excused"},
+        headers=_auth(host_tok),
+    )
+    assert r.status_code == 200
+    assert r.json()["attendance_status"] == "excused"
+
+
+async def test_host_can_reset_to_pending(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_reset_host@example.com")
+    p_tok, p_uid = await _register(client, "evt_reset_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+
+    await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": p_uid, "attendance_status": "attended"},
+        headers=_auth(host_tok),
+    )
+    r = await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": p_uid, "attendance_status": "pending"},
+        headers=_auth(host_tok),
+    )
+    assert r.status_code == 200
+    assert r.json()["attendance_status"] == "pending"
+
+
+async def test_non_host_cannot_mark_others(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_nh_host@example.com")
+    a_tok, a_uid = await _register(client, "evt_nh_a@example.com")
+    b_tok, _ = await _register(client, "evt_nh_b@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(a_tok))
+    await client.post(f"/events/{event_id}/join", headers=_auth(b_tok))
+
+    r = await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": a_uid, "attendance_status": "attended"},
+        headers=_auth(b_tok),
+    )
+    assert r.status_code == 403
+
+
+async def test_host_cannot_mark_non_participant(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_np_host@example.com")
+    _, outsider_uid = await _register(client, "evt_np_out@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+
+    r = await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": outsider_uid, "attendance_status": "no_show"},
+        headers=_auth(host_tok),
+    )
+    assert r.status_code == 404
+
+
+async def test_invalid_attendance_status_rejected(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_inv_host@example.com")
+    p_tok, p_uid = await _register(client, "evt_inv_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+
+    r = await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": p_uid, "attendance_status": "showed_up"},
+        headers=_auth(host_tok),
+    )
+    assert r.status_code == 422
+
+
+async def test_left_participant_cannot_be_marked(client: AsyncClient) -> None:
+    """Left participants are frozen — no_show is a different outcome."""
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_left_host@example.com")
+    p_tok, p_uid = await _register(client, "evt_left_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+    await client.post(f"/events/{event_id}/leave", headers=_auth(p_tok))
+
+    r = await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": p_uid, "attendance_status": "no_show"},
+        headers=_auth(host_tok),
+    )
+    assert r.status_code == 422
+    assert "left" in r.json()["detail"].lower()
+
+
+# --- Self-report -----------------------------------------------------------
+
+
+async def test_participant_can_self_report_attended(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_sr_host@example.com")
+    p_tok, p_uid = await _register(client, "evt_sr_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+
+    r = await client.post(
+        f"/events/{event_id}/attendance/self",
+        json={"attendance_status": "attended"},
+        headers=_auth(p_tok),
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["participant_user_id"] == p_uid
+    assert body["attendance_status"] == "attended"
+    assert body["attendance_self_reported_at"] is not None
+
+
+async def test_participant_can_self_report_excused(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_sx_host@example.com")
+    p_tok, _ = await _register(client, "evt_sx_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+
+    r = await client.post(
+        f"/events/{event_id}/attendance/self",
+        json={"attendance_status": "excused"},
+        headers=_auth(p_tok),
+    )
+    assert r.status_code == 200
+    assert r.json()["attendance_status"] == "excused"
+
+
+async def test_participant_cannot_self_report_no_show(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_sn_host@example.com")
+    p_tok, _ = await _register(client, "evt_sn_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+
+    r = await client.post(
+        f"/events/{event_id}/attendance/self",
+        json={"attendance_status": "no_show"},
+        headers=_auth(p_tok),
+    )
+    assert r.status_code == 422
+
+
+async def test_non_participant_cannot_self_report(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_xnp_host@example.com")
+    outsider_tok, _ = await _register(client, "evt_xnp_out@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+
+    r = await client.post(
+        f"/events/{event_id}/attendance/self",
+        json={"attendance_status": "attended"},
+        headers=_auth(outsider_tok),
+    )
+    assert r.status_code == 403
+
+
+async def test_left_participant_cannot_self_report(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_lsr_host@example.com")
+    p_tok, _ = await _register(client, "evt_lsr_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+    await client.post(f"/events/{event_id}/leave", headers=_auth(p_tok))
+
+    r = await client.post(
+        f"/events/{event_id}/attendance/self",
+        json={"attendance_status": "attended"},
+        headers=_auth(p_tok),
+    )
+    assert r.status_code == 403
+
+
+# --- GET /attendance scoping ----------------------------------------------
+
+
+async def test_host_sees_all_participants_attendance(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, host_uid = await _register(client, "evt_get_host@example.com")
+    a_tok, a_uid = await _register(client, "evt_get_a@example.com")
+    b_tok, b_uid = await _register(client, "evt_get_b@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(a_tok))
+    await client.post(f"/events/{event_id}/join", headers=_auth(b_tok))
+
+    r = await client.get(f"/events/{event_id}/attendance", headers=_auth(host_tok))
+    assert r.status_code == 200
+    ids = {it["participant_user_id"] for it in r.json()["items"]}
+    assert ids == {host_uid, a_uid, b_uid}
+
+
+async def test_participant_only_sees_own_attendance(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_self_host@example.com")
+    a_tok, a_uid = await _register(client, "evt_self_a@example.com")
+    b_tok, _ = await _register(client, "evt_self_b@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(a_tok))
+    await client.post(f"/events/{event_id}/join", headers=_auth(b_tok))
+
+    r = await client.get(f"/events/{event_id}/attendance", headers=_auth(a_tok))
+    assert r.status_code == 200
+    ids = [it["participant_user_id"] for it in r.json()["items"]]
+    assert ids == [a_uid]
+
+
+async def test_non_participant_cannot_read_attendance(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_out_host@example.com")
+    outsider_tok, _ = await _register(client, "evt_out_out@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+
+    r = await client.get(
+        f"/events/{event_id}/attendance", headers=_auth(outsider_tok)
+    )
+    assert r.status_code == 404
+
+
+# --- Cancelled / completed event behavior ----------------------------------
+
+
+async def _set_event_status(event_id: str, new_status: str) -> None:
+    from uuid import UUID
+
+    from sqlalchemy import update
+
+    from app.models.event import Event
+
+    async with _TestSession() as db:
+        await db.execute(
+            update(Event).where(Event.id == UUID(event_id)).values(status=new_status)
+        )
+        await db.commit()
+
+
+async def test_cancelled_event_attendance_update_rejected(client: AsyncClient) -> None:
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_cxl_host@example.com")
+    p_tok, p_uid = await _register(client, "evt_cxl_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+
+    await _set_event_status(event_id, "cancelled")
+
+    r_host = await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": p_uid, "attendance_status": "attended"},
+        headers=_auth(host_tok),
+    )
+    assert r_host.status_code == 422
+
+    r_self = await client.post(
+        f"/events/{event_id}/attendance/self",
+        json={"attendance_status": "attended"},
+        headers=_auth(p_tok),
+    )
+    assert r_self.status_code == 422
+
+
+async def test_completed_event_attendance_update_allowed(client: AsyncClient) -> None:
+    """Completed events stay editable so the host can correct a mark."""
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_done_host@example.com")
+    p_tok, p_uid = await _register(client, "evt_done_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+
+    await _set_event_status(event_id, "completed")
+
+    r = await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": p_uid, "attendance_status": "attended"},
+        headers=_auth(host_tok),
+    )
+    assert r.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Privacy regression: attendance never leaks through general event detail,
+# and private-event outsiders are hidden from all attendance endpoints.
+# ---------------------------------------------------------------------------
+
+
+async def test_general_event_detail_does_not_leak_attendance_status(
+    client: AsyncClient,
+) -> None:
+    """
+    GET /events/{id} must NOT include attendance_status on participant
+    summaries. Attendance data is served only by /attendance, which
+    scopes results to host / self.
+    """
+    await _wipe_events()
+    host_tok, _ = await _register(client, "evt_leak_host@example.com")
+    p_tok, p_uid = await _register(client, "evt_leak_p@example.com")
+    created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
+    event_id = created.json()["id"]
+    await client.post(f"/events/{event_id}/join", headers=_auth(p_tok))
+
+    # Host marks the joiner — this would be the value most likely to
+    # leak if /events/{id} happened to surface it.
+    await client.post(
+        f"/events/{event_id}/attendance",
+        json={"participant_user_id": p_uid, "attendance_status": "no_show"},
+        headers=_auth(host_tok),
+    )
+
+    r = await client.get(f"/events/{event_id}", headers=_auth(host_tok))
+    assert r.status_code == 200
+    body = r.json()
+    # The participant array must be present but every entry must omit
+    # the attendance field. Belt-and-braces: also check the response
+    # body string for "attendance" so any new attendance-shaped field
+    # added to the participants payload trips this test.
+    assert body["participants"], "expected at least one participant"
+    for p in body["participants"]:
+        assert "attendance_status" not in p
+        assert "attendanceStatus" not in p
+    # Outer event payload also shouldn't carry attendance data.
+    assert "attendance_status" not in body
+    assert "attendanceStatus" not in body
+
+
+async def test_private_event_outsider_cannot_get_attendance(
+    client: AsyncClient,
+) -> None:
+    """Hide-as-404, not 403, for private-event outsiders."""
+    await _wipe_events()
+    host_tok, host_uid = await _register(client, "evt_pga_host@example.com")
+    outsider_tok, _ = await _register(client, "evt_pga_out@example.com")
+    event_id = await _seed_private_event(host_user_id=host_uid)
+
+    r = await client.get(
+        f"/events/{event_id}/attendance", headers=_auth(outsider_tok)
+    )
+    assert r.status_code == 404
+
+
+async def test_private_event_outsider_cannot_host_update_attendance(
+    client: AsyncClient,
+) -> None:
+    """
+    Outsider trying the host endpoint on a private event must get 404,
+    not 403 — 403 would advertise that the event exists.
+    """
+    await _wipe_events()
+    host_tok, host_uid = await _register(client, "evt_pha_host@example.com")
+    outsider_tok, outsider_uid = await _register(client, "evt_pha_out@example.com")
+    event_id = await _seed_private_event(host_user_id=host_uid)
+
+    r = await client.post(
+        f"/events/{event_id}/attendance",
+        json={
+            "participant_user_id": outsider_uid,
+            "attendance_status": "attended",
+        },
+        headers=_auth(outsider_tok),
+    )
+    assert r.status_code == 404
+
+
+async def test_private_event_outsider_cannot_self_report_attendance(
+    client: AsyncClient,
+) -> None:
+    """Outsider on private self-report endpoint must also see 404."""
+    await _wipe_events()
+    host_tok, host_uid = await _register(client, "evt_psa_host@example.com")
+    outsider_tok, _ = await _register(client, "evt_psa_out@example.com")
+    event_id = await _seed_private_event(host_user_id=host_uid)
+
+    r = await client.post(
+        f"/events/{event_id}/attendance/self",
+        json={"attendance_status": "attended"},
+        headers=_auth(outsider_tok),
+    )
+    assert r.status_code == 404

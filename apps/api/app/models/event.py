@@ -27,6 +27,25 @@ EVENT_MODES: frozenset[str] = frozenset({"casual", "ranked"})
 EVENT_VISIBILITIES: frozenset[str] = frozenset({"public", "private"})
 EVENT_PARTICIPANT_STATUSES: frozenset[str] = frozenset({"joined", "left"})
 
+# Attendance vocabulary. Kept as plain strings so future values
+# (e.g. "late") can be added without a DB migration.
+#
+#   pending     — default; outcome not yet recorded
+#   attended    — confirmed present
+#   no_show     — expected but did not attend; host-only mark
+#   excused     — could not attend with valid reason (illness, conflict);
+#                 self-report or host mark
+EVENT_ATTENDANCE_STATUSES: frozenset[str] = frozenset(
+    {"pending", "attended", "no_show", "excused"}
+)
+# Host can set any of these (including resetting back to pending).
+EVENT_ATTENDANCE_HOST_STATUSES: frozenset[str] = EVENT_ATTENDANCE_STATUSES
+# Participants self-report only positive / excused outcomes — they cannot
+# brand themselves as no_show, and resetting back to pending is host-only.
+EVENT_ATTENDANCE_SELF_STATUSES: frozenset[str] = frozenset(
+    {"attended", "excused"}
+)
+
 
 class Event(Base):
     """
@@ -82,6 +101,20 @@ class EventParticipant(Base):
     left_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Attendance lifecycle is independent of participant lifecycle.
+    # status='left' means the user departed before attendance was
+    # finalized; attendance_status='no_show' means they were expected
+    # and didn't appear. The two never get auto-merged.
+    attendance_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending", server_default="pending"
+    )
+    attendance_confirmed_by_host_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    attendance_self_reported_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    attendance_note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     __table_args__ = (
         # One active "joined" row per (event, user) is enforced in the

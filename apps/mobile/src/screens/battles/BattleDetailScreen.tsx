@@ -11,7 +11,14 @@ import {
 
 import { Screen } from '../../components/Screen';
 import { useEventDetail } from '../../hooks/useEvents';
-import { formatEventWhen, sportLabelForBattle } from '../../lib/events';
+import {
+  type SelfAttendanceStatus,
+  attendanceStatusLabel,
+  formatEventWhen,
+  selfReportAttendance,
+  sportLabelForBattle,
+} from '../../lib/events';
+import { useAuthStore } from '../../stores/auth';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { BattleDetailScreenProps } from '../../navigation/types';
 
@@ -20,7 +27,13 @@ export function BattleDetailScreen({ navigation, route }: BattleDetailScreenProp
   const { detail, isLoading, error, join, leave, refresh } = useEventDetail({
     eventId,
   });
+  const currentUserId = useAuthStore((s) => s.user?.id ?? null);
   const [isActing, setIsActing] = useState(false);
+  const [selfReportSaving, setSelfReportSaving] = useState(false);
+  const [selfReportError, setSelfReportError] = useState<string | null>(null);
+  const [selfReportSaved, setSelfReportSaved] = useState<SelfAttendanceStatus | null>(
+    null
+  );
 
   const handleJoin = useCallback(async () => {
     if (isActing) return;
@@ -87,6 +100,30 @@ export function BattleDetailScreen({ navigation, route }: BattleDetailScreenProp
   const isFull = detail.status === 'full' || detail.spotsLeft <= 0;
   const isCancelled = detail.status === 'cancelled';
   const isCompleted = detail.status === 'completed';
+  const isHost = currentUserId !== null && currentUserId === detail.hostUserId;
+  // Active joined non-host participant — eligible for self-report.
+  const isParticipant = detail.hasJoined && !isHost;
+  // Saved-state reflects only the self-report performed in this
+  // session. Persisted attendance is no longer leaked via GET
+  // /events/{id} — fetching it back would require a separate
+  // /attendance call which is out of scope for this patch.
+  const ownAttendanceStatus = selfReportSaved;
+
+  const handleSelfReport = async (statusValue: SelfAttendanceStatus) => {
+    if (selfReportSaving || !eventId) return;
+    setSelfReportSaving(true);
+    setSelfReportError(null);
+    try {
+      await selfReportAttendance(eventId, { attendanceStatus: statusValue });
+      setSelfReportSaved(statusValue);
+    } catch (err) {
+      setSelfReportError(
+        err instanceof Error ? err.message : 'Could not save attendance.'
+      );
+    } finally {
+      setSelfReportSaving(false);
+    }
+  };
 
   // Primary CTA selection. Order: Joined → Cancelled/Completed disabled →
   // Full disabled → Join.
@@ -166,6 +203,80 @@ export function BattleDetailScreen({ navigation, route }: BattleDetailScreenProp
             Only join if you can attend. No-shows affect your Honor.
           </Text>
         </View>
+
+        {isHost ? (
+          <View style={styles.attendanceSection}>
+            <Text style={styles.sectionLabel}>Attendance</Text>
+            <Text style={styles.attendanceCopy}>
+              Only mark no-show when the player clearly did not attend.
+            </Text>
+            <Pressable
+              onPress={() =>
+                navigation.navigate('AttendanceCheck', { eventId: detail.id })
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Confirm attendance"
+              style={({ pressed }) => [
+                styles.attendanceCta,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.attendanceCtaText}>Confirm attendance</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {isParticipant ? (
+          <View style={styles.attendanceSection}>
+            <Text style={styles.sectionLabel}>Did you attend this game?</Text>
+            <Text style={styles.attendanceCopy}>
+              Attendance helps keep Honor fair.
+            </Text>
+            {ownAttendanceStatus ? (
+              <Text
+                style={styles.attendanceSaved}
+                accessibilityLabel="Attendance saved"
+              >
+                Attendance saved · {attendanceStatusLabel(ownAttendanceStatus)}
+              </Text>
+            ) : null}
+            <View style={styles.attendanceButtonRow}>
+              <Pressable
+                onPress={() => void handleSelfReport('attended')}
+                disabled={selfReportSaving}
+                accessibilityRole="button"
+                accessibilityLabel="Yes, I attended"
+                style={({ pressed }) => [
+                  styles.attendanceButton,
+                  styles.attendanceButtonPrimary,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.attendanceButtonPrimaryText}>
+                  Yes, I attended
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void handleSelfReport('excused')}
+                disabled={selfReportSaving}
+                accessibilityRole="button"
+                accessibilityLabel="I could not attend"
+                style={({ pressed }) => [
+                  styles.attendanceButton,
+                  styles.attendanceButtonSecondary,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.attendanceButtonSecondaryText}>
+                  I could not attend
+                </Text>
+              </Pressable>
+            </View>
+            {selfReportError ? (
+              <Text style={styles.attendanceErrorText}>{selfReportError}</Text>
+            ) : null}
+          </View>
+        ) : null}
 
         <View style={styles.secondaryActions}>
           <SecondaryAction
@@ -501,4 +612,65 @@ const styles = StyleSheet.create({
     color: colors.brand,
   },
   pressed: { opacity: 0.65 },
+  attendanceSection: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.separator,
+    backgroundColor: colors.surface,
+    gap: spacing.xs,
+  },
+  attendanceCopy: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  attendanceCta: {
+    marginTop: spacing.xs,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radii.pill,
+    backgroundColor: colors.brand,
+    alignItems: 'center',
+  },
+  attendanceCtaText: {
+    ...typography.button,
+    color: colors.textInverse,
+  },
+  attendanceButtonRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  attendanceButton: {
+    flex: 1,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+  },
+  attendanceButtonPrimary: {
+    backgroundColor: colors.brand,
+  },
+  attendanceButtonPrimaryText: {
+    ...typography.button,
+    color: colors.textInverse,
+  },
+  attendanceButtonSecondary: {
+    borderWidth: 1,
+    borderColor: colors.brand,
+    backgroundColor: 'transparent',
+  },
+  attendanceButtonSecondaryText: {
+    ...typography.button,
+    color: colors.brand,
+  },
+  attendanceSaved: {
+    ...typography.bodySmall,
+    color: colors.brand,
+  },
+  attendanceErrorText: {
+    ...typography.bodySmall,
+    color: colors.error,
+    marginTop: spacing.xs,
+  },
 });

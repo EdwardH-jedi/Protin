@@ -19,6 +19,7 @@ let mockState: {
 const mockJoin = jest.fn();
 const mockLeave = jest.fn();
 const mockRefresh = jest.fn();
+const mockSelfReport = jest.fn();
 
 jest.mock('../hooks/useEvents', () => ({
   useEventDetail: () => ({
@@ -27,6 +28,20 @@ jest.mock('../hooks/useEvents', () => ({
     leave: mockLeave,
     refresh: mockRefresh,
   }),
+}));
+
+jest.mock('../lib/events', () => {
+  const actual = jest.requireActual('../lib/events');
+  return {
+    ...actual,
+    selfReportAttendance: (...args: unknown[]) => mockSelfReport(...args),
+  };
+});
+
+let mockCurrentUserId: string | null = 'viewer-1';
+jest.mock('../stores/auth', () => ({
+  useAuthStore: (selector: (s: { user: { id: string } | null }) => unknown) =>
+    selector({ user: mockCurrentUserId ? { id: mockCurrentUserId } : null }),
 }));
 
 jest.mock('../components/Screen', () => {
@@ -98,6 +113,7 @@ function renderScreen(detail: EventDetail | null) {
 describe('BattleDetailScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCurrentUserId = 'viewer-1';
   });
 
   it('renders title, location, host, and the no-show warning copy', () => {
@@ -168,5 +184,88 @@ describe('BattleDetailScreen', () => {
     const { getByLabelText, navigation } = renderScreen(makeDetail());
     fireEvent.press(getByLabelText('Back'));
     expect(navigation.goBack).toHaveBeenCalled();
+  });
+
+  // ── Attendance ───────────────────────────────────────────────────────────
+
+  it('shows the host Confirm attendance CTA when current user is host', () => {
+    mockCurrentUserId = 'host-1';
+    const { getByLabelText } = renderScreen(makeDetail({ hasJoined: true }));
+    getByLabelText('Confirm attendance');
+  });
+
+  it('navigates to AttendanceCheck when host taps Confirm attendance', () => {
+    mockCurrentUserId = 'host-1';
+    const { getByLabelText, navigation } = renderScreen(
+      makeDetail({ hasJoined: true })
+    );
+    fireEvent.press(getByLabelText('Confirm attendance'));
+    expect(navigation.navigate).toHaveBeenCalledWith('AttendanceCheck', {
+      eventId: 'e1',
+    });
+  });
+
+  it('shows participant self-attendance CTAs when joined and not host', () => {
+    mockCurrentUserId = 'viewer-1';
+    const { getByLabelText, getByText } = renderScreen(
+      makeDetail({ hasJoined: true })
+    );
+    getByText('Did you attend this game?');
+    getByText('Attendance helps keep Honor fair.');
+    getByLabelText('Yes, I attended');
+    getByLabelText('I could not attend');
+  });
+
+  it('does not show attendance CTAs for non-participants', () => {
+    mockCurrentUserId = 'viewer-1';
+    const { queryByLabelText, queryByText } = renderScreen(
+      makeDetail({ hasJoined: false })
+    );
+    expect(queryByText('Did you attend this game?')).toBeNull();
+    expect(queryByLabelText('Confirm attendance')).toBeNull();
+  });
+
+  it('does not show participant self-attendance section to the host', () => {
+    mockCurrentUserId = 'host-1';
+    const { queryByText } = renderScreen(makeDetail({ hasJoined: true }));
+    expect(queryByText('Did you attend this game?')).toBeNull();
+  });
+
+  it('calls selfReportAttendance and shows saved state on tap', async () => {
+    mockCurrentUserId = 'viewer-1';
+    mockSelfReport.mockResolvedValueOnce({
+      eventId: 'e1',
+      participantUserId: 'viewer-1',
+      displayName: 'Me',
+      participantStatus: 'joined',
+      attendanceStatus: 'attended',
+      joinedAt: '2026-01-01T00:00:00Z',
+      leftAt: null,
+      attendanceConfirmedByHostAt: null,
+      attendanceSelfReportedAt: '2026-01-01T00:01:00Z',
+      attendanceNote: null,
+    });
+    const { getByLabelText, findByText } = renderScreen(
+      makeDetail({ hasJoined: true })
+    );
+    await act(async () => {
+      fireEvent.press(getByLabelText('Yes, I attended'));
+    });
+    expect(mockSelfReport).toHaveBeenCalledWith('e1', {
+      attendanceStatus: 'attended',
+    });
+    await findByText(/Attendance saved/);
+  });
+
+  it('renders an error message when self-report fails', async () => {
+    mockCurrentUserId = 'viewer-1';
+    mockSelfReport.mockRejectedValueOnce(new Error('Network down'));
+    const { getByLabelText, findByText } = renderScreen(
+      makeDetail({ hasJoined: true })
+    );
+    await act(async () => {
+      fireEvent.press(getByLabelText('Yes, I attended'));
+    });
+    await findByText('Network down');
   });
 });

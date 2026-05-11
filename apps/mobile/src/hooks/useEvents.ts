@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import {
+  type AttendanceListResponse,
+  type AttendanceStatus,
   type EventDetail,
   type EventListResponse,
   type EventMode,
   type EventSummary,
+  type HostAttendanceUpdateRequest,
+  type SelfAttendanceStatus,
   getEvent,
+  getEventAttendance,
+  hostUpdateAttendance,
   joinEvent,
   leaveEvent,
   listEvents,
+  selfReportAttendance,
 } from '../lib/events';
 
 interface UseEventsArgs {
@@ -91,3 +98,79 @@ export function useEventDetail({ eventId, enabled = true }: UseEventDetailArgs) 
 
   return { detail, isLoading, error, join, leave, refresh };
 }
+
+interface UseEventAttendanceArgs {
+  eventId: string | null;
+  enabled?: boolean;
+}
+
+export function useEventAttendance({
+  eventId,
+  enabled = true,
+}: UseEventAttendanceArgs) {
+  const [data, setData] = useState<AttendanceListResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!enabled || !eventId) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await getEventAttendance(eventId);
+      setData(res);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not load attendance.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [eventId, enabled]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const updateAsHost = useCallback(
+    async (body: HostAttendanceUpdateRequest) => {
+      if (!eventId) return;
+      const entry = await hostUpdateAttendance(eventId, body);
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.map((it) =>
+                it.participantUserId === entry.participantUserId ? entry : it
+              ),
+            }
+          : prev
+      );
+      return entry;
+    },
+    [eventId]
+  );
+
+  const selfReport = useCallback(
+    async (attendanceStatus: SelfAttendanceStatus) => {
+      if (!eventId) return;
+      const entry = await selfReportAttendance(eventId, { attendanceStatus });
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.map((it) =>
+                it.participantUserId === entry.participantUserId ? entry : it
+              ),
+            }
+          : prev
+      );
+      return entry;
+    },
+    [eventId]
+  );
+
+  return { data, isLoading, error, refresh, updateAsHost, selfReport };
+}
+
+export type { AttendanceStatus, SelfAttendanceStatus };

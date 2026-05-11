@@ -17,6 +17,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.event import (
+    EVENT_ATTENDANCE_HOST_STATUSES,
+    EVENT_ATTENDANCE_SELF_STATUSES,
     EVENT_MODES,
     EVENT_VISIBILITIES,
     Event,
@@ -24,12 +26,16 @@ from app.models.event import (
 )
 from app.models.profile import UserProfile
 from app.schemas.events import (
+    AttendanceEntry,
+    AttendanceListResponse,
     CreateEventRequest,
     EventDetail,
     EventHost,
     EventListResponse,
     EventParticipantSummary,
     EventSummary,
+    HostAttendanceUpdateRequest,
+    SelfAttendanceRequest,
 )
 
 # Statuses where /events lists the row by default.
@@ -392,3 +398,234 @@ async def leave_event(
     await db.commit()
     await db.refresh(e)
     return await get_event(db, e.id, current_user_id)
+
+
+
+# ---------------------------------------------------------------------------
+# Attendance
+# ---------------------------------------------------------------------------
+
+# Event statuses where attendance updates are accepted.
+# - open/full   → host can finalize as soon as the event is over (no
+#                 scheduler runs auto-flip yet)
+# - completed   → still mutable (host may correct a wrong mark)
+# - cancelled   → frozen; no attendance updates make sense for a
+#                 cancelled event
+_ATTENDANCE_MUTABLE_EVENT_STATUSES: frozenset[str] = frozenset(
+    {"open", "full", "completed"}
+)
+
+
+async def _enforce_private_visibility(
+    db: AsyncSession, e: Event, current_user_id: UUID
+) -> None:
+    """
+    Hide-as-404 guard for private events. Must run before any
+    endpoint-specific permission check (403 for non-host, 422 for
+    business rules), so an outsider probing a private event ID never
+    learns the event exists. Mirrors the get_event / join_event
+    pattern: host always passes; active joined participant passes;
+    everyone else gets 404.
+    """
+    if e.visibility != "private":
+        return
+    if current_user_id == e.host_user_id:
+        return
+    joined = await _active_participant(db, e.id, current_user_id)
+    if joined is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+
+
+def _entry_for(
+    event_id: UUID, p: EventParticipant, display_name: str | None
+) -> AttendanceEntry:
+    return AttendanceEntry(
+        event_id=event_id,
+        participant_user_id=p.user_id,
+        display_name=display_name or "Player",
+        participant_status=p.status,
+        attendance_status=p.attendance_status,
+        joined_at=p.joined_at,
+        left_at=p.left_at,
+        attendance_confirmed_by_host_at=p.attendance_confirmed_by_host_at,
+        attendance_self_reported_at=p.attendance_self_reported_at,
+        attendance_note=p.attendance_note,
+    )
+
+
+async def get_event_attendance(
+    db: AsyncSession, event_id: UUID, current_user_id: UUID
+) -> AttendanceListResponse:
+    """
+    Return attendance rows for an event.
+
+    - Host sees every participant (joined and left), to support
+      after-the-fact corrections and a future no-show review.
+    - An active joined participant sees their own row only — no leak
+      of the rest of the roster's attendance status.
+    - Non-participants are 404'd (matches the project's hide-as-404
+      convention for inaccessible resources).
+    """
+    e = await _get_event_or_404(db, event_id)
+    await _enforce_private_visibility(db, e, current_user_id)
+
+    if current_user_id == e.host_user_id:
+        stmt = (
+            select(EventParticipant, UserProfile.display_name)
+            .where(EventParticipant.event_id == e.id)
+            .outerjoin(UserProfile, UserProfile.user_id == EventParticipant.user_id)
+            .order_by(EventParticipant.joined_at.asc())
+        )
+        rows = (await db.execute(stmt)).all()
+        return AttendanceListResponse(
+            event_id=e.id,
+            host_user_id=e.host_user_id,
+            items=[_entry_for(e.id, p, name) for (p, name) in rows],
+        )
+
+    # Participant self-view. Must be active or have a left audit row;
+    # outsiders are not told the event exists.
+    me_stmt = (
+        select(EventParticipant, UserProfile.display_name)
+        .where(
+            EventParticipant.event_id == e.id,
+            EventParticipant.user_id == current_user_id,
+        )
+        .outerjoin(UserProfile, UserProfile.user_id == EventParticipant.user_id)
+    )
+    row = (await db.execute(me_stmt)).first()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    p, name = row
+    return AttendanceListResponse(
+        event_id=e.id,
+        host_user_id=e.host_user_id,
+        items=[_entry_for(e.id, p, name)],
+    )
+
+
+async def _load_participant_with_name(
+    db: AsyncSession, event_id: UUID, user_id: UUID
+) -> tuple[EventParticipant, str | None] | None:
+    stmt = (
+        select(EventParticipant, UserProfile.display_name)
+        .where(
+            EventParticipant.event_id == event_id,
+            EventParticipant.user_id == user_id,
+        )
+        .outerjoin(UserProfile, UserProfile.user_id == EventParticipant.user_id)
+    )
+    row = (await db.execute(stmt)).first()
+    if row is None:
+        return None
+    return row[0], row[1]
+
+
+def _ensure_attendance_event_mutable(e: Event) -> None:
+    if e.status not in _ATTENDANCE_MUTABLE_EVENT_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Cannot update attendance on a {e.status} event",
+        )
+
+
+async def host_update_attendance(
+    db: AsyncSession,
+    event_id: UUID,
+    current_user_id: UUID,
+    body: HostAttendanceUpdateRequest,
+) -> AttendanceEntry:
+    e = await _get_event_or_404(db, event_id)
+    # Private-event outsiders must look like 404 (matches GET pattern)
+    # BEFORE the 403, so probing the host endpoint can't reveal that a
+    # private event with this ID exists.
+    await _enforce_private_visibility(db, e, current_user_id)
+    if current_user_id != e.host_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the host can update attendance",
+        )
+
+    _ensure_attendance_event_mutable(e)
+
+    if body.attendance_status not in EVENT_ATTENDANCE_HOST_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid attendance status: {body.attendance_status}",
+        )
+
+    loaded = await _load_participant_with_name(
+        db, e.id, body.participant_user_id
+    )
+    if loaded is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Participant not found for this event",
+        )
+    participant, display_name = loaded
+
+    # Left participants are frozen from attendance updates. The audit
+    # trail still records they joined-then-left; no_show is a separate
+    # outcome from "left before the event" and we don't auto-merge the
+    # two. A future stream can revisit if product wants late marks.
+    if participant.status == "left":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cannot update attendance for a participant who left",
+        )
+
+    participant.attendance_status = body.attendance_status
+    participant.attendance_confirmed_by_host_at = datetime.now(tz=timezone.utc)
+    if body.attendance_note is not None:
+        participant.attendance_note = body.attendance_note
+    await db.commit()
+    await db.refresh(participant)
+    return _entry_for(e.id, participant, display_name)
+
+
+async def self_report_attendance(
+    db: AsyncSession,
+    event_id: UUID,
+    current_user_id: UUID,
+    body: SelfAttendanceRequest,
+) -> AttendanceEntry:
+    e = await _get_event_or_404(db, event_id)
+    # Outsiders on a private event get 404, never 403 — same hide-as-404
+    # pattern as the GET and host-update endpoints.
+    await _enforce_private_visibility(db, e, current_user_id)
+    _ensure_attendance_event_mutable(e)
+
+    if body.attendance_status not in EVENT_ATTENDANCE_SELF_STATUSES:
+        # Either invalid vocab or no_show (host-only). Returns the same
+        # 422 either way — participants don't get to self-brand no_show.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid self-report status: {body.attendance_status}",
+        )
+
+    # Only ACTIVE joined participants can self-report. A left
+    # participant's attendance row is frozen alongside their leave row.
+    participant = await _active_participant(db, e.id, current_user_id)
+    if participant is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only active participants can self-report attendance",
+        )
+
+    participant.attendance_status = body.attendance_status
+    participant.attendance_self_reported_at = datetime.now(tz=timezone.utc)
+    if body.attendance_note is not None:
+        participant.attendance_note = body.attendance_note
+    await db.commit()
+    await db.refresh(participant)
+
+    # Resolve display name for the response payload.
+    name_stmt = select(UserProfile.display_name).where(
+        UserProfile.user_id == current_user_id
+    )
+    name = (await db.execute(name_stmt)).scalar_one_or_none()
+    return _entry_for(e.id, participant, name)

@@ -146,4 +146,11 @@ export type {
   EventDetail,
   EventListResponse,
   CreateEventRequest,
+  AttendanceStatus,
+  SelfAttendanceStatus,
+  ParticipantLifecycleStatus,
+  AttendanceEntry,
+  AttendanceListResponse,
+  HostAttendanceUpdateRequest,
+  SelfAttendanceRequest,
 } from './event';

@@ -7,9 +7,13 @@ from app.db.session import get_db
 from app.models.user import User
 from app.routers.auth import get_current_user
 from app.schemas.events import (
+    AttendanceEntry,
+    AttendanceListResponse,
     CreateEventRequest,
     EventDetail,
     EventListResponse,
+    HostAttendanceUpdateRequest,
+    SelfAttendanceRequest,
 )
 from app.services import events as events_service
 
@@ -71,3 +75,36 @@ async def leave_event(
     db: AsyncSession = Depends(get_db),
 ) -> EventDetail:
     return await events_service.leave_event(db, event_id, current_user.id)
+
+
+@router.get("/{event_id}/attendance", response_model=AttendanceListResponse)
+async def get_event_attendance(
+    event_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AttendanceListResponse:
+    return await events_service.get_event_attendance(db, event_id, current_user.id)
+
+
+@router.post("/{event_id}/attendance", response_model=AttendanceEntry)
+async def host_update_attendance(
+    event_id: UUID,
+    body: HostAttendanceUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AttendanceEntry:
+    return await events_service.host_update_attendance(
+        db, event_id, current_user.id, body
+    )
+
+
+@router.post("/{event_id}/attendance/self", response_model=AttendanceEntry)
+async def self_report_attendance(
+    event_id: UUID,
+    body: SelfAttendanceRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AttendanceEntry:
+    return await events_service.self_report_attendance(
+        db, event_id, current_user.id, body
+    )
