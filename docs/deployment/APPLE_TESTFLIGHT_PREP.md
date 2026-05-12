@@ -94,10 +94,15 @@ Snapshot of where the seven areas stand right now, in plain present tense.
   `eas env:list --environment {preview,production}`. The only remaining
   legal-link verification step is a dated real-device tap-through (see
   §4.4 and §4.8).
-- **Reviewer notes / contact / demo account** are `blocked`. The notes
-  template exists in `APP_STORE_SUBMISSION.md` section 7, but it requires a
-  seeded review account that depends on `apps/api/scripts/seed_review_data.py`,
-  which does not exist yet.
+- **Reviewer notes / contact / demo account** — the seeded review account
+  side is `configured` as of 2026-05-12: `apps/api/scripts/seed_review_data.py`
+  is committed, has been run against production (`protin-api`), and the
+  reviewer login + 5 demo discovery candidates + 3 matches + chat history +
+  3 bookings are live and verified via the public API. The reviewer notes
+  template still lives in `APP_STORE_SUBMISSION.md` section 7. What
+  remains is operator-side: paste the `REVIEWER_PASSWORD` from the Fly
+  secret into the App Store Connect "App Review Information" panel at
+  resubmission time.
 - **TestFlight internal readiness** is `blocked` on two of: `eas.json`
   placeholders and the reviewer demo account path. `apps/mobile/assets/`
   now contains placeholder `icon.png`, `splash.png`, and
@@ -168,8 +173,8 @@ Detailed area-by-area tables follow.
 | Item | Status | Evidence / what is missing | Next action |
 |---|---|---|---|
 | Review notes block | configured | Template verbatim in `APP_STORE_SUBMISSION.md` section 7 | Fill in real email, phone, and the seeded credentials at submission time. |
-| Reviewer demo account | blocked | `apps/api/scripts/seed_review_data.py` does not exist; `apps/api/scripts/` directory does not exist | Write the seed script, run against staging, capture the generated credentials for the review notes. |
-| Required review test data (2 seeded partners + pending booking + 1 chat history) | blocked | Same script dependency | Same as above; seed data shape is described in `APP_STORE_SUBMISSION.md` section 6. |
+| Reviewer demo account | configured | 2026-05-12 — `apps/api/scripts/seed_review_data.py` committed and run against production `protin-api`. Reviewer login `review@sportsgang.app` is live, with 5 demo discovery candidates (Chris/Kim/Luke/Taylor Kim/Sarah), 3 mutual matches, 5 seeded messages, and 3 bookings (1 confirmed + 1 incoming proposal + 1 outgoing proposal). All endpoints verified via the public HTTPS API. Reason this matters: the April 2026 Apple Guideline 2.1(a) rejection ("No content loaded during review") was caused by the reviewer landing on an empty Discover feed. | Paste the Fly-secret `REVIEWER_PASSWORD` into the App Store Connect "App Review Information" → Password field at resubmission time. Re-run the seed before each resubmission so booking dates remain future-facing. |
+| Required review test data (demo partners + pending booking + chat history) | configured | 2026-05-12 — seeded via `seed_review_data.py`; final shape exceeds the original two-partner minimum (5 demo partners under Gym, 3 mutual matches, 2 seeded chats, 3 bookings spanning incoming pending, outgoing pending, and confirmed upcoming). Seed shape documented in `APP_STORE_SUBMISSION.md` §6. | Re-run before each resubmission to roll booking start times forward. |
 | Reviewer contact info | Apple-side setup required | Not in repo | Capture real name + email + phone for the ASC App Review Contact form. |
 | Sign in with Apple path for reviewers | configured (but not verified on device) | Backend `POST /auth/apple` + mobile `LoginScreen.tsx` button, iOS-gated, plus `APPLE_CLIENT_ID` documented in `.env.staging.example` | Set `APPLE_CLIENT_ID = com.edh1223.protin` on the deployed backend; then `verify on real device`. |
 

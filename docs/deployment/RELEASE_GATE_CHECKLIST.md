@@ -450,7 +450,7 @@ states the stage it blocks.
 | TestFlight external review (if used) | Gate 3 | [ ] |
 | Privacy Policy URL publicly hosted; URL in `apps/mobile/src/lib/legal.ts` updated to final | Gate 3 | [x] hosted at `https://sportgang.netlify.app/privacy/`; pinned via `EXPO_PUBLIC_PRIVACY_URL` on EAS preview + production. Constant-default swap in `apps/mobile/src/lib/legal.ts` is optional once the env-driven flow is shipped. |
 | Support URL publicly hosted | Gate 3 | [x] hosted at `https://sportgang.netlify.app/support/`; pinned via `EXPO_PUBLIC_SUPPORT_URL` on EAS preview + production. |
-| Reviewer demo account credentials seeded and captured | Gate 3 | [ ] |
+| Reviewer demo account credentials seeded and captured | Gate 3 | [x] DB seed run against production on 2026-05-12 via `apps/api/scripts/seed_review_data.py`; reviewer email `review@sportsgang.app` and 5 demo candidates / 3 matches / 5 messages / 3 bookings verified live via public API. Password lives only in the Fly `REVIEWER_PASSWORD` secret — must still be pasted into the App Store Connect "App Review Information" → Password field at resubmission time. |
 | App Review Contact Info (name, email, phone) finalized | Gate 3 | [ ] |
 | Review notes block finalized (see `APP_STORE_SUBMISSION.md` section 7) | Gate 3 | [ ] |
 | `apps/mobile/eas.json` `ascAppId` and `appleTeamId` filled (non-placeholder) | Gate 2 | [x] PASS — 2026-05-07. `ascAppId = "6767027447"`, `appleTeamId = "37C8A2733Y"` pinned in `apps/mobile/eas.json`. |
@@ -468,7 +468,7 @@ known-absent repo artifacts, and Apple-side unknowns live.
 | Item | Why it blocks or creates risk | Affected gate | Owner | Resolution condition |
 |---|---|---|---|---|
 | `apps/mobile/assets/` directory does not exist | `app.config.js` references `./assets/notification-icon.png`; `eas build` fails on missing path. App icon, splash, and adaptive icon also not wired | Gate 2 | mobile | Assets committed and referenced in `app.config.js` |
-| `apps/api/scripts/seed_review_data.py` does not exist | Reviewers need a pre-populated demo account plus matches plus a pending booking; submission doc assumes this script | Gate 3 | api | Script exists, documented, and run against staging with captured credentials |
+| ~~`apps/api/scripts/seed_review_data.py` does not exist~~ | RESOLVED 2026-05-12 — script is committed, idempotent, and gated on `REVIEWER_EMAIL` / `REVIEWER_PASSWORD` Fly secrets. Seeded against production (`protin-api`) on 2026-05-12; verified via public API: `/auth/login` 200, `/discovery?sport=gym` returns 7 candidates including Chris/Kim/Luke/Taylor Kim/Sarah, `/matches` returns 3 (Chris/Kim/Sarah) with seeded message previews, `/bookings` returns 1 confirmed + 2 proposed sessions. Original cause of the April 2026 Apple Guideline 2.1(a) rejection ("No content loaded during review"). | Gate 3 | api | DONE |
 | ~~`apps/mobile/eas.json` still contains `REPLACE_WITH_APP_STORE_CONNECT_APP_ID` and `REPLACE_WITH_APPLE_TEAM_ID` placeholders~~ | RESOLVED 2026-05-07 — `ascAppId = "6767027447"` and `appleTeamId = "37C8A2733Y"` are pinned in `apps/mobile/eas.json` `submit.production.ios`. | Gate 2 | mobile / release owner | Real values in `eas.json` |
 | Push end-to-end on real iPhone not yet proven | Code-and-config readiness is not APNs delivery; claiming push as ready is the single highest rejection risk | Gate 2 push claim, Gate 3 | mobile and api | Section 4.3 rows checked with dated evidence |
 | Google Calendar flow not yet proven on real iPhone | Surface is exposed in booking UI; if unverified at Gate 3, hide or mark as optional | Gate 3 (risk) | mobile | Section 4.4 rows checked or feature hidden behind a flag |
@@ -590,8 +590,12 @@ supplied demo account.
 - [ ] Legal URLs in `apps/mobile/src/lib/legal.ts` are live and reachable.
 - [ ] Reviewer demo account exercised end-to-end by a team member against
   the production build from TestFlight.
-- [ ] `apps/api/scripts/seed_review_data.py` exists, is documented, and has
-  been executed against staging with captured credentials.
+- [x] `apps/api/scripts/seed_review_data.py` exists, is documented, and has
+  been executed against **production** on 2026-05-12 (Fly `protin-api`).
+  Reviewer credentials live in the Fly `REVIEWER_EMAIL` / `REVIEWER_PASSWORD`
+  secrets; verified end-to-end via public API (`/auth/login`, `/discovery`,
+  `/matches`, `/bookings`). Re-running before each resubmission is idempotent
+  and refreshes the booking start times forward.
 - [ ] Section 6 has no rows flagged "affected gate: Gate 3" still open.
 
 **No-go conditions:**

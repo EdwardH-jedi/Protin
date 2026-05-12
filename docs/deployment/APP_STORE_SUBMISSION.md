@@ -51,7 +51,7 @@ Split between what the repo already supports today (no engineering work needed) 
 ### Still required before submission
 
 - `apps/mobile/assets/` does not yet exist in the repo. `app.config.js` directly references `./assets/notification-icon.png` (under the `expo-notifications` plugin) - `eas build` fails on a missing path. App icon, splash image, and Android adaptive-icon foreground are not currently referenced in `app.config.js`, so Expo would fall back to template defaults that will not pass App Store visual review; add them (and the matching `ios.icon`, `android.adaptiveIcon`, `splash.image` keys) before the first production build.
-- `apps/api/scripts/seed_review_data.py` does not exist. The review test account + two seed accounts + a pending booking (see section 6) depend on it.
+- `apps/api/scripts/seed_review_data.py` is committed and has been run against the production database on 2026-05-12 (Fly `protin-api`). The reviewer account, five demo discovery candidates (Chris, Kim, Luke, Taylor Kim, Sarah), three mutual matches, two seeded chats, and three bookings (one incoming proposal, one outgoing proposal, one confirmed upcoming session) are live. The script is idempotent and credential-gated on `REVIEWER_EMAIL` / `REVIEWER_PASSWORD` Fly secrets. See section 6 for the demo account contract.
 - `apps/mobile/eas.json` `submit.production.ios.ascAppId` and `appleTeamId` are pinned to the real values (`6767027447` and `37C8A2733Y` respectively) as of 2026-05-07. The earlier `REPLACE_WITH_*` placeholders are gone; `eas submit --platform ios --latest` is unblocked once a production build artifact exists.
 - Hosted URLs for the legal docs are **live** on Netlify at `https://sportgang.netlify.app/{privacy,terms,support}/`, and the matching `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, and `EXPO_PUBLIC_SUPPORT_URL` values are pinned on the EAS `preview` and `production` environments (verify with `eas env:list --environment {preview,production}`). Same values also live in the env example files (`apps/mobile/.env.example`, `apps/mobile/.env.staging.example`, `.env.example`) for local Expo runs. **Privacy / Terms / Support real-device tap-through: PASS — 2026-05-05** (operator-confirmed on iPhone via Expo Go; recorded in `docs/deployment/RELEASE_GATE_CHECKLIST.md` §4.6 and `docs/deployment/APPLE_TESTFLIGHT_PREP.md` §4.8). The same tap-through must be re-run against the actual signed TestFlight build before submission — that re-run remains PENDING.
 - Fly secrets: `APPLE_CLIENT_ID=com.edh1223.protin`, `SECRET_KEY`, `FIELD_ENCRYPTION_KEY`. Without these the staging / production API refuses to boot and the `/auth/apple` endpoint returns 503.
@@ -170,21 +170,42 @@ questionnaire — Apple has not assigned any rating yet. Aligned with
 | Field | Value |
 |---|---|
 | Sign-in required | **Yes** |
-| Demo account username | `[review-tester@protin.app]` - create before submission |
-| Demo account password | `[generated-strong-password]` |
+| Demo account username | `review@sportsgang.app` (live in production — seeded 2026-05-12) |
+| Demo account password | Set as the Fly secret `REVIEWER_PASSWORD` on `protin-api`. Paste the same value directly into the App Store Connect "App Review Information" → Password field. **Never commit it to this repo, this file, or §7 review notes.** |
 | Notes | See section 7 "Review notes" below - paste the full block |
 | Contact info | Your real name, email, and phone |
 | Attachment | Optional; include a 30-second screen-recording of the core flow if the review team has previously requested clarification |
 
-### Required test data (seed before enabling TestFlight review)
+### Required test data (already seeded in production)
 
-The app has no real users at launch - reviewers will bounce if they can't see any activity. Seed at minimum:
+The April 2026 App Review rejection under Guideline 2.1(a) ("No content loaded during review") was caused by an empty production database for the reviewer account — Discover showed *"No players to show right now."* `apps/api/scripts/seed_review_data.py` resolves this by upserting the minimum reviewer-facing dataset.
 
-- **Reviewer's account** (the one above): already onboarded with a complete profile, 2 sport profiles, and identity preferences set.
-- **Two additional seeded accounts** matched with the reviewer: one with a confirmed booking scheduled 2 days out, one with a chat history (3-5 non-offensive messages).
-- **One proposed booking** awaiting the reviewer's confirmation (lets them exercise the confirm flow).
+Run once per release window (idempotent):
 
-A seed script belongs in `apps/api/scripts/seed_review_data.py`. **This script does not exist in the repo today** - the `apps/api/scripts/` directory itself has not been created. Write it (and check it in) before enabling TestFlight external review, and invoke it as a one-shot against the staging database with the review credentials.
+```
+# Set / rotate reviewer credentials on Fly
+fly secrets set REVIEWER_EMAIL=review@sportsgang.app \
+    REVIEWER_PASSWORD='<strong-password>' -a protin-api
+
+# Seed (reads creds from the Fly secret env)
+fly ssh console -a protin-api -C "/app/.venv/bin/python -m scripts.seed_review_data"
+```
+
+Seeded content (verified via the public API on 2026-05-12 against `https://protin-api.fly.dev`):
+
+- **Reviewer account** `review@sportsgang.app` — complete profile in Annandale, sport profiles for **gym / golf / tennis / running**, identity preferences set.
+- **Five demo discovery candidates** — Chris (Pyrmont), Kim (Glebe), Luke (Newtown), Taylor Kim (Paddington), Sarah (Surry Hills). All Apple-style accounts (`hashed_password=NULL`, no password login). Discover under Gym returns ≥ 3 candidates.
+- **Three mutual-interest matches** for the reviewer — Chris, Kim, Sarah on Gym.
+- **Seeded chat history** on two matches:
+  - *Chris*: "Want to train this weekend?" → "Let's find a court" → "Saturday morning works for me."
+  - *Kim*: "Lets find a court" → "Sounds good!"
+  - Sarah's match is intentionally chat-free so reviewers can exercise sending the first message.
+- **Three bookings** at *Anytime Fitness Pyrmont, Pyrmont NSW 2009*, sport=gym, all 1-hour sessions 2–5 days in the future:
+  - **Incoming pending** proposal from Chris → reviewer (Accept / Decline path).
+  - **Outgoing pending** proposal from reviewer → Kim (awaiting partner confirmation).
+  - **Confirmed upcoming** session between reviewer and Sarah (Events tab → Upcoming sessions).
+
+The script is safe to re-run before each App Review window — it upserts users / matches by stable keys, never deletes data, never wipes existing reviewer chat, and rolls booking start times forward so the demo always shows a future-facing upcoming session.
 
 ---
 
