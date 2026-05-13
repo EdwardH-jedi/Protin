@@ -12,8 +12,10 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { HonorCard } from '../../components/HonorCard';
+import { LocalRankSection } from '../../components/LocalRankSection';
 import { Screen } from '../../components/Screen';
 import { useHonorSummary } from '../../hooks/useHonorSummary';
+import { useHonorSystem } from '../../hooks/useHonorSystem';
 import { api } from '../../lib/api';
 import { openLegal, PRIVACY_URL, SUPPORT_URL, TERMS_URL } from '../../lib/legal';
 import { useAuthStore } from '../../stores/auth';
@@ -62,6 +64,19 @@ export function ProfileScreen() {
     isLoading: honorLoading,
     error: honorError,
   } = useHonorSummary();
+  // Honor System (local champion titles) read-only surface. The
+  // (sport, area) pair here is a temporary MVP default — replace with
+  // the user's selected sport/location context once Profile exposes a
+  // "primary sport + area" preference. The backend GET /rankings/me is
+  // read-only and returns the default rank row without persisting, so
+  // a brand-new user safely lands on the empty state.
+  const {
+    rank: localRank,
+    localChampion,
+    myTitles,
+    isLoading: localRankLoading,
+    error: localRankError,
+  } = useHonorSystem({ sport: 'tennis', area: 'annandale' });
   // Local guard so a double-tap or repeat confirmation cannot fire
   // DELETE /auth/me twice. Also blocks Log out while a delete is mid-flight.
   // A ref (not state) is required because Alert button onPress callbacks close
@@ -249,6 +264,16 @@ export function ProfileScreen() {
               summary={honorSummary}
               isLoading={honorLoading}
               error={honorError}
+            />
+
+            <LocalRankSection
+              sport="tennis"
+              area="annandale"
+              rank={localRank}
+              localChampion={localChampion}
+              myTitles={myTitles}
+              isLoading={localRankLoading}
+              error={localRankError}
             />
 
             {profile.bio ? (

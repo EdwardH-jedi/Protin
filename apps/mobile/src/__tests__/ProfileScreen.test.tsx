@@ -111,6 +111,60 @@ jest.mock('../hooks/useHonorSummary', () => ({
   }),
 }));
 
+// ─── Mock useHonorSystem hook (local champion titles) ─────────────────────────
+// LocalRankSection is unit-tested on its own. Here we just stub the data
+// path so the ProfileScreen renders the section without touching the
+// real read-only API client.
+
+let mockLocalRank:
+  | {
+      id: string | null;
+      userId: string;
+      sport: string;
+      area: string;
+      rating: number;
+      wins: number;
+      losses: number;
+      streak: number;
+      lastPlayedAt: string | null;
+      createdAt: string | null;
+      updatedAt: string | null;
+    }
+  | null = null;
+let mockLocalChampion:
+  | {
+      id: string;
+      sport: string;
+      area: string;
+      titleName: string;
+      currentHolderUserId: string | null;
+      active: boolean;
+      createdAt: string;
+      updatedAt: string;
+    }
+  | null = null;
+let mockMyTitles: Array<{
+  id: string;
+  sport: string;
+  area: string;
+  titleName: string;
+  currentHolderUserId: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}> = [];
+
+jest.mock('../hooks/useHonorSystem', () => ({
+  useHonorSystem: () => ({
+    rank: mockLocalRank,
+    localChampion: mockLocalChampion,
+    myTitles: mockMyTitles,
+    isLoading: false,
+    error: null,
+    refresh: jest.fn(),
+  }),
+}));
+
 // ─── Mock useTournamentsAvailable hook ────────────────────────────────────────
 // The real hook does a one-time GET /tournaments?limit=1 probe. Without a
 // dedicated mock, the trailing setState from that probe fires after the
@@ -179,6 +233,9 @@ describe('ProfileScreen', () => {
     mockSportProfiles = [];
     mockRankSummary = null;
     mockRankLoading = false;
+    mockLocalRank = null;
+    mockLocalChampion = null;
+    mockMyTitles = [];
     // Default: fetchProfile resolves immediately, gcal not connected
     mockFetchProfile.mockResolvedValue(undefined);
     mockApiGet.mockResolvedValue({ connected: false });
@@ -510,6 +567,110 @@ describe('ProfileScreen', () => {
       await waitFor(() => getByText('Profile not set up'));
       expect(queryByLabelText('Honor card empty')).toBeNull();
       expect(queryByText('Sports reputation')).toBeNull();
+    });
+  });
+
+  // ── Local rank / Honor System section ──────────────────────────────────────
+  //
+  // The read-only Honor System surface (rating, wins/losses, streak,
+  // current titles) lives next to the Honor card. These tests pin
+  // that:
+  //   * it renders when a profile exists,
+  //   * its empty-state copy is shown for a new user,
+  //   * no Honor System mutation endpoint is called from Profile.
+
+  describe('local rank section', () => {
+    it('renders the Local Rank section with empty-state copy for a new user', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      // Default mocks: rank null + no titles.
+      const { findByLabelText, findByText } = render(<ProfileScreen />);
+      await findByLabelText('Local rank section');
+      await findByText('Annandale Tennis Rank');
+      await findByText(
+        'No local rank yet. Your rank will update when verified results are available.'
+      );
+    });
+
+    it('renders rating / wins / streak when the user has activity', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      mockLocalRank = {
+        id: 'rp-1',
+        userId: 'u-1',
+        sport: 'tennis',
+        area: 'annandale',
+        rating: 1080,
+        wins: 4,
+        losses: 1,
+        streak: 3,
+        lastPlayedAt: '2026-05-10T10:00:00Z',
+        createdAt: '2026-05-01T00:00:00Z',
+        updatedAt: '2026-05-10T10:00:00Z',
+      };
+      const { findByLabelText } = render(<ProfileScreen />);
+      await findByLabelText('Rating: 1080');
+      await findByLabelText('Wins / Losses: 4 / 1');
+      await findByLabelText('Streak: 3');
+    });
+
+    it('renders the local champion row when a holder exists', async () => {
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      mockLocalRank = {
+        id: 'rp-1',
+        userId: 'u-1',
+        sport: 'tennis',
+        area: 'annandale',
+        rating: 1080,
+        wins: 4,
+        losses: 1,
+        streak: 3,
+        lastPlayedAt: '2026-05-10T10:00:00Z',
+        createdAt: '2026-05-01T00:00:00Z',
+        updatedAt: '2026-05-10T10:00:00Z',
+      };
+      mockLocalChampion = {
+        id: 'ht-1',
+        sport: 'tennis',
+        area: 'annandale',
+        titleName: 'Annandale Tennis Champion',
+        currentHolderUserId: 'u-1',
+        active: true,
+        createdAt: '2026-05-01T00:00:00Z',
+        updatedAt: '2026-05-10T10:00:00Z',
+      };
+      const { findByLabelText, findByText } = render(<ProfileScreen />);
+      await findByLabelText('Local champion');
+      await findByText('Annandale Tennis Champion');
+    });
+
+    it('never invokes a Honor System mutation endpoint from Profile', async () => {
+      // ProfileScreen must not call POST/PUT/PATCH/DELETE against the
+      // Honor System routes. The public API is read-only and there is
+      // no mutation surface on this screen.
+      mockProfile = { displayName: 'Jordan Lee', suburb: null, bio: null };
+      const { findByLabelText } = render(<ProfileScreen />);
+      await findByLabelText('Local rank section');
+
+      // mockApiGet captures every api.get call from the screen.
+      const getCalls = mockApiGet.mock.calls.map((c) => c[0]);
+      // The Honor System reads go through `lib/honorSystem.ts` which
+      // is mocked by useHonorSystem — Profile itself should not be
+      // hitting /rankings or /honors directly through the bare api.
+      for (const path of getCalls) {
+        expect(typeof path === 'string' && path.startsWith('/rankings')).toBe(
+          false
+        );
+        expect(typeof path === 'string' && path.startsWith('/honors')).toBe(
+          false
+        );
+      }
+
+      // No write verbs are exercised at all on this screen via api.delete
+      // unless the user invokes "Delete my account". That path is covered
+      // by the dedicated delete-account tests; the local rank surface
+      // must never touch a mutation verb against honors/rankings.
+      expect(mockApiDelete).not.toHaveBeenCalledWith(
+        expect.stringMatching(/^\/(honors|rankings)/)
+      );
     });
   });
 
