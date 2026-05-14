@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.chat import Message
 from app.models.match import Match
 from app.schemas.chat import MessageListResponse, MessageResponse
+from app.services.content_moderation import ensure_text_allowed
 
 
 async def _assert_participant(db: AsyncSession, match_id: UUID, user_id: UUID) -> Match:
@@ -56,6 +57,11 @@ async def send_message(
     sender_id: UUID,
     body: str,
 ) -> MessageResponse:
+    # Moderation runs FIRST — before the participant check and before
+    # any DB write — so disallowed content costs us no Match lookup,
+    # is never persisted, and never triggers a WebSocket broadcast.
+    # English-only V1; Korean/CJK is a follow-up.
+    ensure_text_allowed(body, context="chat")
     await _assert_participant(db, match_id, sender_id)
 
     msg = Message(match_id=match_id, sender_id=sender_id, body=body)

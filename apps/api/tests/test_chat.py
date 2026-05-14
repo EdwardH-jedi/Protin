@@ -166,6 +166,42 @@ async def test_send_and_receive_message(client: AsyncClient) -> None:
     assert items[0]["body"] == "Hey, want to hit the gym tomorrow?"
 
 
+async def test_send_message_blocked_by_moderation_returns_422_and_does_not_persist(
+    client: AsyncClient,
+) -> None:
+    """
+    Integration: a message containing disallowed content is rejected
+    with the moderation service's safe user message, and no Message
+    row is created.
+
+    Uses the ``BANNED_PROFANITY_FIXTURE`` sentinel so the test file
+    doesn't contain real slurs. Real-word coverage lives in the
+    unit-test surface (``test_content_moderation.py``).
+    """
+    token_a, uid_a = await _register(client, "chat_mod_a@example.com")
+    token_b, uid_b = await _register(client, "chat_mod_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(
+        client, token_a, uid_a, token_b, uid_b
+    )
+
+    r = await client.post(
+        f"/matches/{match_id}/messages",
+        json={"body": "hey BANNED_PROFANITY_FIXTURE jerk"},
+        headers=_auth(token_a),
+    )
+    assert r.status_code == 422, r.text
+    assert "community guidelines" in r.json()["detail"].lower()
+    # Defense in depth: the matched fragment must NOT leak to the client.
+    assert "BANNED" not in r.json()["detail"]
+
+    # No message persisted — listing should return empty.
+    list_r = await client.get(
+        f"/matches/{match_id}/messages", headers=_auth(token_a)
+    )
+    assert list_r.status_code == 200
+    assert list_r.json()["items"] == []
+
+
 async def test_messages_ordered_by_created_at_asc(client: AsyncClient) -> None:
     token_a, uid_a = await _register(client, "chat_order_a@example.com")
     token_b, uid_b = await _register(client, "chat_order_b@example.com")

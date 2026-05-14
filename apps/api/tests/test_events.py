@@ -191,6 +191,68 @@ async def test_create_event_returns_detail(client: AsyncClient) -> None:
     assert body["host"]["id"] == uid
 
 
+async def test_create_event_blocked_by_moderation_returns_422(
+    client: AsyncClient,
+) -> None:
+    """
+    Title with disallowed text → 422 with safe message; no event row.
+
+    Uses ``BANNED_PROFANITY_FIXTURE`` so the test file doesn't enumerate
+    real slurs. Real-word coverage lives in
+    ``apps/api/tests/test_content_moderation.py``.
+    """
+    await _wipe_events()
+    token, _ = await _register(client, "evt_mod_title@example.com")
+
+    r = await client.post(
+        "/events",
+        json=_payload(title="BANNED_PROFANITY_FIXTURE pickup hoops"),
+        headers=_auth(token),
+    )
+    assert r.status_code == 422, r.text
+    assert "community guidelines" in r.json()["detail"].lower()
+    assert "BANNED" not in r.json()["detail"]
+
+    # No event persisted.
+    listing = await client.get("/events", headers=_auth(token))
+    assert listing.json()["items"] == []
+
+
+async def test_create_event_blocked_when_description_violates(
+    client: AsyncClient,
+) -> None:
+    await _wipe_events()
+    token, _ = await _register(client, "evt_mod_desc@example.com")
+
+    r = await client.post(
+        "/events",
+        json=_payload(description="Free game! BANNED_SPAM_FIXTURE today"),
+        headers=_auth(token),
+    )
+    assert r.status_code == 422, r.text
+    assert "community guidelines" in r.json()["detail"].lower()
+
+
+async def test_create_event_allows_normal_venue_name_in_location_text(
+    client: AsyncClient,
+) -> None:
+    """
+    Curated venue names from the picker must pass through. The backend
+    does not moderate ``location_text`` (see ``services/events.py``).
+    """
+    await _wipe_events()
+    token, _ = await _register(client, "evt_loc_safe@example.com")
+
+    r = await client.post(
+        "/events",
+        json=_payload(
+            location_text="Anytime Fitness Surry Hills, 428 Crown St"
+        ),
+        headers=_auth(token),
+    )
+    assert r.status_code == 201, r.text
+
+
 async def test_create_event_capacity_must_be_positive(client: AsyncClient) -> None:
     await _wipe_events()
     token, _ = await _register(client, "evt_cap0@example.com")

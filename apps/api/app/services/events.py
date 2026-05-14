@@ -37,6 +37,7 @@ from app.schemas.events import (
     HostAttendanceUpdateRequest,
     SelfAttendanceRequest,
 )
+from app.services.content_moderation import ensure_text_allowed
 
 # Statuses where /events lists the row by default.
 _VISIBLE_STATUSES: frozenset[str] = frozenset({"open", "full"})
@@ -142,6 +143,15 @@ async def create_event(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Only public events are supported in this release",
         )
+
+    # Moderation: block disallowed text BEFORE persistence. Title and
+    # description are user-generated; ``location_text`` is intentionally
+    # NOT moderated — the mobile composer's venue picker is the safe
+    # surface, and curated venue names (e.g. "Anytime Fitness Surry
+    # Hills") would never trigger the wordlist anyway.
+    ensure_text_allowed(body.title, context="event-title")
+    if body.description:
+        ensure_text_allowed(body.description, context="event-description")
 
     e = Event(
         host_user_id=host_user_id,
