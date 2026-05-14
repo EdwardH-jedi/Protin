@@ -46,6 +46,7 @@ async def list_nearby_venues(
     sport: str,
     lat: float | None,
     lng: float | None,
+    radius_km: float = 10.0,
     limit: int = 20,
 ) -> NearbyVenuesResponse:
     """
@@ -56,10 +57,21 @@ async def list_nearby_venues(
     catalog. If the catalog grows large, switch to a Postgres ARRAY column
     + GIN index and push the filter into SQL.
 
-    When lat/lng are supplied, results are sorted by distance ascending
-    and `distance_km` is populated. When lat/lng are missing (the MVP
-    mobile path while expo-location is not installed), results are sorted
-    alphabetically by name and `distance_km` is None.
+    Two modes:
+
+    * **Coordinates supplied** (`lat` AND `lng`). Compute Haversine distance,
+      drop venues outside ``radius_km``, sort by (distance ASC, name ASC) so
+      ties are deterministic, then apply ``limit``. ``distance_km`` is
+      populated. If no sport-matching venue is inside the radius the items
+      list is empty — we do NOT fall back to the Sydney catalog, because
+      that would silently mislead a caller who explicitly said "near me."
+    * **No coordinates**. Preserve the existing catalog fallback: sport
+      filter, alphabetical by name, ``limit`` applied. ``radius_km`` is
+      ignored in this mode (radius without a centre is meaningless).
+
+    ``total`` reflects the post-sport, post-radius pre-limit count, so
+    callers can use ``len(items) < total`` to detect that a smaller
+    ``limit`` truncated the result set.
     """
     rows = (await db.execute(select(Venue))).scalars().all()
 
@@ -67,13 +79,18 @@ async def list_nearby_venues(
 
     if lat is not None and lng is not None:
         scored = [(v, _haversine_km(lat, lng, v.latitude, v.longitude)) for v in matching]
-        scored.sort(key=lambda pair: pair[1])
-        items = [_to_response(v, d) for (v, d) in scored[:limit]]
+        within = [(v, d) for (v, d) in scored if d <= radius_km]
+        # (distance ASC, name ASC) — name is the deterministic tie-breaker
+        # so equidistant venues return in stable alphabetical order.
+        within.sort(key=lambda pair: (pair[1], pair[0].name.lower()))
+        items = [_to_response(v, d) for (v, d) in within[:limit]]
+        total = len(within)
     else:
         matching.sort(key=lambda v: v.name.lower())
         items = [_to_response(v, None) for v in matching[:limit]]
+        total = len(matching)
 
-    return NearbyVenuesResponse(items=items, total=len(matching))
+    return NearbyVenuesResponse(items=items, total=total)
 
 
 async def get_venue_or_404(db: AsyncSession, venue_id: UUID) -> Venue:
