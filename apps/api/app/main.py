@@ -100,6 +100,7 @@ async def health(
 from app.routers import (  # noqa: E402  # noqa: E402
     auth,
     bookings,
+    challenges,
     chat,
     discovery,
     events,
@@ -130,6 +131,7 @@ app.include_router(rank.router)
 app.include_router(rank.honor_router)
 app.include_router(honor_system.rankings_router)
 app.include_router(honor_system.honors_router)
+app.include_router(challenges.router)
 app.include_router(tournaments.router)
 app.include_router(events.router)
 
