@@ -15,6 +15,7 @@ import {
 import { CalendarPicker } from '../../components/CalendarPicker';
 import { Screen } from '../../components/Screen';
 import { TimeWheelPicker } from '../../components/TimeWheelPicker';
+import { useVenueLocation } from '../../hooks/useVenueLocation';
 import { api } from '../../lib/api';
 import {
   combineToLocalDate,
@@ -55,6 +56,10 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [startPickerOpen, setStartPickerOpen] = useState(false);
   const [endPickerOpen, setEndPickerOpen] = useState(false);
+
+  // Foreground location for the venue picker. The OS prompt only fires
+  // once the user actually opens the picker — never on composer mount.
+  const venueLocation = useVenueLocation({ enabled: isVenuePickerOpen });
 
   // Validation is derived from the picker state on every render so the
   // submit button + inline error always reflect the current selection
@@ -256,6 +261,9 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
       <NearbyCourtsModal
         isOpen={isVenuePickerOpen}
         sport={sport as Sport}
+        lat={venueLocation.latitude}
+        lng={venueLocation.longitude}
+        locationStatus={venueLocation.status}
         onSelect={(venue) => {
           setSelectedVenue(venue);
           // Drop any freeform location text once a structured venue is chosen.

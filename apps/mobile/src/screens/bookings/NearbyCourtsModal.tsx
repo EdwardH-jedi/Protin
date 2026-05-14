@@ -11,15 +11,22 @@ import {
 
 import { VenueCard } from '../../components/VenueCard';
 import { useNearbyVenues } from '../../hooks/useNearbyVenues';
+import type { VenueLocationStatus } from '../../hooks/useVenueLocation';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { Sport, Venue } from '@protin/shared-types';
 
 interface NearbyCourtsModalProps {
   isOpen: boolean;
   sport: Sport;
-  /** Optional coordinates if a future location source is wired in. */
+  /** Coordinates from useVenueLocation. Pass both or neither. */
   lat?: number;
   lng?: number;
+  /**
+   * Optional location-flow status from useVenueLocation. Drives the
+   * compact banner under the header so users see why results are or
+   * are not distance-sorted. Defaults to "idle" if omitted.
+   */
+  locationStatus?: VenueLocationStatus;
   onSelect: (venue: Venue) => void;
   onClose: () => void;
 }
@@ -37,6 +44,7 @@ export function NearbyCourtsModal({
   sport,
   lat,
   lng,
+  locationStatus = 'idle',
   onSelect,
   onClose,
 }: NearbyCourtsModalProps) {
@@ -46,6 +54,16 @@ export function NearbyCourtsModal({
     lng,
     enabled: isOpen,
   });
+
+  const hasCoords = lat !== undefined && lng !== undefined;
+  // Catalog-honest fallback wording: only call results "near you" when
+  // the server actually got coordinates. Otherwise we're showing the
+  // Sydney venue catalog.
+  const statusLabel: string | null = hasCoords
+    ? 'Sorted near you'
+    : locationStatus === 'denied' || locationStatus === 'unavailable'
+      ? 'Location off. Showing Sydney catalog.'
+      : null;
 
   const handleUse = (venue: Venue) => {
     onSelect(venue);
@@ -80,6 +98,17 @@ export function NearbyCourtsModal({
             <Text style={styles.closeText}>Close</Text>
           </Pressable>
         </View>
+
+        {statusLabel ? (
+          <View style={styles.statusBanner}>
+            <Text
+              style={styles.statusText}
+              accessibilityLabel={`Location status: ${statusLabel}`}
+            >
+              {statusLabel}
+            </Text>
+          </View>
+        ) : null}
 
         {isLoading ? (
           <View style={styles.centred}>
@@ -160,6 +189,17 @@ const styles = StyleSheet.create({
   closeText: {
     ...typography.button,
     color: colors.brand,
+  },
+  statusBanner: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.separator,
+  },
+  statusText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
   },
   list: {
     padding: spacing.lg,

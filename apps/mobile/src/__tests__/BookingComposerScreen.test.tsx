@@ -70,11 +70,18 @@ jest.mock('../theme', () => ({
 
 // ─── Mock NearbyCourtsModal ──────────────────────────────────────────────────
 
+// Captures the latest props the composer passes into the modal so the
+// venue-picker integration tests can assert that coordinates + status
+// flow through from useVenueLocation.
+const mockNearbyModalProps = jest.fn();
+
 jest.mock('../screens/bookings/NearbyCourtsModal', () => {
   const { Pressable, Text } = require('react-native');
   return {
-    NearbyCourtsModal: ({ isOpen, onSelect, onClose }: any) =>
-      isOpen
+    NearbyCourtsModal: (props: any) => {
+      mockNearbyModalProps(props);
+      const { isOpen, onSelect, onClose } = props;
+      return isOpen
         ? (
           <Pressable
             accessibilityLabel="mock-pick-venue"
@@ -96,9 +103,67 @@ jest.mock('../screens/bookings/NearbyCourtsModal', () => {
             <Text>pick mock venue</Text>
           </Pressable>
         )
-        : null,
+        : null;
+    },
   };
 });
+
+// ─── Mock expo-location ───────────────────────────────────────────────────────
+
+jest.mock('expo-location', () => ({
+  getForegroundPermissionsAsync: jest.fn(),
+  requestForegroundPermissionsAsync: jest.fn(),
+  getCurrentPositionAsync: jest.fn(),
+  PermissionStatus: {
+    GRANTED: 'granted',
+    DENIED: 'denied',
+    UNDETERMINED: 'undetermined',
+  },
+  Accuracy: { Balanced: 3 },
+}));
+
+const Location = require('expo-location') as {
+  getForegroundPermissionsAsync: jest.Mock;
+  requestForegroundPermissionsAsync: jest.Mock;
+  getCurrentPositionAsync: jest.Mock;
+};
+
+function mockLocationGranted(latitude = -33.89, longitude = 151.27) {
+  Location.getForegroundPermissionsAsync.mockResolvedValue({
+    status: 'granted',
+    granted: true,
+    canAskAgain: true,
+    expires: 'never',
+  });
+  Location.getCurrentPositionAsync.mockResolvedValue({
+    coords: { latitude, longitude, altitude: 0, accuracy: 5, heading: 0, speed: 0 },
+    timestamp: 1_700_000_000_000,
+  });
+}
+
+function mockLocationDeniedHard() {
+  Location.getForegroundPermissionsAsync.mockResolvedValue({
+    status: 'denied',
+    granted: false,
+    canAskAgain: false,
+    expires: 'never',
+  });
+}
+
+function mockLocationUndeterminedThenDenied() {
+  Location.getForegroundPermissionsAsync.mockResolvedValue({
+    status: 'undetermined',
+    granted: false,
+    canAskAgain: true,
+    expires: 'never',
+  });
+  Location.requestForegroundPermissionsAsync.mockResolvedValue({
+    status: 'denied',
+    granted: false,
+    canAskAgain: true,
+    expires: 'never',
+  });
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -468,6 +533,69 @@ describe('BookingComposerScreen', () => {
       });
       fireEvent.press(getByLabelText('Clear selected court'));
       expect(getByPlaceholderText('Or type a location, e.g. Bondi gym')).toBeTruthy();
+    });
+
+    // ── Location wiring ──────────────────────────────────────────────────────
+
+    it('does not request location permission while the picker stays closed', () => {
+      mockLocationGranted();
+      render(
+        <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      expect(Location.getForegroundPermissionsAsync).not.toHaveBeenCalled();
+      expect(Location.requestForegroundPermissionsAsync).not.toHaveBeenCalled();
+    });
+
+    it('passes coordinates into NearbyCourtsModal when location is granted', async () => {
+      mockLocationGranted(-33.89, 151.27);
+      const { getByLabelText } = render(
+        <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose a court or venue'));
+      });
+      // Wait for the hook's async chain to settle so the granted-path
+      // props land on the modal.
+      await waitFor(() => {
+        const props = mockNearbyModalProps.mock.calls.at(-1)?.[0];
+        expect(props?.isOpen).toBe(true);
+        expect(props?.lat).toBeCloseTo(-33.89);
+        expect(props?.lng).toBeCloseTo(151.27);
+        expect(props?.locationStatus).toBe('granted');
+      });
+    });
+
+    it('passes denied status and no coords when permission is hard-denied', async () => {
+      mockLocationDeniedHard();
+      const { getByLabelText } = render(
+        <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose a court or venue'));
+      });
+      await waitFor(() => {
+        const props = mockNearbyModalProps.mock.calls.at(-1)?.[0];
+        expect(props?.locationStatus).toBe('denied');
+        expect(props?.lat).toBeUndefined();
+        expect(props?.lng).toBeUndefined();
+      });
+      // A hard-denied user must never be re-prompted.
+      expect(Location.requestForegroundPermissionsAsync).not.toHaveBeenCalled();
+    });
+
+    it('prompts once when status is undetermined and reports denied if the user refuses', async () => {
+      mockLocationUndeterminedThenDenied();
+      const { getByLabelText } = render(
+        <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose a court or venue'));
+      });
+      await waitFor(() => {
+        expect(Location.requestForegroundPermissionsAsync).toHaveBeenCalledTimes(1);
+        const props = mockNearbyModalProps.mock.calls.at(-1)?.[0];
+        expect(props?.locationStatus).toBe('denied');
+      });
     });
   });
 

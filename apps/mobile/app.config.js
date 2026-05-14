@@ -147,6 +147,10 @@ module.exports = () => {
         infoPlist: {
           NSCalendarsUsageDescription:
             "SportsGang uses your calendar to add confirmed workout sessions.",
+          // Foreground-only. We never request always/background — venue
+          // sorting only needs a single fix when the picker opens.
+          NSLocationWhenInUseUsageDescription:
+            "SportsGang uses your location to show nearby courts and venues.",
           // Required because expo-notifications is declared in plugins and
           // relies on silent remote push delivery in the background.
           UIBackgroundModes: ["remote-notification"],
@@ -162,6 +166,10 @@ module.exports = () => {
           "WRITE_CALENDAR",
           "RECEIVE_BOOT_COMPLETED",
           "SCHEDULE_EXACT_ALARM",
+          // Foreground location only. ACCESS_BACKGROUND_LOCATION is
+          // intentionally absent — venue sorting reads a single fix.
+          "ACCESS_FINE_LOCATION",
+          "ACCESS_COARSE_LOCATION",
         ],
         ...(androidGoogleServicesFile
           ? { googleServicesFile: androidGoogleServicesFile }

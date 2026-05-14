@@ -235,15 +235,77 @@ describe('NearbyCourtsModal', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('does not use "nearby" wording in the visible header', async () => {
-    // Pin the regression: until expo-location is wired and lat/lng is
-    // actually passed, the modal must use catalog-honest wording.
+  it('does not claim "nearby" sort when no coordinates are passed', async () => {
+    // Catalog-honest wording: without coords the modal must not call the
+    // results nearby. "Sorted near you" / "nearest" are reserved for the
+    // distance-sorted path.
     mockApiGet.mockResolvedValue({ items: [], total: 0 });
     const { findByText, queryByText } = render(
       <NearbyCourtsModal isOpen sport="tennis" onSelect={jest.fn()} onClose={jest.fn()} />
     );
     await findByText('Courts & venues');
-    expect(queryByText(/nearby/i)).toBeNull();
+    expect(queryByText('Sorted near you')).toBeNull();
     expect(queryByText(/nearest/i)).toBeNull();
+  });
+
+  it('shows "Sorted near you" when coordinates are provided', async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0 });
+    const { findByText } = render(
+      <NearbyCourtsModal
+        isOpen
+        sport="tennis"
+        lat={-33.89}
+        lng={151.27}
+        locationStatus="granted"
+        onSelect={jest.fn()}
+        onClose={jest.fn()}
+      />
+    );
+    await findByText('Sorted near you');
+  });
+
+  it('shows "Location off" fallback when permission is denied', async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0 });
+    const { findByText } = render(
+      <NearbyCourtsModal
+        isOpen
+        sport="tennis"
+        locationStatus="denied"
+        onSelect={jest.fn()}
+        onClose={jest.fn()}
+      />
+    );
+    await findByText('Location off. Showing Sydney catalog.');
+  });
+
+  it('shows "Location off" fallback when location is unavailable', async () => {
+    mockApiGet.mockResolvedValue({ items: [], total: 0 });
+    const { findByText } = render(
+      <NearbyCourtsModal
+        isOpen
+        sport="tennis"
+        locationStatus="unavailable"
+        onSelect={jest.fn()}
+        onClose={jest.fn()}
+      />
+    );
+    await findByText('Location off. Showing Sydney catalog.');
+  });
+
+  it('still renders the catalog when location is denied (does not block the modal)', async () => {
+    mockApiGet.mockResolvedValue({
+      items: [venue({ name: 'Catalog Court' })],
+      total: 1,
+    });
+    const { findByText } = render(
+      <NearbyCourtsModal
+        isOpen
+        sport="tennis"
+        locationStatus="denied"
+        onSelect={jest.fn()}
+        onClose={jest.fn()}
+      />
+    );
+    await findByText('Catalog Court');
   });
 });
