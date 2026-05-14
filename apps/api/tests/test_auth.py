@@ -132,6 +132,46 @@ async def test_get_me_with_valid_token_returns_user(client: AsyncClient) -> None
     assert "id" in body
 
 
+async def test_login_then_me_returns_logged_in_user_not_another(
+    client: AsyncClient,
+) -> None:
+    """
+    Regression pin: backing the local-only reviewer flow.
+
+    A second login (different email) must mint a token whose ``/auth/me``
+    resolves to the second user — never to the first. The mobile auth
+    store relies on this contract; if it ever broke, ``/auth/me`` could
+    silently return a stale identity after an account switch.
+    """
+    # First account
+    a_payload = {"email": "switch_a@example.com", "password": "password123"}
+    await client.post("/auth/register", json=a_payload)
+
+    # Second account
+    b_payload = {"email": "switch_b@example.com", "password": "password123"}
+    await client.post("/auth/register", json=b_payload)
+
+    # Log in as A and pin identity.
+    a_login = await client.post("/auth/login", json=a_payload)
+    a_token = a_login.json()["access_token"]
+    a_me = await client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {a_token}"}
+    )
+    assert a_me.status_code == 200
+    assert a_me.json()["email"] == "switch_a@example.com"
+
+    # Log in as B; B's token must NOT resolve to A.
+    b_login = await client.post("/auth/login", json=b_payload)
+    b_token = b_login.json()["access_token"]
+    assert b_token != a_token
+    b_me = await client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {b_token}"}
+    )
+    assert b_me.status_code == 200
+    assert b_me.json()["email"] == "switch_b@example.com"
+    assert b_me.json()["id"] != a_me.json()["id"]
+
+
 async def test_get_me_with_no_token_returns_401(client: AsyncClient) -> None:
     r = await client.get("/auth/me")
     # FastAPI's HTTPBearer returned 403 historically; current versions

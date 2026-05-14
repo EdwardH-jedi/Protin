@@ -216,6 +216,22 @@ async def test_create_event_rejects_private_for_now(client: AsyncClient) -> None
 # ---------------------------------------------------------------------------
 
 
+async def test_list_returns_empty_for_fresh_user_with_no_events(
+    client: AsyncClient,
+) -> None:
+    """
+    Belt-and-suspenders: the mobile Battles screen ("Find a battle")
+    must receive ``200 {items: [], total: 0}`` for a brand-new user when
+    no events exist. A 404 / 500 here would break the empty-state UX.
+    """
+    await _wipe_events()
+    token, _ = await _register(client, "evt_empty@example.com")
+    r = await client.get("/events", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body == {"items": [], "total": 0}
+
+
 async def test_list_returns_open_events(client: AsyncClient) -> None:
     await _wipe_events()
     token, _ = await _register(client, "evt_list@example.com")

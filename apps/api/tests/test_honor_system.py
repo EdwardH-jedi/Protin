@@ -533,6 +533,21 @@ async def test_honors_endpoint_returns_expected_current_holder(
     assert body["active"] is True
 
 
+async def test_honors_me_returns_empty_list_when_user_holds_no_titles(
+    client: AsyncClient,
+) -> None:
+    """
+    Belt-and-suspenders: a brand-new user with zero honors must get
+    ``200 []``, not 404 / 500 / null. This is the empty-state contract
+    the mobile ProfileScreen relies on for `myTitles` rendering.
+    """
+    await _wipe_state()
+    token, _ = await _register(client, "hs_me_empty@example.com")
+    r = await client.get("/honors/me", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    assert r.json() == []
+
+
 async def test_honors_me_returns_titles_held_by_user(
     client: AsyncClient,
 ) -> None:
