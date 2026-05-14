@@ -119,5 +119,195 @@
     "longitude": 151.1245,
     "is_bookable": false,
     "notes": "Public tennis courts and a 2 km running track."
+  },
+  {
+    "name": "The Crescent Synthetic Sportsfield",
+    "sport_tags": ["running"],
+    "area": "Annandale",
+    "address": "The Crescent, Annandale NSW 2038",
+    "latitude": -33.8789,
+    "longitude": 151.1718,
+    "is_bookable": false,
+    "notes": "Council synthetic pitch with perimeter paths suitable for running."
+  },
+  {
+    "name": "Federal Park Sportsfield",
+    "sport_tags": ["running"],
+    "area": "Annandale",
+    "address": "Chapman Rd, Annandale NSW 2038",
+    "latitude": -33.8798,
+    "longitude": 151.1688,
+    "is_bookable": false,
+    "notes": "Large open sportsfield near Tramsheds; useful for running loops along the canal."
+  },
+  {
+    "name": "Annandale Oval",
+    "sport_tags": ["running"],
+    "area": "Annandale",
+    "address": "Johnston St, Annandale NSW 2038",
+    "latitude": -33.8841,
+    "longitude": 151.1697,
+    "is_bookable": false,
+    "notes": "Traditional local oval; perimeter is used for casual running."
+  },
+  {
+    "name": "Jubilee Oval Glebe",
+    "sport_tags": ["running"],
+    "area": "Glebe",
+    "address": "Chapman Rd, Glebe NSW 2037",
+    "latitude": -33.8783,
+    "longitude": 151.1820,
+    "is_bookable": false,
+    "notes": "Council oval near Glebe Foreshore; open running loops."
+  },
+  {
+    "name": "Wentworth Park Sportsfields",
+    "sport_tags": ["running"],
+    "area": "Glebe",
+    "address": "Wentworth Park Rd, Glebe NSW 2037",
+    "latitude": -33.8789,
+    "longitude": 151.1914,
+    "is_bookable": false,
+    "notes": "Multiple grass fields with encircling paths close to Broadway."
+  },
+  {
+    "name": "Reg Bartley Oval",
+    "sport_tags": ["running"],
+    "area": "Rushcutters Bay",
+    "address": "Waratah St, Rushcutters Bay NSW 2011",
+    "latitude": -33.8744,
+    "longitude": 151.2284,
+    "is_bookable": false,
+    "notes": "Harbour-side oval; flat perimeter run."
+  },
+  {
+    "name": "E.S. Marks Athletics Field",
+    "sport_tags": ["running"],
+    "area": "Moore Park",
+    "address": "Boronia St, Moore Park NSW 2021",
+    "latitude": -33.9030,
+    "longitude": 151.2267,
+    "is_bookable": false,
+    "notes": "Full athletics track with infield; ideal for structured running sessions."
+  },
+  {
+    "name": "Sydney Park parkrun course",
+    "sport_tags": ["running"],
+    "area": "St Peters",
+    "address": "Sydney Park Rd, St Peters NSW 2044",
+    "latitude": -33.9105,
+    "longitude": 151.1853,
+    "is_bookable": false,
+    "notes": "Weekly free 5 km parkrun and established loops."
+  },
+  {
+    "name": "Sydney Park sportsfield (McPherson Oval)",
+    "sport_tags": ["running"],
+    "area": "Alexandria",
+    "address": "Sydney Park Rd & Euston Rd, Alexandria NSW 2015",
+    "latitude": -33.9069,
+    "longitude": 151.1873,
+    "is_bookable": false,
+    "notes": "Marked oval at Sydney Park edge with surrounding paths."
+  },
+  {
+    "name": "Perry Park Synthetic Sportsfield",
+    "sport_tags": ["running"],
+    "area": "Alexandria",
+    "address": "1B Maddox St, Alexandria NSW 2015",
+    "latitude": -33.9053,
+    "longitude": 151.1974,
+    "is_bookable": false,
+    "notes": "Synthetic fields with perimeter for running drills."
+  },
+  {
+    "name": "Alan Davidson Oval",
+    "sport_tags": ["running"],
+    "area": "Alexandria",
+    "address": "31-53 Sydney Park Rd, Alexandria NSW 2015",
+    "latitude": -33.9076,
+    "longitude": 151.1946,
+    "is_bookable": false,
+    "notes": "Council oval between Newtown and St Peters."
+  },
+  {
+    "name": "Alexandria Park Oval & Tennis Courts",
+    "sport_tags": ["tennis", "running"],
+    "area": "Alexandria",
+    "address": "Park Rd, Alexandria NSW 2015",
+    "latitude": -33.9009,
+    "longitude": 151.1940,
+    "is_bookable": false,
+    "notes": "Oval plus adjacent public tennis courts servicing Newtown/Alexandria residents."
+  },
+  {
+    "name": "Marrickville Park & Lawn Tennis Club",
+    "sport_tags": ["tennis", "running"],
+    "area": "Marrickville",
+    "address": "Lilydale St, Marrickville NSW 2204",
+    "latitude": -33.9073,
+    "longitude": 151.1518,
+    "is_bookable": false,
+    "notes": "Park with multiple tennis courts plus open sportsfield perimeter for running."
+  },
+  {
+    "name": "Sydney Uni Sports & Aquatic Centre",
+    "sport_tags": ["tennis", "gym"],
+    "area": "Camperdown",
+    "address": "Darlington Rd, Camperdown NSW 2006",
+    "latitude": -33.8880,
+    "longitude": 151.1905,
+    "is_bookable": false,
+    "notes": "USYD flagship facility with tennis courts and full gym."
+  },
+  {
+    "name": "Sydney Uni Tennis Courts (Western Ave)",
+    "sport_tags": ["tennis"],
+    "area": "Camperdown",
+    "address": "Western Ave, Camperdown NSW 2006",
+    "latitude": -33.8894,
+    "longitude": 151.1870,
+    "is_bookable": false,
+    "notes": "Several bookable hard-court tennis courts near Oval No. 1."
+  },
+  {
+    "name": "Sydney Uni No.1 Oval & surrounds",
+    "sport_tags": ["running"],
+    "area": "Camperdown",
+    "address": "Western Ave, Camperdown NSW 2006",
+    "latitude": -33.8887,
+    "longitude": 151.1873,
+    "is_bookable": false,
+    "notes": "Campus oval and surrounding paths."
+  },
+  {
+    "name": "Camperdown Park",
+    "sport_tags": ["running"],
+    "area": "Camperdown",
+    "address": "Mallett St, Camperdown NSW 2050",
+    "latitude": -33.8866,
+    "longitude": 151.1768,
+    "is_bookable": false,
+    "notes": "Neighbourhood park with open grass near Newtown."
+  },
+  {
+    "name": "Richard Murden Reserve parkrun",
+    "sport_tags": ["running"],
+    "area": "Haberfield",
+    "address": "Hawthorne Parade, Haberfield NSW 2045",
+    "latitude": -33.8857,
+    "longitude": 151.1449,
+    "is_bookable": false,
+    "notes": "Weekly parkrun along the canal path near Annandale/Summer Hill."
+  },
+  {
+    "name": "King George Park (Bay Run access)",
+    "sport_tags": ["running"],
+    "area": "Rozelle",
+    "address": "Manning St, Rozelle NSW 2039",
+    "latitude": -33.8589,
+    "longitude": 151.1675,
+    "is_bookable": false,
+    "notes": "Popular access point to the Bay Run loop."
   }
 ]

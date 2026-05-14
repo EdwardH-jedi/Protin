@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -565,6 +567,117 @@ def test_gcal_event_returns_empty_when_neither_location_nor_venue() -> None:
         status="confirmed",
     )
     assert _resolve_event_location(b, None) == ""
+
+
+# ---------------------------------------------------------------------------
+# Seed dataset quality (apps/api/data/venues_sydney.json)
+#
+# These tests inspect the JSON file directly — no DB, no auth, no ASGI
+# fixtures — so they run in milliseconds and stay isolated from the
+# module-scoped engine fixture above.
+# ---------------------------------------------------------------------------
+
+
+_SEED_PATH = Path(__file__).resolve().parents[1] / "data" / "venues_sydney.json"
+
+# Whitelist comes from the app's controlled vocabulary
+# (app/schemas/venues.py:9). Keep it in sync when new sports are added.
+_SUPPORTED_SPORTS = {"gym", "golf", "tennis", "running"}
+
+# Greater Sydney bounding box. Liberal enough to cover Parramatta /
+# North Ryde / Bondi without admitting nonsense like a swapped 0,0.
+_SYDNEY_LAT_RANGE = (-34.2, -33.5)
+_SYDNEY_LNG_RANGE = (150.8, 151.4)
+
+
+def _load_seed() -> list[dict]:
+    return json.loads(_SEED_PATH.read_text(encoding="utf-8"))
+
+
+def test_seed_file_exists_and_is_non_empty() -> None:
+    data = _load_seed()
+    assert isinstance(data, list)
+    assert len(data) > 0
+
+
+def test_seed_every_venue_has_required_geo_fields() -> None:
+    for v in _load_seed():
+        assert "name" in v and isinstance(v["name"], str) and v["name"].strip(), v
+        assert "latitude" in v and isinstance(v["latitude"], (int, float)), v
+        assert "longitude" in v and isinstance(v["longitude"], (int, float)), v
+
+
+def test_seed_coordinates_are_inside_greater_sydney() -> None:
+    for v in _load_seed():
+        assert _SYDNEY_LAT_RANGE[0] <= v["latitude"] <= _SYDNEY_LAT_RANGE[1], v
+        assert _SYDNEY_LNG_RANGE[0] <= v["longitude"] <= _SYDNEY_LNG_RANGE[1], v
+
+
+def test_seed_sport_tags_are_non_empty_and_supported() -> None:
+    for v in _load_seed():
+        tags = v.get("sport_tags")
+        assert isinstance(tags, list) and tags, v
+        for tag in tags:
+            assert tag in _SUPPORTED_SPORTS, f"{v['name']}: unsupported tag {tag!r}"
+
+
+def test_seed_names_are_unique() -> None:
+    names = [v["name"] for v in _load_seed()]
+    duplicates = sorted({n for n in names if names.count(n) > 1})
+    assert duplicates == [], f"duplicate venue names: {duplicates}"
+
+
+def test_seed_no_unsupported_top_level_fields() -> None:
+    """Catch typos / stale schema fields like 'suburb' or 'source_url'."""
+    allowed = {
+        "name",
+        "sport_tags",
+        "area",
+        "address",
+        "latitude",
+        "longitude",
+        "booking_url",
+        "is_bookable",
+        "notes",
+    }
+    for v in _load_seed():
+        unexpected = set(v.keys()) - allowed
+        assert unexpected == set(), f"{v['name']}: unsupported fields {unexpected}"
+
+
+def test_seed_newtown_adjacent_launch_coverage_present() -> None:
+    """Stream 3 goal — anchor venues in the belt around Newtown.
+
+    The Perplexity research dataset intentionally does NOT include a
+    venue with ``area == "Newtown"``: there is no source-verified public
+    sports facility whose civic address is literally Newtown 2042 that
+    we can pin to exact coordinates. Instead, V1 launch coverage is
+    achieved through Newtown-adjacent suburbs (Camperdown / Alexandria /
+    St Peters to the south and east, Annandale / Glebe to the west and
+    north, Marrickville further south). An exact-Newtown venue should
+    only be added later once a source + coordinates are verified — do
+    NOT invent one to satisfy this test.
+    """
+    areas = {v.get("area") for v in _load_seed()}
+    assert "Camperdown" in areas, "missing Camperdown coverage"
+    assert {"Alexandria", "St Peters"} & areas, "missing Alexandria/St Peters coverage"
+    assert {"Annandale", "Glebe"} & areas, "missing Annandale/Glebe coverage"
+    assert "Marrickville" in areas, "missing Marrickville coverage"
+
+
+def test_seed_tennis_coverage_in_inner_west_or_usyd() -> None:
+    """At least one tennis venue should sit in the new Inner West / USYD belt."""
+    inner_west_or_usyd = {"Camperdown", "Alexandria", "Marrickville"}
+    tennis_in_belt = [
+        v for v in _load_seed()
+        if "tennis" in v.get("sport_tags", []) and v.get("area") in inner_west_or_usyd
+    ]
+    assert tennis_in_belt, "no tennis venue in Camperdown/Alexandria/Marrickville"
+
+
+# ---------------------------------------------------------------------------
+# Remaining HTTP tests
+# ---------------------------------------------------------------------------
 
 
 async def test_create_booking_with_mismatched_venue_sport_returns_422(client: AsyncClient) -> None:
