@@ -40,6 +40,8 @@ class NearbyVenuesQuery(BaseModel):
     sport: Sport
     lat: float | None = Field(default=None, ge=-90.0, le=90.0)
     lng: float | None = Field(default=None, ge=-180.0, le=180.0)
+    # Ignored when lat/lng are absent (no centre to measure from).
+    radius_km: float = Field(default=10.0, ge=1.0, le=50.0)
     limit: int = Field(default=20, ge=1, le=50)
 
     @model_validator(mode="after")
