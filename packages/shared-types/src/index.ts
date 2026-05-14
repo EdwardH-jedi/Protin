@@ -136,6 +136,13 @@ export type {
 } from './rank';
 
 export type {
+  RankProfileRead,
+  RankingEntry,
+  RankingListResponse,
+  HonorTitleRead,
+} from './honor-system';
+
+export type {
   TournamentStatus,
   TournamentSummary,
   TournamentParticipantSummary,
