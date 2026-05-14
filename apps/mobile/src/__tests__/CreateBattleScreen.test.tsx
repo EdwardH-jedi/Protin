@@ -7,7 +7,7 @@
  */
 
 import React from 'react';
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import { CreateBattleScreen } from '../screens/battles/CreateBattleScreen';
 
@@ -27,6 +27,66 @@ jest.mock('../components/Screen', () => {
     Screen: ({ children }: { children: React.ReactNode }) => <View>{children}</View>,
   };
 });
+
+// ─── Mock NearbyCourtsModal ──────────────────────────────────────────────────
+
+// Captures the latest props the event form passes into the modal so the
+// venue-picker integration tests can assert that sport + coords + status
+// flow through correctly. Mirrors the BookingComposerScreen test pattern.
+const mockNearbyModalProps = jest.fn();
+
+jest.mock('../screens/bookings/NearbyCourtsModal', () => {
+  const { Pressable, Text } = require('react-native');
+  return {
+    NearbyCourtsModal: (props: any) => {
+      mockNearbyModalProps(props);
+      const { isOpen, onSelect, onClose } = props;
+      return isOpen
+        ? (
+          <Pressable
+            accessibilityLabel="mock-pick-venue"
+            onPress={() => {
+              onSelect({
+                id: 'venue-1',
+                name: 'Tennis Court Alpha',
+                sportTags: ['tennis'],
+                area: 'Bondi',
+                address: '1 Beach Rd, Bondi NSW',
+                latitude: -33.89,
+                longitude: 151.27,
+                isBookable: false,
+                createdAt: '2026-01-01T00:00:00Z',
+                updatedAt: '2026-01-01T00:00:00Z',
+              });
+              onClose();
+            }}
+          >
+            <Text>pick mock venue</Text>
+          </Pressable>
+        )
+        : null;
+    },
+  };
+});
+
+// ─── Mock expo-location ───────────────────────────────────────────────────────
+
+jest.mock('expo-location', () => ({
+  getForegroundPermissionsAsync: jest.fn().mockResolvedValue({
+    status: 'denied',
+    granted: false,
+    canAskAgain: false,
+    expires: 'never',
+  }),
+  requestForegroundPermissionsAsync: jest.fn(),
+  getCurrentPositionAsync: jest.fn(),
+  PermissionStatus: {
+    GRANTED: 'granted',
+    DENIED: 'denied',
+    UNDETERMINED: 'undetermined',
+  },
+  Accuracy: { Balanced: 3 },
+}));
 
 jest.mock('../theme', () => ({
   colors: {
@@ -139,5 +199,137 @@ describe('CreateBattleScreen', () => {
     );
     fireEvent.press(getByLabelText('Back'));
     expect(navigation.goBack).toHaveBeenCalled();
+  });
+
+  // ── Venue picker integration ────────────────────────────────────────────
+
+  describe('venue picker', () => {
+    it('shows the Choose nearby venue button for venue-supported sports (tennis)', () => {
+      const { getByLabelText } = render(
+        <CreateBattleScreen
+          navigation={makeNavigation() as any}
+          route={{} as any}
+        />
+      );
+      fireEvent.press(getByLabelText('Select sport Tennis'));
+      expect(getByLabelText('Choose nearby venue')).toBeTruthy();
+    });
+
+    it('hides the picker for unsupported sports (basketball default) and shows free-text only', () => {
+      const { queryByLabelText, getByLabelText } = render(
+        <CreateBattleScreen
+          navigation={makeNavigation() as any}
+          route={{} as any}
+        />
+      );
+      // Basketball is the default first sport in BATTLE_SPORTS, and it
+      // sits outside the gym|golf|tennis|running venue catalog.
+      expect(queryByLabelText('Choose nearby venue')).toBeNull();
+      expect(getByLabelText('Game location')).toBeTruthy();
+    });
+
+    it('opens the modal and forwards sport + location status when picker is tapped', async () => {
+      const { getByLabelText } = render(
+        <CreateBattleScreen
+          navigation={makeNavigation() as any}
+          route={{} as any}
+        />
+      );
+      fireEvent.press(getByLabelText('Select sport Tennis'));
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose nearby venue'));
+      });
+      // Wait for useVenueLocation's denied-path effect to settle.
+      await waitFor(() => {
+        const props = mockNearbyModalProps.mock.calls.at(-1)?.[0];
+        expect(props?.isOpen).toBe(true);
+        expect(props?.sport).toBe('tennis');
+        expect(props?.locationStatus).toBe('denied');
+        expect(props?.lat).toBeUndefined();
+        expect(props?.lng).toBeUndefined();
+      });
+    });
+
+    it('selecting a venue populates the form and submit sends a venue-derived locationText', async () => {
+      mockCreateEvent.mockResolvedValueOnce({ id: 'event-with-venue' });
+      const navigation = makeNavigation();
+      const { getByLabelText, getByText, queryByLabelText } = render(
+        <CreateBattleScreen navigation={navigation as any} route={{} as any} />
+      );
+      fireEvent.press(getByLabelText('Select sport Tennis'));
+      fireEvent.changeText(getByLabelText('Game title'), 'Annandale Tennis Hit');
+
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose nearby venue'));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText('mock-pick-venue'));
+      });
+
+      // Chip replaces the free-text input.
+      expect(getByText('Tennis Court Alpha')).toBeTruthy();
+      expect(getByText('1 Beach Rd, Bondi NSW')).toBeTruthy();
+      expect(queryByLabelText('Game location')).toBeNull();
+      expect(getByLabelText('Clear selected venue')).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.press(getByLabelText('Create game'));
+      });
+
+      expect(mockCreateEvent).toHaveBeenCalledTimes(1);
+      const payload = mockCreateEvent.mock.calls[0][0];
+      expect(payload.sport).toBe('tennis');
+      expect(payload.locationText).toBe('Tennis Court Alpha — 1 Beach Rd, Bondi NSW');
+    });
+
+    it('Change clears the selected venue back to the free-text fallback', async () => {
+      const { getByLabelText, getByPlaceholderText } = render(
+        <CreateBattleScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      fireEvent.press(getByLabelText('Select sport Tennis'));
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose nearby venue'));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText('mock-pick-venue'));
+      });
+      fireEvent.press(getByLabelText('Clear selected venue'));
+      expect(getByPlaceholderText('Bondi Beach Court 2')).toBeTruthy();
+    });
+
+    it('switching sport away from a venue-supported one drops the selected venue', async () => {
+      const { getByLabelText, queryByText } = render(
+        <CreateBattleScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      fireEvent.press(getByLabelText('Select sport Tennis'));
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose nearby venue'));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText('mock-pick-venue'));
+      });
+      expect(queryByText('Tennis Court Alpha')).toBeTruthy();
+
+      fireEvent.press(getByLabelText('Select sport Basketball'));
+      // Venue chip is gone; basketball has no picker so free-text returns.
+      expect(queryByText('Tennis Court Alpha')).toBeNull();
+      expect(getByLabelText('Game location')).toBeTruthy();
+    });
+
+    it('still allows submit using only the free-text input on an unsupported sport', async () => {
+      mockCreateEvent.mockResolvedValueOnce({ id: 'event-no-picker' });
+      const { getByLabelText } = render(
+        <CreateBattleScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      // Sport defaults to basketball (no picker available).
+      fireEvent.changeText(getByLabelText('Game title'), 'Bondi pickup hoops');
+      fireEvent.changeText(getByLabelText('Game location'), 'Bondi Court');
+      await act(async () => {
+        fireEvent.press(getByLabelText('Create game'));
+      });
+      const payload = mockCreateEvent.mock.calls[0][0];
+      expect(payload.sport).toBe('basketball');
+      expect(payload.locationText).toBe('Bondi Court');
+    });
   });
 });

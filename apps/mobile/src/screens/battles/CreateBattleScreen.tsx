@@ -12,14 +12,28 @@ import {
 } from 'react-native';
 
 import { Screen } from '../../components/Screen';
+import { useVenueLocation } from '../../hooks/useVenueLocation';
 import {
   BATTLE_SPORTS,
   SPORT_CAPACITY_DEFAULTS,
   createEvent,
   type EventMode,
 } from '../../lib/events';
+import { formatVenueLocation } from '../../lib/venueLocation';
+import { NearbyCourtsModal } from '../bookings/NearbyCourtsModal';
 import { colors, radii, spacing, typography } from '../../theme';
+import type { Sport, Venue } from '@protin/shared-types';
 import type { CreateBattleScreenProps } from '../../navigation/types';
+
+// Sports the venue catalog supports today (matches the shared `Sport`
+// literal in `@protin/shared-types`). When a battle's sport is outside
+// this set we skip the picker entirely and fall back to free-text — a
+// picker that's guaranteed to be empty is worse UX than no picker.
+const VENUE_SUPPORTED_SPORTS = new Set<string>(['gym', 'golf', 'tennis', 'running']);
+
+function isVenueSupportedSport(s: string): s is Sport {
+  return VENUE_SUPPORTED_SPORTS.has(s);
+}
 
 const MODE_OPTIONS: { value: EventMode; label: string; sub: string }[] = [
   { value: 'casual', label: 'Casual Game', sub: 'Just play. No Honor risk.' },
@@ -68,15 +82,25 @@ export function CreateBattleScreen({ navigation }: CreateBattleScreenProps) {
   const [date, setDate] = useState(defaultDate());
   const [time, setTime] = useState(defaultTime());
   const [location, setLocation] = useState('');
+  const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
+  const [isVenuePickerOpen, setIsVenuePickerOpen] = useState(false);
   const [capacityInput, setCapacityInput] = useState<string>(
     String(SPORT_CAPACITY_DEFAULTS[BATTLE_SPORTS[0].value] ?? 10)
   );
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // The OS permission prompt only fires once the picker actually opens.
+  // Mirrors BookingComposerScreen's gating exactly.
+  const venueLocation = useVenueLocation({ enabled: isVenuePickerOpen });
+  const sportSupportsPicker = isVenueSupportedSport(sport);
+
   const onSelectSport = (s: string) => {
     setSport(s);
     setCapacityInput(String(SPORT_CAPACITY_DEFAULTS[s] ?? 10));
+    // A venue is tagged to one sport, so switching sport invalidates a
+    // prior selection. Drop it rather than send a mismatched payload.
+    setSelectedVenue(null);
   };
 
   const capacity = useMemo(() => {
@@ -84,9 +108,12 @@ export function CreateBattleScreen({ navigation }: CreateBattleScreenProps) {
     return Number.isFinite(n) ? n : 0;
   }, [capacityInput]);
 
+  // Either a typed location OR a selected venue is enough to satisfy
+  // the form. Same fallback chain as the booking composer.
+  const hasLocation = location.trim().length > 0 || selectedVenue !== null;
   const canSubmit =
     title.trim().length > 0 &&
-    location.trim().length > 0 &&
+    hasLocation &&
     capacity >= 1 &&
     !isSubmitting;
 
@@ -102,12 +129,20 @@ export function CreateBattleScreen({ navigation }: CreateBattleScreenProps) {
     }
     setIsSubmitting(true);
     try {
+      // Fallback chain mirrors BookingComposerScreen:
+      //   1. typed text (always wins — manual overrides venue)
+      //   2. venue-derived "Name — Address/Suburb"
+      //   3. empty (validation should have blocked us getting here)
+      const trimmedTyped = location.trim();
+      const venueDerived = selectedVenue ? formatVenueLocation(selectedVenue) : '';
+      const locationText = trimmedTyped || venueDerived;
+
       const detail = await createEvent({
         title: title.trim(),
         sport,
         mode,
         startsAt: startsAtDate.toISOString(),
-        locationText: location.trim(),
+        locationText,
         capacity,
         description: description.trim() ? description.trim() : null,
         visibility: 'public',
@@ -256,17 +291,55 @@ export function CreateBattleScreen({ navigation }: CreateBattleScreenProps) {
           </View>
         </View>
 
-        {/* Location */}
-        <FieldLabel>Location</FieldLabel>
-        <TextInput
-          value={location}
-          onChangeText={setLocation}
-          placeholder="Bondi Beach Court 2"
-          placeholderTextColor={colors.textTertiary}
-          maxLength={200}
-          style={styles.input}
-          accessibilityLabel="Game location"
-        />
+        {/* Venue / Location */}
+        <FieldLabel>Venue / Court</FieldLabel>
+        {sportSupportsPicker && selectedVenue ? (
+          <View style={styles.selectedVenueRow}>
+            <View style={styles.selectedVenueText}>
+              <Text style={styles.selectedVenueName} numberOfLines={1}>
+                {selectedVenue.name}
+              </Text>
+              {selectedVenue.area || selectedVenue.address ? (
+                <Text style={styles.selectedVenueArea} numberOfLines={1}>
+                  {selectedVenue.address ?? selectedVenue.area}
+                </Text>
+              ) : null}
+            </View>
+            <Pressable
+              onPress={() => setSelectedVenue(null)}
+              accessibilityRole="button"
+              accessibilityLabel="Clear selected venue"
+              style={({ pressed }) => [styles.clearVenue, pressed && styles.pressed]}
+            >
+              <Text style={styles.clearVenueText}>Change</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            {sportSupportsPicker ? (
+              <Pressable
+                onPress={() => setIsVenuePickerOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Choose nearby venue"
+                style={({ pressed }) => [styles.findCourtButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.findCourtText}>Choose nearby venue</Text>
+              </Pressable>
+            ) : null}
+            <TextInput
+              value={location}
+              onChangeText={setLocation}
+              placeholder="Bondi Beach Court 2"
+              placeholderTextColor={colors.textTertiary}
+              maxLength={200}
+              style={[
+                styles.input,
+                sportSupportsPicker ? styles.locationFallback : undefined,
+              ]}
+              accessibilityLabel="Game location"
+            />
+          </>
+        )}
 
         {/* Capacity */}
         <FieldLabel>Capacity</FieldLabel>
@@ -298,6 +371,24 @@ export function CreateBattleScreen({ navigation }: CreateBattleScreenProps) {
           Visibility: Public · Friends-only events are coming later.
         </Text>
       </ScrollView>
+
+      {sportSupportsPicker ? (
+        <NearbyCourtsModal
+          isOpen={isVenuePickerOpen}
+          sport={sport as Sport}
+          lat={venueLocation.latitude}
+          lng={venueLocation.longitude}
+          locationStatus={venueLocation.status}
+          onSelect={(venue) => {
+            setSelectedVenue(venue);
+            // Match BookingComposerScreen: clear typed text once a
+            // structured venue is chosen so it doesn't quietly override
+            // on submit via the typed-wins fallback chain.
+            setLocation('');
+          }}
+          onClose={() => setIsVenuePickerOpen(false)}
+        />
+      ) : null}
 
       <View style={styles.ctaBar}>
         <Pressable
@@ -437,6 +528,52 @@ const styles = StyleSheet.create({
   inputMultiline: {
     minHeight: 96,
     textAlignVertical: 'top',
+  },
+  findCourtButton: {
+    borderWidth: 1,
+    borderColor: colors.brand,
+    borderRadius: radii.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    backgroundColor: colors.brandSoft,
+  },
+  findCourtText: {
+    ...typography.button,
+    color: colors.brand,
+  },
+  locationFallback: {
+    marginTop: spacing.sm,
+  },
+  selectedVenueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.brand,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.brandSoft,
+  },
+  selectedVenueText: {
+    flex: 1,
+    gap: 2,
+  },
+  selectedVenueName: {
+    ...typography.bodyLarge,
+    color: colors.textPrimary,
+  },
+  selectedVenueArea: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  clearVenue: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  clearVenueText: {
+    ...typography.button,
+    color: colors.brand,
   },
   row: {
     flexDirection: 'row',
