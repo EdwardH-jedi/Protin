@@ -48,6 +48,15 @@ class Settings(BaseSettings):
     media_root: str = "media"
     media_url_prefix: str = "/media"
 
+    # Google Places API (New) — venue discovery provider.
+    #
+    # Used by app/services/places.py to back the "Google-Maps-like venue
+    # density" picker results in v1.1. Empty string is the default and
+    # the provider returns [] without making any HTTP call — so the
+    # local seed catalog continues to work unchanged when the key is
+    # not configured (local dev, CI, App Store reviewer environment).
+    google_places_api_key: str = ""
+
     # V2 Tournaments feature flag.
     #
     # Why it's behind a flag:
