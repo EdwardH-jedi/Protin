@@ -647,7 +647,9 @@ const styles = StyleSheet.create({
   },
   manualInput: {
     flex: 1,
-    backgroundColor: colors.surface,
+    // Use the same input surface every other TextInput in the app uses
+    // (CreateBattle, BookingComposer, Login, Register, EditProfile).
+    backgroundColor: colors.inputBackground,
     color: colors.textPrimary,
     borderRadius: radii.md,
     borderWidth: 1,

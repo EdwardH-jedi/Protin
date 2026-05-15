@@ -276,7 +276,10 @@ const styles = StyleSheet.create({
   },
   doneButton: {
     backgroundColor: colors.brand,
-    borderRadius: radii.md,
+    // Pill for the post-success affirmative CTA — matches every other
+    // brand-primary button in the app. The red `submitButton` above
+    // stays at radii.md as an intentional destructive-action signal.
+    borderRadius: radii.pill,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
     marginTop: spacing.md,

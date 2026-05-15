@@ -579,7 +579,9 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     backgroundColor: colors.brand,
-    borderRadius: radii.md,
+    // Pill matches the dominant primary-CTA shape across the app
+    // (LoginScreen, RegisterScreen, AuthEntry, CreateBattle, BattleDetail).
+    borderRadius: radii.pill,
     paddingVertical: spacing.md,
     alignItems: 'center',
     marginTop: spacing.sm,

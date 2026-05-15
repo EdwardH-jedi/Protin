@@ -278,7 +278,9 @@ const styles = StyleSheet.create({
   },
   buttonPrimary: {
     backgroundColor: colors.brand,
-    borderRadius: radii.md,
+    // Match the pill shape used by OnboardingStep1/2 + LoginScreen so the
+    // onboarding flow ends on the same CTA silhouette it began with.
+    borderRadius: radii.pill,
     paddingVertical: spacing.md,
     alignItems: 'center',
     marginBottom: spacing.xl,

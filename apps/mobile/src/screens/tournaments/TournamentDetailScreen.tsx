@@ -335,7 +335,9 @@ const styles = StyleSheet.create({
   },
   joinButton: {
     backgroundColor: colors.brand,
-    borderRadius: radii.md,
+    // Pill keeps tournament-detail's primary CTA visually identical to
+    // BattleDetailScreen's join CTA.
+    borderRadius: radii.pill,
     paddingVertical: spacing.md,
     alignItems: 'center',
   },
