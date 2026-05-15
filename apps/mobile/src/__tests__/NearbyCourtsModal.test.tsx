@@ -114,7 +114,7 @@ describe('NearbyCourtsModal', () => {
     expect(mockApiGet).not.toHaveBeenCalled();
   });
 
-  it('fetches /venues/nearby with the sport when opened', async () => {
+  it('fetches /venues/nearby with the sport when opened (no coords → source=seed)', async () => {
     mockApiGet.mockResolvedValue({ items: [], total: 0 });
     render(
       <NearbyCourtsModal
@@ -125,11 +125,15 @@ describe('NearbyCourtsModal', () => {
       />
     );
     await waitFor(() => {
-      expect(mockApiGet).toHaveBeenCalledWith('/venues/nearby?sport=tennis');
+      // No coords → modal picks source=seed (catalog-only honesty;
+      // server can't query Google without a centre).
+      expect(mockApiGet).toHaveBeenCalledWith(
+        '/venues/nearby?sport=tennis&source=seed'
+      );
     });
   });
 
-  it('passes lat/lng query params when both are provided', async () => {
+  it('passes lat/lng + source=both when coordinates are provided', async () => {
     mockApiGet.mockResolvedValue({ items: [], total: 0 });
     render(
       <NearbyCourtsModal
@@ -142,8 +146,10 @@ describe('NearbyCourtsModal', () => {
       />
     );
     await waitFor(() => {
+      // Coords present → modal opts into source=both so the picker is
+      // densified by Google Places results merged server-side.
       expect(mockApiGet).toHaveBeenCalledWith(
-        '/venues/nearby?sport=running&lat=-33.89&lng=151.27'
+        '/venues/nearby?sport=running&lat=-33.89&lng=151.27&source=both'
       );
     });
   });
@@ -764,20 +770,20 @@ describe('NearbyCourtsModal', () => {
           onClose={jest.fn()}
         />
       );
-      // Default URL — no radius_km param.
+      // Default URL — no radius_km param; coords present so source=both.
       await waitFor(() => {
         expect(mockApiGet).toHaveBeenCalledWith(
-          '/venues/nearby?sport=tennis&lat=-33.89&lng=151.27'
+          '/venues/nearby?sport=tennis&lat=-33.89&lng=151.27&source=both'
         );
       });
       const wider = await findByLabelText('Show wider results');
       await act(async () => {
         fireEvent.press(wider);
       });
-      // Once toggled, the next fetch includes radius_km=50.
+      // Once toggled, the next fetch includes radius_km=50 + source=both.
       await waitFor(() => {
         expect(mockApiGet).toHaveBeenCalledWith(
-          '/venues/nearby?sport=tennis&lat=-33.89&lng=151.27&radius_km=50'
+          '/venues/nearby?sport=tennis&lat=-33.89&lng=151.27&radius_km=50&source=both'
         );
       });
     });
@@ -840,11 +846,12 @@ describe('NearbyCourtsModal', () => {
         );
       });
       // Final URL after the sport switch must be the narrow default —
-      // no radius_km — proving the toggle reset.
+      // no radius_km — proving the toggle reset. Coords are present so
+      // source=both is still in the query.
       await waitFor(() => {
         const lastCall = mockApiGet.mock.calls.at(-1)?.[0];
         expect(lastCall).toBe(
-          '/venues/nearby?sport=running&lat=-33.89&lng=151.27'
+          '/venues/nearby?sport=running&lat=-33.89&lng=151.27&source=both'
         );
       });
     });
@@ -1038,6 +1045,156 @@ describe('NearbyCourtsModal', () => {
       });
       const switched = await findByLabelText('Type venue or court name');
       expect(switched.props.value).toBe('');
+    });
+  });
+
+  // ── Stream 3 — Google Places source-mode + attribution ─────────────────
+
+  describe('Google Places attribution + source mode', () => {
+    it('renders "Powered by Google" when any result is google_places-sourced', async () => {
+      mockApiGet.mockResolvedValue({
+        items: [
+          venue({
+            id: 'v-seed',
+            name: 'Seeded Court',
+            source: 'seed',
+            attributionRequired: false,
+          }),
+          venue({
+            id: 'v-places',
+            name: 'Places Court',
+            source: 'google_places',
+            providerPlaceId: 'places/ChIJabc',
+            attributionRequired: true,
+          }),
+        ],
+        total: 2,
+      });
+      const { findByLabelText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          lat={-33.89}
+          lng={151.27}
+          locationStatus="granted"
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      await findByLabelText('Powered by Google');
+    });
+
+    it('does NOT render the attribution when all results are seed-only', async () => {
+      mockApiGet.mockResolvedValue({
+        items: [
+          venue({ id: 'v-seed-a', name: 'Seed A', source: 'seed' }),
+          venue({ id: 'v-seed-b', name: 'Seed B', source: 'seed' }),
+        ],
+        total: 2,
+      });
+      const { findByText, queryByLabelText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          lat={-33.89}
+          lng={151.27}
+          locationStatus="granted"
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      // Make sure the response has actually rendered before asserting absence.
+      await findByText('Seed A');
+      expect(queryByLabelText('Powered by Google')).toBeNull();
+    });
+
+    it('does NOT render the attribution when the response is empty', async () => {
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const { findByText, queryByLabelText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          lat={-33.89}
+          lng={151.27}
+          locationStatus="granted"
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      await findByText('No courts found');
+      expect(queryByLabelText('Powered by Google')).toBeNull();
+    });
+
+    it('renders the attribution when source is missing but attributionRequired is true', async () => {
+      // Defensive: a future backend that omits `source` but still flags
+      // attributionRequired must still surface the chip — the contract
+      // is "show it whenever Google data is on screen".
+      mockApiGet.mockResolvedValue({
+        items: [
+          venue({
+            id: 'v-misc',
+            name: 'Misc Provider',
+            // Note: no `source` field.
+            attributionRequired: true,
+          }),
+        ],
+        total: 1,
+      });
+      const { findByLabelText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          lat={-33.89}
+          lng={151.27}
+          locationStatus="granted"
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      await findByLabelText('Powered by Google');
+    });
+
+    it('selecting a Google Places venue calls onSelect with the structured row (compatible payload)', async () => {
+      const placesRow = venue({
+        id: 'v-places',
+        name: 'Places Pickable',
+        area: 'Newtown',
+        address: '1 Places St, Newtown NSW',
+        source: 'google_places',
+        providerPlaceId: 'places/ChIJpick',
+        attributionRequired: true,
+      });
+      mockApiGet.mockResolvedValue({ items: [placesRow], total: 1 });
+      const onSelect = jest.fn();
+      const onClose = jest.fn();
+      const { findByLabelText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          lat={-33.89}
+          lng={151.27}
+          locationStatus="granted"
+          onSelect={onSelect}
+          onClose={onClose}
+        />
+      );
+      const useBtn = await findByLabelText('Use Places Pickable for session');
+      await act(async () => {
+        fireEvent.press(useBtn);
+      });
+      // onSelect receives the whole venue — payload conversion happens
+      // in the caller (BookingComposer / CreateBattle) via the same
+      // formatVenueLocation helper used for seed rows. No payload
+      // change required for Stream 3.
+      expect(onSelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'v-places',
+          name: 'Places Pickable',
+          source: 'google_places',
+          providerPlaceId: 'places/ChIJpick',
+        }),
+      );
+      expect(onClose).toHaveBeenCalled();
     });
   });
 });

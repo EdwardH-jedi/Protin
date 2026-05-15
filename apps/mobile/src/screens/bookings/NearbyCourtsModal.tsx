@@ -107,13 +107,35 @@ export function NearbyCourtsModal({
   const radiusKm =
     hasCoords && enableWiderResults && widerEnabled ? WIDER_RADIUS_KM : undefined;
 
+  // Source mode for /venues/nearby (Stream 2 backend, Stream 3 mobile):
+  //
+  //   * Coords present → "both"  — seed catalog + Google Places, merged
+  //                                + deduped server-side. Densifies the
+  //                                picker for sports/areas where the
+  //                                seed catalog is sparse.
+  //   * No coords     → "seed"  — pure catalog. "places" is silent
+  //                                without coords (server can't query
+  //                                Google without a centre) so "seed"
+  //                                is the honest source label.
+  //
+  // The Google API key stays on the backend; mobile never sees it.
+  const sourceMode: 'seed' | 'both' = hasCoords ? 'both' : 'seed';
+
   const { venues, isLoading, error, refresh } = useNearbyVenues({
     sport,
     lat,
     lng,
     radiusKm,
+    source: sourceMode,
     enabled: isOpen,
   });
+
+  // Google Places terms require a "Powered by Google" attribution mark
+  // whenever Places-sourced rows are visibly surfaced. Seed-only result
+  // sets must NOT show the chip (it would falsely imply Google data).
+  const requiresGoogleAttribution = venues.some(
+    (v) => v.source === 'google_places' || v.attributionRequired === true,
+  );
 
   // Reset the map selection on every close/open boundary and whenever
   // sport changes. Without this, a user who tapped a pin, dismissed the
@@ -386,6 +408,15 @@ export function NearbyCourtsModal({
           </View>
         )}
 
+        {requiresGoogleAttribution ? (
+          <View
+            style={styles.attributionChip}
+            accessibilityLabel="Powered by Google"
+          >
+            <Text style={styles.attributionText}>Powered by Google</Text>
+          </View>
+        ) : null}
+
         {showManualFooter ? (
           <View
             style={styles.manualFooter}
@@ -633,6 +664,24 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  attributionChip: {
+    // Slim, subdued chip — Google requires the attribution to be
+    // visible whenever Places data is shown, but it must not compete
+    // visually with primary picker actions. Lives above the manual
+    // footer so it appears in a stable position regardless of list/
+    // map/empty/error state.
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.separator,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'flex-end',
+  },
+  attributionText: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
+    fontSize: 11,
   },
   manualFooter: {
     paddingHorizontal: spacing.lg,
