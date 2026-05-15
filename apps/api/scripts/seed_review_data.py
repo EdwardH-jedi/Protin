@@ -59,7 +59,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import get_settings
@@ -69,7 +69,6 @@ from app.models.chat import Message
 from app.models.match import Match
 from app.models.profile import IdentityPreferences, SportProfile, UserProfile
 from app.models.user import User
-
 
 # ---------------------------------------------------------------------------
 # Seed catalogue
