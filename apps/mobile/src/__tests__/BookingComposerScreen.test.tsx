@@ -76,13 +76,14 @@ jest.mock('../theme', () => ({
 const mockNearbyModalProps = jest.fn();
 
 jest.mock('../screens/bookings/NearbyCourtsModal', () => {
-  const { Pressable, Text } = require('react-native');
+  const { Pressable, Text, View } = require('react-native');
   return {
     NearbyCourtsModal: (props: any) => {
       mockNearbyModalProps(props);
-      const { isOpen, onSelect, onClose } = props;
-      return isOpen
-        ? (
+      const { isOpen, onSelect, onSelectManual, onClose } = props;
+      if (!isOpen) return null;
+      return (
+        <View>
           <Pressable
             accessibilityLabel="mock-pick-venue"
             onPress={() => {
@@ -102,8 +103,19 @@ jest.mock('../screens/bookings/NearbyCourtsModal', () => {
           >
             <Text>pick mock venue</Text>
           </Pressable>
-        )
-        : null;
+          <Pressable
+            accessibilityLabel="mock-pick-manual"
+            onPress={() => {
+              // Simulates the user typing a court into the modal's
+              // bottom manual fallback and confirming.
+              onSelectManual?.('Hidden Garage Court');
+              onClose();
+            }}
+          >
+            <Text>pick mock manual</Text>
+          </Pressable>
+        </View>
+      );
     },
   };
 });
@@ -596,6 +608,88 @@ describe('BookingComposerScreen', () => {
         const props = mockNearbyModalProps.mock.calls.at(-1)?.[0];
         expect(props?.locationStatus).toBe('denied');
       });
+    });
+
+    // ── Wider results + manual fallback (parity with Battle picker UX) ─
+
+    it('forwards enableWiderResults and onSelectManual to the modal', async () => {
+      const { getByLabelText } = render(
+        <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose a court or venue'));
+      });
+      await waitFor(() => {
+        const props = mockNearbyModalProps.mock.calls.at(-1)?.[0];
+        expect(props?.enableWiderResults).toBe(true);
+        expect(typeof props?.onSelectManual).toBe('function');
+      });
+    });
+
+    it('manual venue from the modal becomes the booking location (no venueId)', async () => {
+      mockApiPost.mockResolvedValue({ id: 'booking-manual-venue' });
+      const { getByLabelText, queryByText } = render(
+        <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose a court or venue'));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText('mock-pick-manual'));
+      });
+
+      // No structured chip — typed path is in play.
+      expect(queryByText('Tennis Court Alpha')).toBeNull();
+
+      await act(async () => {
+        fireEvent.press(getByLabelText('Send proposal'));
+      });
+
+      expect(mockApiPost).toHaveBeenCalledWith(
+        '/bookings',
+        expect.objectContaining({
+          location: 'Hidden Garage Court',
+          // Clearing selectedVenue must also clear the structured
+          // venueId — otherwise we'd ship a manual string with a
+          // stale venue link.
+          venueId: undefined,
+        })
+      );
+    });
+
+    it('manual venue overrides a previously selected structured venue', async () => {
+      mockApiPost.mockResolvedValue({ id: 'booking-manual-overrides' });
+      const { getByLabelText, queryByText } = render(
+        <BookingComposerScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
+      );
+      // Step 1: select a structured venue.
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose a court or venue'));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText('mock-pick-venue'));
+      });
+      // Step 2: clear it and reopen the picker, then pick manual.
+      fireEvent.press(getByLabelText('Clear selected court'));
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose a court or venue'));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText('mock-pick-manual'));
+      });
+      expect(queryByText('Tennis Court Alpha')).toBeNull();
+
+      await act(async () => {
+        fireEvent.press(getByLabelText('Send proposal'));
+      });
+
+      expect(mockApiPost).toHaveBeenCalledWith(
+        '/bookings',
+        expect.objectContaining({
+          location: 'Hidden Garage Court',
+          venueId: undefined,
+        })
+      );
     });
   });
 

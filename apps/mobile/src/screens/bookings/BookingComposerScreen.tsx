@@ -264,10 +264,24 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
         lat={venueLocation.latitude}
         lng={venueLocation.longitude}
         locationStatus={venueLocation.status}
+        // Mirrors the polished Battle picker UX so partner-session
+        // proposals get the same Nearby/Wider toggle when coords are
+        // available. Off by default in the modal — opting in here.
+        enableWiderResults
         onSelect={(venue) => {
           setSelectedVenue(venue);
           // Drop any freeform location text once a structured venue is chosen.
           setLocation('');
+        }}
+        onSelectManual={(text) => {
+          // Manual fallback from inside the picker: discard any
+          // structured selection (which also clears the venueId we
+          // send to /bookings) and surface the typed string in the
+          // outer freeform input so the user still sees it after
+          // the modal closes. The submit fallback chain
+          // (typed → venue-derived) then lands on the typed value.
+          setSelectedVenue(null);
+          setLocation(text);
         }}
         onClose={() => setIsVenuePickerOpen(false)}
       />
