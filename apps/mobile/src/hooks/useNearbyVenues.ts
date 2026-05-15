@@ -8,6 +8,12 @@ interface UseNearbyVenuesArgs {
   /** Pass both lat and lng or neither. */
   lat?: number;
   lng?: number;
+  /**
+   * Optional search radius in km. Only sent to the server when defined
+   * AND coordinates are provided — the backend silently ignores it on the
+   * no-coordinate catalog path. Omit to use the backend default (10km).
+   */
+  radiusKm?: number;
   /** When false, the hook will not fetch (use to skip until the modal opens). */
   enabled?: boolean;
 }
@@ -31,6 +37,7 @@ export function useNearbyVenues({
   sport,
   lat,
   lng,
+  radiusKm,
   enabled = true,
 }: UseNearbyVenuesArgs): UseNearbyVenuesResult {
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -46,6 +53,13 @@ export function useNearbyVenues({
       if (lat !== undefined && lng !== undefined) {
         params.set('lat', String(lat));
         params.set('lng', String(lng));
+        // radius_km is only meaningful with coords — backend ignores it
+        // on the catalog path. Skip the param when callers omit it so
+        // the request stays byte-identical to the prior nearby URL and
+        // existing test assertions keep passing.
+        if (radiusKm !== undefined && Number.isFinite(radiusKm)) {
+          params.set('radius_km', String(radiusKm));
+        }
       }
       const data = await api.get<NearbyVenuesResponse>(`/venues/nearby?${params.toString()}`);
       setVenues(data.items);
@@ -55,7 +69,7 @@ export function useNearbyVenues({
     } finally {
       setIsLoading(false);
     }
-  }, [sport, lat, lng, enabled]);
+  }, [sport, lat, lng, radiusKm, enabled]);
 
   useEffect(() => {
     void fetchVenues();

@@ -36,13 +36,14 @@ jest.mock('../components/Screen', () => {
 const mockNearbyModalProps = jest.fn();
 
 jest.mock('../screens/bookings/NearbyCourtsModal', () => {
-  const { Pressable, Text } = require('react-native');
+  const { Pressable, Text, View } = require('react-native');
   return {
     NearbyCourtsModal: (props: any) => {
       mockNearbyModalProps(props);
-      const { isOpen, onSelect, onClose } = props;
-      return isOpen
-        ? (
+      const { isOpen, onSelect, onSelectManual, onClose } = props;
+      if (!isOpen) return null;
+      return (
+        <View>
           <Pressable
             accessibilityLabel="mock-pick-venue"
             onPress={() => {
@@ -63,8 +64,19 @@ jest.mock('../screens/bookings/NearbyCourtsModal', () => {
           >
             <Text>pick mock venue</Text>
           </Pressable>
-        )
-        : null;
+          <Pressable
+            accessibilityLabel="mock-pick-manual"
+            onPress={() => {
+              // Simulates the user typing a court name into the
+              // modal's bottom fallback and pressing "Use this venue".
+              onSelectManual?.('My Backyard Court');
+              onClose();
+            }}
+          >
+            <Text>pick mock manual</Text>
+          </Pressable>
+        </View>
+      );
     },
   };
 });
@@ -330,6 +342,89 @@ describe('CreateBattleScreen', () => {
       const payload = mockCreateEvent.mock.calls[0][0];
       expect(payload.sport).toBe('basketball');
       expect(payload.locationText).toBe('Bondi Court');
+    });
+
+    it('forwards enableWiderResults and onSelectManual to the modal', async () => {
+      const { getByLabelText } = render(
+        <CreateBattleScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      fireEvent.press(getByLabelText('Select sport Tennis'));
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose nearby venue'));
+      });
+      await waitFor(() => {
+        const props = mockNearbyModalProps.mock.calls.at(-1)?.[0];
+        expect(props?.enableWiderResults).toBe(true);
+        expect(typeof props?.onSelectManual).toBe('function');
+      });
+    });
+
+    it('manual venue from the modal becomes the locationText on submit', async () => {
+      mockCreateEvent.mockResolvedValueOnce({ id: 'event-manual-venue' });
+      const navigation = makeNavigation();
+      const { getByLabelText, queryByText } = render(
+        <CreateBattleScreen navigation={navigation as any} route={{} as any} />
+      );
+      fireEvent.press(getByLabelText('Select sport Tennis'));
+      fireEvent.changeText(getByLabelText('Game title'), 'Tennis at the back court');
+
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose nearby venue'));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText('mock-pick-manual'));
+      });
+
+      // No structured selection chip — the typed-text path is in play.
+      expect(queryByText('Tennis Court Alpha')).toBeNull();
+      // Outer free-text mirrors what the user typed in the modal.
+      const locationInput = getByLabelText('Game location');
+      expect(locationInput.props.value).toBe('My Backyard Court');
+
+      await act(async () => {
+        fireEvent.press(getByLabelText('Create game'));
+      });
+
+      expect(mockCreateEvent).toHaveBeenCalledTimes(1);
+      const payload = mockCreateEvent.mock.calls[0][0];
+      // Existing backend-compatible field: locationText.
+      expect(payload.locationText).toBe('My Backyard Court');
+      expect(payload.sport).toBe('tennis');
+    });
+
+    it('manual venue overrides a previously selected structured venue', async () => {
+      mockCreateEvent.mockResolvedValueOnce({ id: 'event-manual-overrides' });
+      const { getByLabelText, queryByText } = render(
+        <CreateBattleScreen navigation={makeNavigation() as any} route={{} as any} />
+      );
+      fireEvent.press(getByLabelText('Select sport Tennis'));
+      fireEvent.changeText(getByLabelText('Game title'), 'Tennis hit');
+
+      // First: pick a structured venue.
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose nearby venue'));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText('mock-pick-venue'));
+      });
+      // Then: reopen and use manual fallback — modal closes, chip
+      // disappears, free-text input returns with the typed value.
+      await act(async () => {
+        fireEvent.press(getByLabelText('Clear selected venue'));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText('Choose nearby venue'));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText('mock-pick-manual'));
+      });
+      expect(queryByText('Tennis Court Alpha')).toBeNull();
+
+      await act(async () => {
+        fireEvent.press(getByLabelText('Create game'));
+      });
+      const payload = mockCreateEvent.mock.calls[0][0];
+      expect(payload.locationText).toBe('My Backyard Court');
     });
   });
 });

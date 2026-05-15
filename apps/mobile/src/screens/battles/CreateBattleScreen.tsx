@@ -379,12 +379,25 @@ export function CreateBattleScreen({ navigation }: CreateBattleScreenProps) {
           lat={venueLocation.latitude}
           lng={venueLocation.longitude}
           locationStatus={venueLocation.status}
+          // Battle hosts hunt across a city, not just their block — give
+          // them a Wider toggle once we actually have coords.
+          enableWiderResults
           onSelect={(venue) => {
             setSelectedVenue(venue);
             // Match BookingComposerScreen: clear typed text once a
             // structured venue is chosen so it doesn't quietly override
             // on submit via the typed-wins fallback chain.
             setLocation('');
+          }}
+          onSelectManual={(text) => {
+            // Manual venue from inside the picker wins over any prior
+            // chip — drop the structured selection so the submit
+            // fallback chain (typed → venue-derived) lands on the
+            // typed string, and surface the value in the outer
+            // free-text field so the user still sees what they
+            // entered after the modal closes.
+            setSelectedVenue(null);
+            setLocation(text);
           }}
           onClose={() => setIsVenuePickerOpen(false)}
         />

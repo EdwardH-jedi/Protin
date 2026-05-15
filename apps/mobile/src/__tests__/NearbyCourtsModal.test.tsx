@@ -695,4 +695,349 @@ describe('NearbyCourtsModal', () => {
       expect(queryByLabelText('Selected venue preview')).toBeNull();
     });
   });
+
+  // ── Wider results toggle (Battle picker UX) ────────────────────────────
+
+  describe('wider results toggle', () => {
+    it('does not render the toggle by default (no enableWiderResults prop)', async () => {
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const { findByText, queryByLabelText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          lat={-33.89}
+          lng={151.27}
+          locationStatus="granted"
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      await findByText('Sorted near you');
+      expect(queryByLabelText('Show wider results')).toBeNull();
+    });
+
+    it('does not render the toggle when enableWiderResults=true but coords are missing', async () => {
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const { findByText, queryByLabelText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          enableWiderResults
+          locationStatus="denied"
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      await findByText('Location off. Showing Sydney catalog.');
+      expect(queryByLabelText('Show wider results')).toBeNull();
+    });
+
+    it('renders the Nearby/Wider toggle when enabled AND coords are present', async () => {
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const { findByLabelText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          lat={-33.89}
+          lng={151.27}
+          locationStatus="granted"
+          enableWiderResults
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      await findByLabelText('Show nearby venues');
+      await findByLabelText('Show wider results');
+    });
+
+    it('toggling "Wider results" appends radius_km=50 to the venues request', async () => {
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const { findByLabelText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          lat={-33.89}
+          lng={151.27}
+          locationStatus="granted"
+          enableWiderResults
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      // Default URL — no radius_km param.
+      await waitFor(() => {
+        expect(mockApiGet).toHaveBeenCalledWith(
+          '/venues/nearby?sport=tennis&lat=-33.89&lng=151.27'
+        );
+      });
+      const wider = await findByLabelText('Show wider results');
+      await act(async () => {
+        fireEvent.press(wider);
+      });
+      // Once toggled, the next fetch includes radius_km=50.
+      await waitFor(() => {
+        expect(mockApiGet).toHaveBeenCalledWith(
+          '/venues/nearby?sport=tennis&lat=-33.89&lng=151.27&radius_km=50'
+        );
+      });
+    });
+
+    it('"Sorted near you" copy flips to "Wider results" when toggled', async () => {
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const { findByText, findByLabelText, queryByText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          lat={-33.89}
+          lng={151.27}
+          locationStatus="granted"
+          enableWiderResults
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      await findByText('Sorted near you');
+      await act(async () => {
+        fireEvent.press(await findByLabelText('Show wider results'));
+      });
+      // Status banner exposes the wider label via accessibilityLabel so
+      // the chip text doesn't collide with the toggle's chip text.
+      await findByLabelText(/Location status: Wider results/);
+      // Catalog-honesty: must not still claim "near you" once widened.
+      expect(queryByText('Sorted near you')).toBeNull();
+    });
+
+    it('wider toggle resets when sport changes mid-session', async () => {
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const { findByLabelText, rerender } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          lat={-33.89}
+          lng={151.27}
+          locationStatus="granted"
+          enableWiderResults
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      await act(async () => {
+        fireEvent.press(await findByLabelText('Show wider results'));
+      });
+      // Sport switch — toggle should snap back to "Nearby" (selected).
+      await act(async () => {
+        rerender(
+          <NearbyCourtsModal
+            isOpen
+            sport="running"
+            lat={-33.89}
+            lng={151.27}
+            locationStatus="granted"
+            enableWiderResults
+            onSelect={jest.fn()}
+            onClose={jest.fn()}
+          />
+        );
+      });
+      // Final URL after the sport switch must be the narrow default —
+      // no radius_km — proving the toggle reset.
+      await waitFor(() => {
+        const lastCall = mockApiGet.mock.calls.at(-1)?.[0];
+        expect(lastCall).toBe(
+          '/venues/nearby?sport=running&lat=-33.89&lng=151.27'
+        );
+      });
+    });
+  });
+
+  // ── Manual venue fallback (Battle picker UX) ───────────────────────────
+
+  describe('manual venue fallback', () => {
+    it('does not render the manual footer when onSelectManual is omitted', async () => {
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const { findByText, queryByLabelText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      await findByText('No courts found');
+      expect(queryByLabelText('Type venue or court name')).toBeNull();
+      expect(queryByLabelText('Use typed venue')).toBeNull();
+      expect(queryByLabelText('Manual venue entry')).toBeNull();
+    });
+
+    it('renders the manual footer when onSelectManual is provided', async () => {
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const { findByLabelText, findByText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          onSelectManual={jest.fn()}
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      await findByLabelText('Type venue or court name');
+      await findByLabelText('Use typed venue');
+      await findByText("Can't find your court?");
+    });
+
+    it('manual footer is also reachable from the empty state', async () => {
+      // The empty-state copy directs users to "type one in instead" —
+      // the manual footer is the surface that fulfils that promise.
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const { findByText, findByLabelText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          onSelectManual={jest.fn()}
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      await findByText('No courts found');
+      await findByLabelText('Type venue or court name');
+    });
+
+    it('"Use this venue" stays disabled until non-empty text is typed', async () => {
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const onSelectManual = jest.fn();
+      const onClose = jest.fn();
+      const { findByLabelText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          onSelectManual={onSelectManual}
+          onSelect={jest.fn()}
+          onClose={onClose}
+        />
+      );
+      const useBtn = await findByLabelText('Use typed venue');
+      // Empty by default — disabled flag is on, no callback fires.
+      expect(useBtn.props.accessibilityState?.disabled).toBe(true);
+      await act(async () => {
+        fireEvent.press(useBtn);
+      });
+      expect(onSelectManual).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('whitespace-only text does not enable the button', async () => {
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const onSelectManual = jest.fn();
+      const { findByLabelText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          onSelectManual={onSelectManual}
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      const input = await findByLabelText('Type venue or court name');
+      const useBtn = await findByLabelText('Use typed venue');
+      fireEvent.changeText(input, '   ');
+      await act(async () => {
+        fireEvent.press(useBtn);
+      });
+      expect(onSelectManual).not.toHaveBeenCalled();
+    });
+
+    it('typing a venue and pressing "Use this venue" fires onSelectManual(trimmed) and onClose', async () => {
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const onSelectManual = jest.fn();
+      const onClose = jest.fn();
+      const { findByLabelText } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          onSelectManual={onSelectManual}
+          onSelect={jest.fn()}
+          onClose={onClose}
+        />
+      );
+      const input = await findByLabelText('Type venue or court name');
+      const useBtn = await findByLabelText('Use typed venue');
+      fireEvent.changeText(input, '  Pop-up Pickleball Court  ');
+      await act(async () => {
+        fireEvent.press(useBtn);
+      });
+      expect(onSelectManual).toHaveBeenCalledTimes(1);
+      // Trimmed but casing preserved.
+      expect(onSelectManual).toHaveBeenCalledWith('Pop-up Pickleball Court');
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('manual text resets on close/reopen boundary', async () => {
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const { findByLabelText, rerender } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          onSelectManual={jest.fn()}
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      const input = await findByLabelText('Type venue or court name');
+      fireEvent.changeText(input, 'Half-typed venue');
+      // Close.
+      await act(async () => {
+        rerender(
+          <NearbyCourtsModal
+            isOpen={false}
+            sport="tennis"
+            onSelectManual={jest.fn()}
+            onSelect={jest.fn()}
+            onClose={jest.fn()}
+          />
+        );
+      });
+      // Reopen.
+      await act(async () => {
+        rerender(
+          <NearbyCourtsModal
+            isOpen
+            sport="tennis"
+            onSelectManual={jest.fn()}
+            onSelect={jest.fn()}
+            onClose={jest.fn()}
+          />
+        );
+      });
+      const reopenedInput = await findByLabelText('Type venue or court name');
+      expect(reopenedInput.props.value).toBe('');
+    });
+
+    it('manual text resets when sport changes', async () => {
+      mockApiGet.mockResolvedValue({ items: [], total: 0 });
+      const { findByLabelText, rerender } = render(
+        <NearbyCourtsModal
+          isOpen
+          sport="tennis"
+          onSelectManual={jest.fn()}
+          onSelect={jest.fn()}
+          onClose={jest.fn()}
+        />
+      );
+      const input = await findByLabelText('Type venue or court name');
+      fireEvent.changeText(input, 'Tennis-specific text');
+      await act(async () => {
+        rerender(
+          <NearbyCourtsModal
+            isOpen
+            sport="running"
+            onSelectManual={jest.fn()}
+            onSelect={jest.fn()}
+            onClose={jest.fn()}
+          />
+        );
+      });
+      const switched = await findByLabelText('Type venue or court name');
+      expect(switched.props.value).toBe('');
+    });
+  });
 });

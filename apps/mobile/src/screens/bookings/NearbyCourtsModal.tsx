@@ -7,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -20,6 +21,13 @@ import type { Sport, Venue } from '@protin/shared-types';
 
 type PickerMode = 'list' | 'map';
 
+/**
+ * Radius (km) sent to the backend when the user toggles "Wider".
+ * Matches the upper bound of the API's `radius_km` Query() validator
+ * (apps/api/app/routers/venues.py — le=50.0) so we never get rejected.
+ */
+const WIDER_RADIUS_KM = 50;
+
 interface NearbyCourtsModalProps {
   isOpen: boolean;
   sport: Sport;
@@ -32,6 +40,22 @@ interface NearbyCourtsModalProps {
    * are not distance-sorted. Defaults to "idle" if omitted.
    */
   locationStatus?: VenueLocationStatus;
+  /**
+   * When true AND coordinates are present, show a Nearby/Wider toggle
+   * that expands the search radius to {@link WIDER_RADIUS_KM} km. Default
+   * off so existing booking/event flows keep their current narrow
+   * default-radius behavior and URL shape.
+   */
+  enableWiderResults?: boolean;
+  /**
+   * Optional manual-entry fallback. When provided, renders an input at
+   * the bottom of the modal so users can type a venue/court name when
+   * the catalog doesn't list it. The callback receives the trimmed
+   * non-empty text; parents are responsible for clearing any
+   * structured selectedVenue and closing the modal (mirrors the
+   * onSelect contract).
+   */
+  onSelectManual?: (text: string) => void;
   onSelect: (venue: Venue) => void;
   onClose: () => void;
 }
@@ -50,22 +74,40 @@ export function NearbyCourtsModal({
   lat,
   lng,
   locationStatus = 'idle',
+  enableWiderResults = false,
+  onSelectManual,
   onSelect,
   onClose,
 }: NearbyCourtsModalProps) {
-  const { venues, isLoading, error, refresh } = useNearbyVenues({
-    sport,
-    lat,
-    lng,
-    enabled: isOpen,
-  });
-
   // Default to list so every existing test + integration path keeps
   // working unchanged. The user opts into map mode explicitly.
   const [mode, setMode] = useState<PickerMode>('list');
   // Selected-pin state lives here (not in the parent) so List mode
   // stays untouched. Tap → show preview card → "Select this venue".
   const [mapSelectedVenue, setMapSelectedVenue] = useState<Venue | null>(null);
+  // Wider-search toggle. Only meaningful when coords are available;
+  // resets on every isOpen/sport boundary so a stale toggle from a
+  // previous session doesn't quietly widen the new one.
+  const [widerEnabled, setWiderEnabled] = useState(false);
+  // Manual-entry buffer for the bottom fallback. Stays local to the
+  // modal — the parent only sees the trimmed value when the user
+  // explicitly taps "Use this venue".
+  const [manualText, setManualText] = useState('');
+
+  const hasCoords = lat !== undefined && lng !== undefined;
+  // Only pass radius_km when (a) coords are present and (b) the user
+  // has opted into wider results. Otherwise omit, so the request URL
+  // stays byte-identical to the prior nearby endpoint shape.
+  const radiusKm =
+    hasCoords && enableWiderResults && widerEnabled ? WIDER_RADIUS_KM : undefined;
+
+  const { venues, isLoading, error, refresh } = useNearbyVenues({
+    sport,
+    lat,
+    lng,
+    radiusKm,
+    enabled: isOpen,
+  });
 
   // Reset the map selection on every close/open boundary and whenever
   // sport changes. Without this, a user who tapped a pin, dismissed the
@@ -73,8 +115,14 @@ export function NearbyCourtsModal({
   // sport with a different venue set) would still see the previous pin
   // as the live preview — and could "Select this venue" on something
   // that no longer matches the current result set.
+  //
+  // Manual text + wider toggle share the same boundary for the same
+  // reason: a half-typed manual venue or a previously-toggled wider
+  // search shouldn't bleed into a brand-new picker session.
   useEffect(() => {
     setMapSelectedVenue(null);
+    setManualText('');
+    setWiderEnabled(false);
   }, [isOpen, sport]);
 
   // Second guard: if the venue results change mid-session (refresh, a
@@ -90,12 +138,14 @@ export function NearbyCourtsModal({
     }
   }, [venues, mapSelectedVenue]);
 
-  const hasCoords = lat !== undefined && lng !== undefined;
   // Catalog-honest fallback wording: only call results "near you" when
-  // the server actually got coordinates. Otherwise we're showing the
-  // Sydney venue catalog.
+  // the server actually got coordinates. The "Wider results" branch
+  // reuses the same honesty rule — don't claim "near you" once the
+  // user has explicitly asked to look further out.
   const statusLabel: string | null = hasCoords
-    ? 'Sorted near you'
+    ? widerEnabled
+      ? `Wider results (within ${WIDER_RADIUS_KM} km)`
+      : 'Sorted near you'
     : locationStatus === 'denied' || locationStatus === 'unavailable'
       ? 'Location off. Showing Sydney catalog.'
       : null;
@@ -110,6 +160,18 @@ export function NearbyCourtsModal({
       void Linking.openURL(venue.bookingUrl);
     }
   };
+
+  const handleUseManual = () => {
+    if (!onSelectManual) return;
+    const trimmed = manualText.trim();
+    if (trimmed.length === 0) return;
+    onSelectManual(trimmed);
+    onClose();
+  };
+
+  const showWiderToggle = enableWiderResults && hasCoords;
+  const showManualFooter = !!onSelectManual;
+  const manualTrimmedNonEmpty = manualText.trim().length > 0;
 
   return (
     <Modal
@@ -187,6 +249,51 @@ export function NearbyCourtsModal({
             </Text>
           </Pressable>
         </View>
+
+        {showWiderToggle ? (
+          <View style={styles.radiusToggle}>
+            <Pressable
+              onPress={() => setWiderEnabled(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Show nearby venues"
+              accessibilityState={{ selected: !widerEnabled }}
+              style={({ pressed }) => [
+                styles.radiusChip,
+                !widerEnabled && styles.radiusChipActive,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.radiusChipText,
+                  !widerEnabled && styles.radiusChipTextActive,
+                ]}
+              >
+                Nearby
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setWiderEnabled(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Show wider results"
+              accessibilityState={{ selected: widerEnabled }}
+              style={({ pressed }) => [
+                styles.radiusChip,
+                widerEnabled && styles.radiusChipActive,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.radiusChipText,
+                  widerEnabled && styles.radiusChipTextActive,
+                ]}
+              >
+                Wider results
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {isLoading ? (
           <View style={styles.centred}>
@@ -272,6 +379,51 @@ export function NearbyCourtsModal({
             )}
           </View>
         )}
+
+        {showManualFooter ? (
+          <View
+            style={styles.manualFooter}
+            accessibilityLabel="Manual venue entry"
+          >
+            <Text style={styles.manualLabel}>Can&apos;t find your court?</Text>
+            <View style={styles.manualRow}>
+              <TextInput
+                value={manualText}
+                onChangeText={setManualText}
+                placeholder="Type venue or court name"
+                placeholderTextColor={colors.textTertiary}
+                maxLength={200}
+                autoCapitalize="words"
+                autoCorrect={false}
+                style={styles.manualInput}
+                accessibilityLabel="Type venue or court name"
+                returnKeyType="done"
+                onSubmitEditing={handleUseManual}
+              />
+              <Pressable
+                onPress={handleUseManual}
+                disabled={!manualTrimmedNonEmpty}
+                accessibilityRole="button"
+                accessibilityLabel="Use typed venue"
+                accessibilityState={{ disabled: !manualTrimmedNonEmpty }}
+                style={({ pressed }) => [
+                  styles.manualButton,
+                  !manualTrimmedNonEmpty && styles.manualButtonDisabled,
+                  pressed && manualTrimmedNonEmpty && styles.pressed,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.manualButtonText,
+                    !manualTrimmedNonEmpty && styles.manualButtonTextDisabled,
+                  ]}
+                >
+                  Use this venue
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
       </View>
     </Modal>
   );
@@ -349,6 +501,34 @@ const styles = StyleSheet.create({
   },
   modeChipTextActive: {
     color: colors.textInverse,
+  },
+  radiusToggle: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.separator,
+  },
+  radiusChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  radiusChipActive: {
+    backgroundColor: colors.brandSoft,
+    borderColor: colors.brand,
+  },
+  radiusChipText: {
+    ...typography.button,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  radiusChipTextActive: {
+    color: colors.brand,
   },
   mapWrap: {
     flex: 1,
@@ -447,6 +627,51 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  manualFooter: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.separator,
+    backgroundColor: colors.surfaceElevated,
+    gap: spacing.xs,
+  },
+  manualLabel: {
+    ...typography.label,
+    color: colors.textTertiary,
+  },
+  manualRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  manualInput: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    color: colors.textPrimary,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 15,
+  },
+  manualButton: {
+    backgroundColor: colors.brand,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  manualButtonDisabled: {
+    backgroundColor: colors.border,
+  },
+  manualButtonText: {
+    ...typography.button,
+    color: colors.textInverse,
+    fontSize: 13,
+  },
+  manualButtonTextDisabled: {
+    color: colors.textTertiary,
   },
   pressed: {
     opacity: 0.65,
