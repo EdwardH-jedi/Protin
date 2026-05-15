@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +20,13 @@ async def get_nearby_venues(
     # silently ignores it in the no-coordinate catalog fallback path.
     radius_km: float = Query(10.0, ge=1.0, le=50.0),
     limit: int = Query(20, ge=1, le=50),
+    # v1.1: source selector. Default "seed" preserves v1.0 wire shape
+    # exactly. FastAPI's Literal-typed Query validates and returns 422
+    # for any other value.
+    source: Literal["seed", "places", "both"] = Query(
+        "seed",
+        description="Venue source: seed | places | both (default seed)",
+    ),
     _user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> NearbyVenuesResponse:
@@ -27,5 +36,11 @@ async def get_nearby_venues(
             detail="lat and lng must be provided together",
         )
     return await venues_service.list_nearby_venues(
-        db=db, sport=sport, lat=lat, lng=lng, radius_km=radius_km, limit=limit
+        db=db,
+        sport=sport,
+        lat=lat,
+        lng=lng,
+        radius_km=radius_km,
+        limit=limit,
+        source=source,
     )
