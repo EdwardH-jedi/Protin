@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -10,10 +11,14 @@ import {
 } from 'react-native';
 
 import { VenueCard } from '../../components/VenueCard';
+import { VenueMapView } from '../../components/VenueMapView';
 import { useNearbyVenues } from '../../hooks/useNearbyVenues';
 import type { VenueLocationStatus } from '../../hooks/useVenueLocation';
+import { formatVenueLocation } from '../../lib/venueLocation';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { Sport, Venue } from '@protin/shared-types';
+
+type PickerMode = 'list' | 'map';
 
 interface NearbyCourtsModalProps {
   isOpen: boolean;
@@ -54,6 +59,36 @@ export function NearbyCourtsModal({
     lng,
     enabled: isOpen,
   });
+
+  // Default to list so every existing test + integration path keeps
+  // working unchanged. The user opts into map mode explicitly.
+  const [mode, setMode] = useState<PickerMode>('list');
+  // Selected-pin state lives here (not in the parent) so List mode
+  // stays untouched. Tap → show preview card → "Select this venue".
+  const [mapSelectedVenue, setMapSelectedVenue] = useState<Venue | null>(null);
+
+  // Reset the map selection on every close/open boundary and whenever
+  // sport changes. Without this, a user who tapped a pin, dismissed the
+  // modal without confirming, and reopened it (possibly for a different
+  // sport with a different venue set) would still see the previous pin
+  // as the live preview — and could "Select this venue" on something
+  // that no longer matches the current result set.
+  useEffect(() => {
+    setMapSelectedVenue(null);
+  }, [isOpen, sport]);
+
+  // Second guard: if the venue results change mid-session (refresh, a
+  // background re-fetch, sport switch race), drop the selected pin
+  // when its id is no longer in the result set. Stay no-op when the
+  // same venue is still present so an in-progress tap doesn't get
+  // wiped by an incidental refetch.
+  useEffect(() => {
+    if (mapSelectedVenue === null) return;
+    const stillPresent = venues.some((v) => v.id === mapSelectedVenue.id);
+    if (!stillPresent) {
+      setMapSelectedVenue(null);
+    }
+  }, [venues, mapSelectedVenue]);
 
   const hasCoords = lat !== undefined && lng !== undefined;
   // Catalog-honest fallback wording: only call results "near you" when
@@ -110,6 +145,49 @@ export function NearbyCourtsModal({
           </View>
         ) : null}
 
+        <View style={styles.modeToggle}>
+          <Pressable
+            onPress={() => setMode('list')}
+            accessibilityRole="button"
+            accessibilityLabel="Show venue list"
+            accessibilityState={{ selected: mode === 'list' }}
+            style={({ pressed }) => [
+              styles.modeChip,
+              mode === 'list' && styles.modeChipActive,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text
+              style={[
+                styles.modeChipText,
+                mode === 'list' && styles.modeChipTextActive,
+              ]}
+            >
+              List
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setMode('map')}
+            accessibilityRole="button"
+            accessibilityLabel="Show venue map"
+            accessibilityState={{ selected: mode === 'map' }}
+            style={({ pressed }) => [
+              styles.modeChip,
+              mode === 'map' && styles.modeChipActive,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text
+              style={[
+                styles.modeChipText,
+                mode === 'map' && styles.modeChipTextActive,
+              ]}
+            >
+              Map
+            </Text>
+          </Pressable>
+        </View>
+
         {isLoading ? (
           <View style={styles.centred}>
             <ActivityIndicator color={colors.brand} />
@@ -134,7 +212,7 @@ export function NearbyCourtsModal({
               type one in instead.
             </Text>
           </View>
-        ) : (
+        ) : mode === 'list' ? (
           <FlatList
             data={venues}
             keyExtractor={(v) => v.id}
@@ -150,6 +228,49 @@ export function NearbyCourtsModal({
               />
             )}
           />
+        ) : (
+          <View style={styles.mapWrap}>
+            <VenueMapView
+              venues={venues}
+              userLat={lat}
+              userLng={lng}
+              selectedVenueId={mapSelectedVenue?.id ?? null}
+              onMarkerPress={setMapSelectedVenue}
+            />
+            {mapSelectedVenue ? (
+              <View style={styles.mapPreview} accessibilityLabel="Selected venue preview">
+                <View style={styles.mapPreviewText}>
+                  <Text style={styles.mapPreviewName} numberOfLines={1}>
+                    {mapSelectedVenue.name}
+                  </Text>
+                  {mapSelectedVenue.area || mapSelectedVenue.address ? (
+                    <Text style={styles.mapPreviewArea} numberOfLines={1}>
+                      {formatVenueLocation(mapSelectedVenue)}
+                    </Text>
+                  ) : null}
+                </View>
+                <Pressable
+                  onPress={() => handleUse(mapSelectedVenue)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Select ${mapSelectedVenue.name} for session`}
+                  style={({ pressed }) => [
+                    styles.mapPreviewButton,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.mapPreviewButtonText}>Select this venue</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.mapHint} pointerEvents="none">
+                <Text style={styles.mapHintText}>
+                  {hasCoords
+                    ? 'Tap a pin to select a venue.'
+                    : 'Tap a pin to select. Map is centred on the Sydney catalog — turn on location for distance sort.'}
+                </Text>
+              </View>
+            )}
+          </View>
         )}
       </View>
     </Modal>
@@ -200,6 +321,92 @@ const styles = StyleSheet.create({
   statusText: {
     ...typography.bodySmall,
     color: colors.textSecondary,
+  },
+  modeToggle: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.separator,
+  },
+  modeChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  modeChipActive: {
+    backgroundColor: colors.brand,
+    borderColor: colors.brand,
+  },
+  modeChipText: {
+    ...typography.button,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  modeChipTextActive: {
+    color: colors.textInverse,
+  },
+  mapWrap: {
+    flex: 1,
+  },
+  mapHint: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  mapHintText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  mapPreview: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.brand,
+  },
+  mapPreviewText: {
+    flex: 1,
+    gap: 2,
+  },
+  mapPreviewName: {
+    ...typography.bodyLarge,
+    color: colors.textPrimary,
+  },
+  mapPreviewArea: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  mapPreviewButton: {
+    backgroundColor: colors.brand,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+  },
+  mapPreviewButtonText: {
+    ...typography.button,
+    color: colors.textInverse,
+    fontSize: 13,
   },
   list: {
     padding: spacing.lg,
