@@ -17,7 +17,7 @@ import { useNearbyVenues } from '../../hooks/useNearbyVenues';
 import type { VenueLocationStatus } from '../../hooks/useVenueLocation';
 import { formatVenueLocation } from '../../lib/venueLocation';
 import { colors, radii, spacing, typography } from '../../theme';
-import type { Sport, Venue } from '@protin/shared-types';
+import type { Venue } from '@protin/shared-types';
 
 type PickerMode = 'list' | 'map';
 
@@ -30,7 +30,13 @@ const WIDER_RADIUS_KM = 50;
 
 interface NearbyCourtsModalProps {
   isOpen: boolean;
-  sport: Sport;
+  /**
+   * Sport identifier passed straight to /venues/nearby. Accepts any
+   * Battle/Game sport string (basketball, soccer, badminton, …) — see
+   * useNearbyVenues for the backend contract. The modal renders the
+   * sport in the header in uppercase regardless.
+   */
+  sport: string;
   /** Coordinates from useVenueLocation. Pass both or neither. */
   lat?: number;
   lng?: number;

@@ -32,7 +32,7 @@ import {
 import { formatVenueLocation } from '../../lib/venueLocation';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { BookingComposerScreenProps } from '../../navigation/types';
-import type { Sport, Venue } from '@protin/shared-types';
+import type { Venue } from '@protin/shared-types';
 import { NearbyCourtsModal } from './NearbyCourtsModal';
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
@@ -260,7 +260,7 @@ export function BookingComposerScreen({ route, navigation }: BookingComposerScre
 
       <NearbyCourtsModal
         isOpen={isVenuePickerOpen}
-        sport={sport as Sport}
+        sport={sport}
         lat={venueLocation.latitude}
         lng={venueLocation.longitude}
         locationStatus={venueLocation.status}

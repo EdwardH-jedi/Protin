@@ -22,17 +22,37 @@ import {
 import { formatVenueLocation } from '../../lib/venueLocation';
 import { NearbyCourtsModal } from '../bookings/NearbyCourtsModal';
 import { colors, radii, spacing, typography } from '../../theme';
-import type { Sport, Venue } from '@protin/shared-types';
+import type { Venue } from '@protin/shared-types';
 import type { CreateBattleScreenProps } from '../../navigation/types';
 
-// Sports the venue catalog supports today (matches the shared `Sport`
-// literal in `@protin/shared-types`). When a battle's sport is outside
-// this set we skip the picker entirely and fall back to free-text — a
-// picker that's guaranteed to be empty is worse UX than no picker.
-const VENUE_SUPPORTED_SPORTS = new Set<string>(['gym', 'golf', 'tennis', 'running']);
-
-function isVenueSupportedSport(s: string): s is Sport {
-  return VENUE_SUPPORTED_SPORTS.has(s);
+/**
+ * Picker CTA text per sport. The picker is now rendered for every
+ * Battle/Game sport — the backend silently returns an empty catalog
+ * for sports it doesn't seed, and the modal's manual-fallback footer
+ * still lets the host type a venue. So the sport-aware label is just
+ * to keep the copy honest:
+ *   - tennis / badminton → "court or venue"
+ *   - basketball / soccer / football → "court, field, or venue"
+ *   - running → "park, route, or meeting spot"
+ *   - everything else (gym, golf, …) → "venue"
+ *
+ * The string is reused for both the displayed text AND the
+ * accessibilityLabel so screen-readers match what the eye sees.
+ */
+function venuePickerCtaLabel(sport: string): string {
+  switch (sport) {
+    case 'tennis':
+    case 'badminton':
+      return 'Choose court or venue';
+    case 'basketball':
+    case 'soccer':
+    case 'football':
+      return 'Choose court, field, or venue';
+    case 'running':
+      return 'Choose park, route, or meeting spot';
+    default:
+      return 'Choose venue';
+  }
 }
 
 const MODE_OPTIONS: { value: EventMode; label: string; sub: string }[] = [
@@ -93,7 +113,7 @@ export function CreateBattleScreen({ navigation }: CreateBattleScreenProps) {
   // The OS permission prompt only fires once the picker actually opens.
   // Mirrors BookingComposerScreen's gating exactly.
   const venueLocation = useVenueLocation({ enabled: isVenuePickerOpen });
-  const sportSupportsPicker = isVenueSupportedSport(sport);
+  const pickerCtaLabel = venuePickerCtaLabel(sport);
 
   const onSelectSport = (s: string) => {
     setSport(s);
@@ -293,7 +313,7 @@ export function CreateBattleScreen({ navigation }: CreateBattleScreenProps) {
 
         {/* Venue / Location */}
         <FieldLabel>Venue / Court</FieldLabel>
-        {sportSupportsPicker && selectedVenue ? (
+        {selectedVenue ? (
           <View style={styles.selectedVenueRow}>
             <View style={styles.selectedVenueText}>
               <Text style={styles.selectedVenueName} numberOfLines={1}>
@@ -316,26 +336,21 @@ export function CreateBattleScreen({ navigation }: CreateBattleScreenProps) {
           </View>
         ) : (
           <>
-            {sportSupportsPicker ? (
-              <Pressable
-                onPress={() => setIsVenuePickerOpen(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Choose nearby venue"
-                style={({ pressed }) => [styles.findCourtButton, pressed && styles.pressed]}
-              >
-                <Text style={styles.findCourtText}>Choose nearby venue</Text>
-              </Pressable>
-            ) : null}
+            <Pressable
+              onPress={() => setIsVenuePickerOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={pickerCtaLabel}
+              style={({ pressed }) => [styles.findCourtButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.findCourtText}>{pickerCtaLabel}</Text>
+            </Pressable>
             <TextInput
               value={location}
               onChangeText={setLocation}
               placeholder="Bondi Beach Court 2"
               placeholderTextColor={colors.textTertiary}
               maxLength={200}
-              style={[
-                styles.input,
-                sportSupportsPicker ? styles.locationFallback : undefined,
-              ]}
+              style={[styles.input, styles.locationFallback]}
               accessibilityLabel="Game location"
             />
           </>
@@ -372,36 +387,34 @@ export function CreateBattleScreen({ navigation }: CreateBattleScreenProps) {
         </Text>
       </ScrollView>
 
-      {sportSupportsPicker ? (
-        <NearbyCourtsModal
-          isOpen={isVenuePickerOpen}
-          sport={sport as Sport}
-          lat={venueLocation.latitude}
-          lng={venueLocation.longitude}
-          locationStatus={venueLocation.status}
-          // Battle hosts hunt across a city, not just their block — give
-          // them a Wider toggle once we actually have coords.
-          enableWiderResults
-          onSelect={(venue) => {
-            setSelectedVenue(venue);
-            // Match BookingComposerScreen: clear typed text once a
-            // structured venue is chosen so it doesn't quietly override
-            // on submit via the typed-wins fallback chain.
-            setLocation('');
-          }}
-          onSelectManual={(text) => {
-            // Manual venue from inside the picker wins over any prior
-            // chip — drop the structured selection so the submit
-            // fallback chain (typed → venue-derived) lands on the
-            // typed string, and surface the value in the outer
-            // free-text field so the user still sees what they
-            // entered after the modal closes.
-            setSelectedVenue(null);
-            setLocation(text);
-          }}
-          onClose={() => setIsVenuePickerOpen(false)}
-        />
-      ) : null}
+      <NearbyCourtsModal
+        isOpen={isVenuePickerOpen}
+        sport={sport}
+        lat={venueLocation.latitude}
+        lng={venueLocation.longitude}
+        locationStatus={venueLocation.status}
+        // Battle hosts hunt across a city, not just their block — give
+        // them a Wider toggle once we actually have coords.
+        enableWiderResults
+        onSelect={(venue) => {
+          setSelectedVenue(venue);
+          // Match BookingComposerScreen: clear typed text once a
+          // structured venue is chosen so it doesn't quietly override
+          // on submit via the typed-wins fallback chain.
+          setLocation('');
+        }}
+        onSelectManual={(text) => {
+          // Manual venue from inside the picker wins over any prior
+          // chip — drop the structured selection so the submit
+          // fallback chain (typed → venue-derived) lands on the
+          // typed string, and surface the value in the outer
+          // free-text field so the user still sees what they
+          // entered after the modal closes.
+          setSelectedVenue(null);
+          setLocation(text);
+        }}
+        onClose={() => setIsVenuePickerOpen(false)}
+      />
 
       <View style={styles.ctaBar}>
         <Pressable

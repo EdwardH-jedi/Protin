@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { api } from '../lib/api';
-import type { NearbyVenuesResponse, Sport, Venue } from '@protin/shared-types';
+import type { NearbyVenuesResponse, Venue } from '@protin/shared-types';
 
 interface UseNearbyVenuesArgs {
-  sport: Sport;
+  /**
+   * Sport identifier sent verbatim to /venues/nearby. Backend declares
+   * `sport: str` (apps/api/app/routers/venues.py) and returns an empty
+   * result set for any value it doesn't recognize — so accepting a free
+   * string (e.g. "basketball", "soccer", "badminton") instead of the
+   * narrow shared `Sport` literal lets the picker render uniformly for
+   * every Battle/Game sport without breaking the typed-events contract.
+   */
+  sport: string;
   /** Pass both lat and lng or neither. */
   lat?: number;
   lng?: number;
