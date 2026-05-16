@@ -888,6 +888,66 @@ async def test_source_places_with_mocked_provider_returns_normalized_rows(
     assert kwargs["lng"] == 151.27
 
 
+async def test_source_places_response_exposes_no_raw_google_fields(
+    client: AsyncClient,
+) -> None:
+    """Wire-side contract: the public response must never leak raw Google
+    JSON keys (``displayName``, ``formattedAddress``, ``types``, ...).
+    ``PlaceResult`` + ``VenueResponse`` enforce this internally — this
+    test pins the contract from the HTTP boundary so a future schema
+    widening cannot accidentally re-expose them.
+    """
+    await _wipe_venues()
+    token = await _register(client, "venue_places_no_raw@example.com")
+    with patch(
+        "app.services.venues.places_service.search_sport_places",
+        new=AsyncMock(
+            return_value=[
+                _place(
+                    place_id="places/SHAPE",
+                    name="Shape Court",
+                    lat=-33.892,
+                    lng=151.272,
+                    types=("sports_complex", "tennis_court"),
+                ),
+            ]
+        ),
+    ):
+        r = await client.get(
+            "/venues/nearby",
+            params={
+                "sport": "tennis",
+                "lat": -33.89,
+                "lng": 151.27,
+                "source": "places",
+            },
+            headers=_auth(token),
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["items"], "expected one places-sourced item"
+    item = body["items"][0]
+    # Allowed keys mirror VenueResponse (apps/api/app/schemas/venues.py).
+    allowed = {
+        "id", "name", "sport_tags", "area", "address", "latitude",
+        "longitude", "booking_url", "notes", "is_bookable", "distance_km",
+        "created_at", "updated_at", "source", "provider_place_id",
+        "attribution_required",
+    }
+    leaked = set(item.keys()) - allowed
+    assert leaked == set(), f"unexpected fields on the wire: {leaked}"
+    for forbidden in (
+        "displayName",
+        "formattedAddress",
+        "shortFormattedAddress",
+        "types",
+        "place_id",
+        "rating",
+        "userRatingCount",
+    ):
+        assert forbidden not in item, f"raw Google field leaked: {forbidden}"
+
+
 async def test_source_both_merges_seed_and_places(client: AsyncClient) -> None:
     await _wipe_venues()
     await _seed_venue(name="Seed Court", sport_tags=["tennis"], lat=-33.89, lng=151.27)
