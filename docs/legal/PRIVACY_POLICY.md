@@ -26,7 +26,7 @@ We collect only what the app needs to function.
 - **Account** — email address, password (stored only as a bcrypt hash; we never see it in plaintext).
 - **If you sign in with Apple** — the Apple-issued user identifier and, on first sign-in, the email address Apple shares (which may be a private relay address you control).
 - **If you sign in with Google** — the Google-issued user identifier and the email address associated with your Google account.
-- **Profile** — display name, optional bio, birth year, suburb (free-text, not GPS), and an optional avatar URL.
+- **Profile** — display name, optional bio, birth year, suburb (free-text you type), and an optional avatar URL.
 - **Identity preferences** — which genders you are open to match with, age range, and maximum distance in kilometres. You set these; we use them for discovery filtering only.
 - **Sport profiles** — for each sport you add (gym, golf, tennis, running): skill level, preferred times of day, optional gym or golf-club name, and optional goals text.
 - **Discovery actions** — the users you like, pass, or save in the discovery feed.
@@ -42,8 +42,20 @@ We collect only what the app needs to function.
 ### 2.3 If you link Google Calendar
 If you choose to connect Google Calendar to add confirmed bookings to your calendar, we store your Google OAuth access and refresh tokens **encrypted at rest** (AES-256-GCM via the Fernet scheme). We use them only to write events you have explicitly confirmed. You can disconnect at any time from the profile screen, which deletes the tokens.
 
-### 2.4 What we do **not** collect
-- We do **not** collect GPS location. "Suburb" is free text you type.
+### 2.4 Device location (foreground, optional)
+
+> _Draft wording — confirm with legal/operator before App Store submission._
+
+When you open the in-app venue / court picker (for example to attach a court to a session proposal, booking, or game), SportsGang may ask for **foreground location permission** on your device. You can grant or deny this permission, and you can change it at any time in your device settings.
+
+- **Why we ask.** To help you find sports venues and courts near you and to sort venue results by approximate distance from your current location.
+- **Precision.** When you grant permission, the app reads a single foreground location fix (the operating system decides the precision; this may be approximate or precise depending on your device and permission grant). We do not run background location, and we do not track your location over time.
+- **Where it goes.** When the venue picker is open, your device sends your coordinates to the SportsGang backend with the sport keyword and an optional search radius so we can return nearby venues. We do not store your raw coordinates as a user-profile field; they are used to answer the request and may appear in standard service logs covered by §2.2.
+- **Third-party venue lookup.** To improve venue coverage, the SportsGang backend may forward the same search coordinates and sport/venue query context to **Google Maps Platform / Google Places** as a venue provider (see §4). Google API keys are configured server-side only; the mobile app does not embed or call Google Maps Platform directly.
+- **Opt-out path.** If you deny location, the venue picker still works — it falls back to a manual catalog and you can type a venue or court name yourself.
+
+### 2.5 What we do **not** collect
+- We do **not** run background location, and we do not continuously track where you are.
 - We do **not** access your photo library, camera, microphone, contacts, or health data.
 - We do **not** sell personal data, and we do not share it for cross-context behavioural advertising.
 
@@ -67,6 +79,7 @@ Our legal bases (where GDPR applies) are: **contract** (running the service you 
 | **Expo (Expo Push Service)** | Push notification delivery | Your device push token and the notification payload (e.g. "You have a new match") |
 | **Apple (Sign in with Apple)** | Authentication | The identity token you send us — Apple returns your user ID and, optionally, email |
 | **Google (OAuth + Calendar API)** | Optional calendar linking | Access/refresh tokens (encrypted at rest), event titles and times for bookings you confirm |
+| **Google Maps Platform / Google Places** | Optional venue / court lookup when you use the in-app venue picker (see §2.4) | Search coordinates, sport keyword, and search radius. No SportsGang user identifier or email is sent. Requests are made server-side from the SportsGang backend; the API key is not in the mobile app. |
 | **Sentry** | Crash and error reporting | Anonymised stack traces, device model, OS version. Personal data is scrubbed before upload. |
 
 We do not share personal data with anyone else. We never sell it.

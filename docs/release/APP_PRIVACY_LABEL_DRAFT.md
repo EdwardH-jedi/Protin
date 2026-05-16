@@ -91,17 +91,49 @@ Apple's App Privacy questionnaire asks, for each category of data:
 
 ### 2.7 Location-related → Suburb / manually selected location/venue
 - **Collected:** Yes for suburb (free-text, user-typed during onboarding).
-- **Collected for venue:** **Currently No.** Automatic precise-location
-  detection is intentionally hidden in v1 (Step 1). If a future build
-  enables `expo-location` or similar, this row must move from "Coarse
-  Location" to whatever Apple's matching question expects, and the privacy
-  policy must be updated accordingly.
 - **Source:** User-provided.
 - **Linked to user:** Yes.
 - **Used for tracking:** No.
 - **Purpose:** App Functionality (matching by area).
-- **Verify:** that no background location, GPS, or precise foreground
-  location is ever requested by the v1 build.
+
+### 2.7a Location-related → Foreground device location (v1.1, venue picker)
+
+> _Draft wording — confirm with legal/operator before App Store submission.
+> The App Privacy answers in App Store Connect must be reviewed and
+> updated to reflect this row before v1.1 is submitted._
+
+- **Collected:** Yes, **only with explicit user permission** at the
+  moment the in-app venue / court picker opens. The build uses
+  `expo-location` with foreground permission and a single position
+  fix; no background location, no continuous tracking.
+- **Precision:** Apple's "Precise Location" answer applies when the
+  user grants precise permission; "Coarse Location" applies when the
+  user grants approximate permission. The app accepts whichever
+  precision the OS hands back; the picker works at either level.
+- **Source:** Automatic (foreground OS fix), gated by user permission
+  grant.
+- **Linked to user:** Yes (the request carries the caller's auth
+  token to the SportsGang backend).
+- **Used for tracking:** No.
+- **Purpose:** App Functionality — venue discovery, venue search,
+  list/map sorting by distance, and venue selection for sessions /
+  bookings / games / challenges.
+- **Backend processing:** When the venue picker is open, mobile sends
+  the coordinates to the SportsGang backend together with the sport
+  keyword and an optional search radius. The backend may forward those
+  same query inputs to **Google Maps Platform / Google Places** as a
+  third-party venue provider to widen coverage. No SportsGang user
+  identifier or email is sent to Google.
+- **Opt-out:** Location access is optional. If the user denies, the
+  picker shows a manual venue-entry fallback and a static catalog —
+  the rest of the app continues to function.
+- **Verify:**
+  - that no background location or "Always" location permission is
+    requested (only foreground while-in-use);
+  - that the App Privacy Label answers in App Store Connect are
+    re-published before v1.1 submission so they include this row;
+  - that "Powered by Google" attribution renders whenever Google
+    Places-sourced venue results are visible (see §6 below).
 
 ### 2.8 Diagnostics → Crash logs / performance diagnostics
 - **Collected:** Conditional.
@@ -193,6 +225,7 @@ answer is recorded.
 | Apple Sign-In | Optional auth path | Apple's hide-my-email relay is opaque to the operator; confirm the backend treats the relay address the same as a normal email. |
 | First-party analytics SDK | None today | If one is added, refile §2.9 before that build is submitted. |
 | Push notifications (Expo Push, future) | Currently hidden in v1 | Push registration is best-effort and silent in v1 (Step 4 / RootNavigator). When push is unhidden, confirm whether a device push token is collected and update §2.6. |
+| Google Maps Platform / Google Places (v1.1) | Venue / court lookup behind the in-app picker | (1) Privacy Policy §4 lists this processor; (2) coordinates + sport keyword sent server-side only — API key never embedded in the mobile build; (3) Places-sourced rows are not persisted to the SportsGang database; (4) "Powered by Google" attribution renders whenever Places results are surfaced (see §8 below); (5) App Privacy answers reviewed/re-published in App Store Connect before v1.1 submission. |
 
 ---
 
@@ -217,3 +250,55 @@ These are unresolved. Each must have a recorded answer before submission.
    directly? The label answer changes if the operator switches.
 8. **Future analytics** — operator decision; default for v1 is no
    analytics. Lock this in writing before any build that adds one.
+
+---
+
+## 8. v1.1 release check — Google Places attribution + map provider compatibility
+
+> _Draft wording — confirm with product/legal before App Store submission.
+> No code changes are proposed by this pass; this section is a
+> pre-submission checklist for the venue picker surface._
+
+The v1.1 venue picker can surface rows sourced from Google Places. Google
+Maps Platform terms require "Powered by Google" attribution whenever
+Places data is shown to a user, and they restrict where Google content
+can be rendered.
+
+### 8.1 Attribution must be visible whenever Places results appear
+- [ ] Mobile renders the "Powered by Google" chip in
+      `apps/mobile/src/screens/bookings/NearbyCourtsModal.tsx` whenever
+      the result set includes a venue with `source === "google_places"`
+      (or `attributionRequired === true`).
+- [ ] The chip is hidden for seed-only result sets (verified by
+      `NearbyCourtsModal.test.tsx`).
+- [ ] The chip remains visible in both List and Map modes of the picker
+      and is not cropped by the safe-area / home indicator on notched
+      iOS devices.
+- [ ] Attribution copy is plain ASCII (`Powered by Google`) and uses a
+      color/contrast that remains readable on the dark / neon theme.
+
+### 8.2 Map provider compatibility check (release risk)
+- [ ] Identify which map provider `apps/mobile/src/components/VenueMapView.tsx`
+      uses for pins (Apple Maps via Expo's default `react-native-maps`
+      provider, Google Maps via the `PROVIDER_GOOGLE` provider, or a
+      custom non-Google tile source).
+- [ ] **If pins for Google Places-sourced rows are rendered on a
+      non-Google base map** (Apple Maps, OSM tiles, MapTiler, etc.),
+      flag this as a release risk for product / legal review before
+      v1.1 submission. Google Maps Platform terms restrict displaying
+      Google content on competing maps in some configurations; the
+      product owner needs to confirm whether the current provider
+      choice is compatible or whether the picker needs to (a) show
+      Places results in list-only mode, (b) switch to the Google Maps
+      provider, or (c) drop Places pins from the map view.
+- [ ] **Do not change code in this QA pass.** Action belongs in a
+      follow-up branch once product / legal confirms the chosen
+      direction. Logged here so it is not forgotten between QA and
+      submission.
+
+### 8.3 No mobile-side Google API surface
+- [ ] Mobile bundle has zero references to `GOOGLE_PLACES_API_KEY`,
+      `places.googleapis.com`, `X-Goog-Api-Key`, or any `AIza`-prefixed
+      string (re-grep `apps/mobile/src` before each release build).
+- [ ] The API key is set as a backend Fly secret only (see
+      `docs/release/GOOGLE_PLACES_RELEASE_QA.md` §3).
