@@ -124,6 +124,8 @@ export type {
   Venue,
   NearbyVenuesResponse,
   NearbyVenuesQuery,
+  VenueSourceMode,
+  VenueSourceTag,
 } from './venue';
 
 export type {
