@@ -401,7 +401,7 @@ export function NearbyCourtsModal({
                 <Text style={styles.mapHintText}>
                   {hasCoords
                     ? 'Tap a pin to select a venue.'
-                    : 'Tap a pin to select. Map is centred on the Sydney catalog — turn on location for distance sort.'}
+                    : 'Tap a pin to select. Map is centred on the Sydney catalog - turn on location for distance sort.'}
                 </Text>
               </View>
             )}
