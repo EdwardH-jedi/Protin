@@ -176,6 +176,24 @@ export function EventsScreen() {
             </View>
             <Text style={styles.battlesArrow}>{'→'}</Text>
           </Pressable>
+          <Pressable
+            onPress={() => navigation.navigate('Challenges')}
+            accessibilityRole="button"
+            accessibilityLabel="Open Challenges"
+            style={({ pressed }) => [
+              styles.challengesCard,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View style={styles.battlesCardText}>
+              <Text style={styles.challengesEyebrow}>1-ON-1</Text>
+              <Text style={styles.battlesTitle}>Challenges</Text>
+              <Text style={styles.battlesSub}>
+                Verified head-to-head results count toward Honor and Rank.
+              </Text>
+            </View>
+            <Text style={styles.challengesArrow}>{'→'}</Text>
+          </Pressable>
         </View>
 
         {/* ── Upcoming sessions ─────────────────────────────────────────── */}
@@ -409,5 +427,25 @@ const styles = StyleSheet.create({
   battlesArrow: {
     fontSize: 22,
     color: colors.brand,
+  },
+  challengesCard: {
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.md,
+  },
+  challengesEyebrow: {
+    ...typography.label,
+    color: colors.textSecondary,
+    letterSpacing: 1.2,
+  },
+  challengesArrow: {
+    fontSize: 22,
+    color: colors.textSecondary,
   },
 });

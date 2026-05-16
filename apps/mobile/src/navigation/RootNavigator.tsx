@@ -29,6 +29,8 @@ import { BattlesScreen } from '../screens/battles/BattlesScreen';
 import { BattleDetailScreen } from '../screens/battles/BattleDetailScreen';
 import { CreateBattleScreen } from '../screens/battles/CreateBattleScreen';
 import { AttendanceCheckScreen } from '../screens/battles/AttendanceCheckScreen';
+import { ChallengeListScreen } from '../screens/challenges/ChallengeListScreen';
+import { ChallengeDetailScreen } from '../screens/challenges/ChallengeDetailScreen';
 import { PublicProfileScreen } from '../screens/profile/PublicProfileScreen';
 import { HonorGuideScreen } from '../screens/help/HonorGuideScreen';
 import { SafetyCenterScreen } from '../screens/help/SafetyCenterScreen';
@@ -243,6 +245,16 @@ export function RootNavigator() {
         <Stack.Screen
           name="AttendanceCheck"
           component={AttendanceCheckScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="Challenges"
+          component={ChallengeListScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="ChallengeDetail"
+          component={ChallengeDetailScreen}
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen

@@ -25,6 +25,8 @@ export type RootStackParamList = {
   BattleDetail: { eventId: string };
   CreateBattle: undefined;
   AttendanceCheck: { eventId: string };
+  Challenges: undefined;
+  ChallengeDetail: { challengeId: string };
   /**
    * Public-safe view of another user, opened from Discovery cards.
    * Initial display fields are passed via route params to avoid a
@@ -84,6 +86,8 @@ export type BattlesScreenProps = NativeStackScreenProps<RootStackParamList, 'Bat
 export type BattleDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'BattleDetail'>;
 export type CreateBattleScreenProps = NativeStackScreenProps<RootStackParamList, 'CreateBattle'>;
 export type AttendanceCheckScreenProps = NativeStackScreenProps<RootStackParamList, 'AttendanceCheck'>;
+export type ChallengeListScreenProps = NativeStackScreenProps<RootStackParamList, 'Challenges'>;
+export type ChallengeDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ChallengeDetail'>;
 export type PublicProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'PublicProfile'>;
 export type HonorGuideScreenProps = NativeStackScreenProps<RootStackParamList, 'HonorGuide'>;
 export type SafetyCenterScreenProps = NativeStackScreenProps<RootStackParamList, 'SafetyCenter'>;
