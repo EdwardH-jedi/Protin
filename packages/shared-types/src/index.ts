@@ -170,3 +170,11 @@ export type {
   HostAttendanceUpdateRequest,
   SelfAttendanceRequest,
 } from './event';
+
+export type {
+  ChallengeStatus,
+  ChallengeRead,
+  ChallengeListResponse,
+  CreateChallengeRequest,
+  SubmitChallengeResultRequest,
+} from './challenge';

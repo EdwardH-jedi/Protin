@@ -46,9 +46,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import get_settings
 from app.core.security import hash_password
+from app.models.challenge import SportsChallenge
 from app.models.match import Match
 from app.models.profile import IdentityPreferences, SportProfile, UserProfile
 from app.models.user import User
+from app.services.challenges import accept_challenge, create_challenge
 from app.services.discovery import record_action
 
 # ---------------------------------------------------------------------------
@@ -312,6 +314,63 @@ async def _ensure_identity_preferences(
         db.add(IdentityPreferences(user_id=user_id))
 
 
+async def _ensure_challenge(
+    db: AsyncSession,
+    *,
+    challenger_id: UUID,
+    opponent_id: UUID,
+    sport: str,
+    area: str,
+    note: str | None,
+    accept_after_create: bool,
+) -> tuple[bool, str]:
+    """Idempotently ensure a (challenger, opponent, sport) challenge exists.
+
+    Returns ``(created, status)``. When a row with the same
+    ``(challenger_user_id, opponent_user_id, sport)`` already exists,
+    the seed leaves its state alone — the reviewer might be mid-flow
+    on it (e.g. already submitted a result). When the row is new,
+    we drive creation through the canonical
+    :func:`app.services.challenges.create_challenge` so all server-side
+    validation and timestamp behaviour matches a real user flow. If
+    ``accept_after_create`` is set, we also drive
+    :func:`accept_challenge` from the opponent's perspective to land
+    on ``status=accepted`` — the only state where the mobile picker
+    surfaces the "Submit result" form.
+
+    Rank / Honor is never touched here — only the result-submission
+    path can fire that, and we deliberately do not call it from a seed
+    (faking a verified result would mutate Rank without a real match).
+    """
+    existing = (
+        await db.execute(
+            select(SportsChallenge).where(
+                SportsChallenge.challenger_user_id == challenger_id,
+                SportsChallenge.opponent_user_id == opponent_id,
+                SportsChallenge.sport == sport,
+            )
+        )
+    ).scalars().first()
+    if existing is not None:
+        return False, existing.status
+
+    created = await create_challenge(
+        db,
+        current_user_id=challenger_id,
+        opponent_user_id=opponent_id,
+        sport=sport,
+        area=area,
+        note=note,
+    )
+    if not accept_after_create:
+        return True, "pending"
+
+    accepted = await accept_challenge(
+        db, current_user_id=opponent_id, challenge_id=created.id
+    )
+    return True, accepted.status
+
+
 async def _ensure_mutual_match(
     db: AsyncSession,
     *,
@@ -360,8 +419,16 @@ async def _seed() -> int:
         "demo_users_updated": 0,
         "matches_created": 0,
         "matches_existing": 0,
+        "challenges_created": 0,
+        "challenges_existing": 0,
         "skipped_sports": [],  # type: list[str]
     }
+
+    # Map demo partner email → user id once the loop populates it so the
+    # challenge-seed block below can pick the right opponents without
+    # re-querying. Keyed by email because it's the only stable identifier
+    # we already have in the seed config.
+    partner_ids_by_email: dict[str, UUID] = {}
 
     async with Session() as db:
         # --- Reviewer -----------------------------------------------------
@@ -395,6 +462,7 @@ async def _seed() -> int:
                 summary["demo_users_created"] += 1
             else:
                 summary["demo_users_updated"] += 1
+            partner_ids_by_email[seed.email] = partner.id
             await _upsert_profile(
                 db,
                 user_id=partner.id,
@@ -420,6 +488,56 @@ async def _seed() -> int:
             else:
                 summary["matches_existing"] += 1
 
+        # --- Demo challenges ----------------------------------------------
+        # Two visible states so the reviewer hits both Challenge surfaces:
+        #
+        #   1. Jordan → Reviewer (tennis, Glebe), status="pending".
+        #      Reviewer is the opponent → lands in the "Awaiting your
+        #      response" section with Accept / Decline buttons.
+        #   2. Sam → Reviewer (running, Camperdown), status="accepted".
+        #      Reviewer is the opponent of an accepted challenge →
+        #      lands in the "Active" section with the inline
+        #      Submit-result form available.
+        #
+        # Both seeds intentionally cast the *reviewer* as the opponent
+        # so the reviewer immediately sees actionable UI on landing
+        # (Accept/Decline + Submit form). The "Sent" / "You challenged"
+        # variant is reachable from the same seed by tapping Cancel
+        # on the pending row.
+        challenge_seeds = [
+            {
+                "partner_email": "jordan.local@sportsgang.app",
+                "sport": "tennis",
+                "area": "Glebe",
+                "note": "Saturday hit at Camperdown?",
+                "accept_after_create": False,
+            },
+            {
+                "partner_email": "sam.local@sportsgang.app",
+                "sport": "running",
+                "area": "Camperdown",
+                "note": "Sunday long run — meet at Sydney Park gates.",
+                "accept_after_create": True,
+            },
+        ]
+        for spec in challenge_seeds:
+            partner_id = partner_ids_by_email.get(spec["partner_email"])
+            if partner_id is None:
+                continue
+            created_flag, _status = await _ensure_challenge(
+                db,
+                challenger_id=partner_id,
+                opponent_id=reviewer.id,
+                sport=spec["sport"],
+                area=spec["area"],
+                note=spec["note"],
+                accept_after_create=spec["accept_after_create"],
+            )
+            if created_flag:
+                summary["challenges_created"] += 1
+            else:
+                summary["challenges_existing"] += 1
+
     await engine.dispose()
 
     # ---- Summary -----------------------------------------------------
@@ -441,6 +559,10 @@ async def _seed() -> int:
     print(
         f"  matches:      created={summary['matches_created']} "
         f"existing={summary['matches_existing']}"
+    )
+    print(
+        f"  challenges:   created={summary['challenges_created']} "
+        f"existing={summary['challenges_existing']}"
     )
     print(
         f"  reviewer credentials: email={REVIEWER_EMAIL} "
