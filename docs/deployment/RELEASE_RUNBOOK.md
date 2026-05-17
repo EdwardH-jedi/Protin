@@ -39,13 +39,130 @@ curl -fsS https://protin-api.fly.dev/health
 ### Subsequent deploys
 
 ```bash
-# From a clean main branch:
+# 1. From a clean main branch.
 git pull --ff-only
+
+# 2. Deploy the new image.
 fly deploy --app protin-api
 
-# If the release includes new Alembic revisions:
+# 3. ALWAYS run migrations after every deploy. This step is unconditional
+#    even when you do not think the release ships new revisions: skipping
+#    it once cost us a production outage with relation "rank_profiles"
+#    does not exist after the v1.1 cut, because /health stays green while
+#    feature endpoints 500 against the stale schema.
 fly ssh console -C 'alembic upgrade head' --app protin-api
+
+# 4. Verify the DB matches the shipped image.
+fly ssh console -C 'alembic current' --app protin-api
+fly ssh console -C 'alembic heads' --app protin-api
+# "current" must equal "heads"; otherwise feature endpoints will 500
+# with UndefinedTableError even though /health reports db=ok.
+
+# 5. Smoke the deploy.
+curl -fsS https://protin-api.fly.dev/health
+# {"status":"ok", ...}
 ```
+
+### Post-deploy verification (every release)
+
+After step 4 above, manually hit at least one endpoint backed by each
+recently-added table so a missed migration surfaces immediately rather
+than waiting for a real user. With an auth token in `$TOKEN`:
+
+```bash
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  https://protin-api.fly.dev/events
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  https://protin-api.fly.dev/honors/me
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  https://protin-api.fly.dev/rankings/me?sport=tennis
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  https://protin-api.fly.dev/challenges
+```
+
+A 500 with `relation "..." does not exist` means migrations are stale --
+re-run step 3 and then re-check `alembic current` vs `alembic heads`.
+
+### Seed the venue catalog (first deploy, or when the DB has zero rows)
+
+`/venues/nearby` reads the local `venues` table. If a deploy boots
+against a fresh Postgres (or a wiped one) the table is empty and every
+sport returns `items=[]` -- with Google Places potentially also
+unavailable, the picker shows nothing in production. The seed reads
+`/app/data/venues_sydney.json`, which the API Docker image now ships
+via `COPY apps/api/data ./data`. The
+`apps/api/tests/test_seed_venues.py` guard fails the build if that
+path resolution or the data file regresses.
+
+Run these four commands in order any time the `venues` table needs to
+be (re)populated. Each is a one-shot, non-interactive `fly ssh console
+-C` so it can be pasted into a runbook step:
+
+```bash
+# 1. Deploy the new API image (must include apps/api/data).
+fly deploy -a protin-api
+
+# 2. Apply migrations so the venues table exists at the latest schema.
+fly ssh console -C 'alembic upgrade head' --app protin-api
+
+# 3. Seed the venue catalog (idempotent; upserts by name+area).
+fly ssh console \
+  -C 'PYTHONPATH=/app /app/.venv/bin/python -m scripts.seed_venues' \
+  --app protin-api
+# expected stdout:
+#   [seed_venues] inserted=<N> updated=0 total=<N>
+# If you see "[seed_venues] No data file at /app/data/venues_sydney.json"
+# the image is missing apps/api/data -- rebuild after confirming the
+# Dockerfile still has `COPY apps/api/data ./data`.
+
+# 4. Verify /venues/nearby returns real rows (route is auth-gated, so
+#    unauthenticated curl returns 401 -- not the empty list).
+TOKEN=...   # bearer token from a logged-in test account
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  "https://protin-api.fly.dev/venues/nearby?sport=tennis&source=seed&limit=50"
+```
+
+**Expected response shape** (must satisfy all three):
+
+- `total` > 0 (positive integer, matches the seeded count for the sport).
+- `items` is a non-empty JSON array.
+- Each element in `items` is a venue row carrying `name`, location
+  fields (`latitude`/`longitude` and/or `area`/`address`), and sport
+  data (`sport_tags` includes the requested sport). If `items` is `[]`
+  the seed has not run against this DB yet -- re-run step 3.
+
+Repeat step 4 for the other sport tabs (`gym`, `golf`, `running`) to
+confirm coverage across the app's supported sports.
+
+**No mobile rebuild required.** This recovery is purely a backend API
+image and reference-data packaging fix. An EAS build, App Store
+resubmission, or OTA update is **not** needed for the venue picker to
+start showing rows again -- the mobile client calls
+`/venues/nearby` unchanged. Only rebuild the mobile app if `apps/mobile`
+code or native config (`app.config.js`, `eas.json`, native modules)
+was separately modified in the same release.
+
+#### Optional broader smoke checks
+
+These belong to the general post-deploy verification above, not to
+venue recovery. Run them in addition to step 4 if you also want to
+flush any unrelated migration drift on the same release:
+
+```bash
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  https://protin-api.fly.dev/rankings/me?sport=tennis
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  https://protin-api.fly.dev/honors/me
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  https://protin-api.fly.dev/challenges
+```
+
+The Google Places provider is a *separate* code path. A `403` from
+`places.googleapis.com` (logged as `Google Places non-200 ... status=403`)
+does not affect seed results -- the seed fallback works even when the
+Places key is missing or rejected. See
+`docs/release/GOOGLE_PLACES_RELEASE_QA.md` for the manual Places
+checklist.
 
 ### Rollback
 

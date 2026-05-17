@@ -48,6 +48,12 @@ COPY apps/api/worker.py ./worker.py
 COPY apps/api/alembic.ini ./alembic.ini
 COPY apps/api/alembic ./alembic
 COPY apps/api/scripts ./scripts
+# Reference data consumed by scripts/seed_venues.py. The seed resolves
+# DATA_PATH as scripts/../data/venues_sydney.json, so the runtime image
+# must contain /app/data/venues_sydney.json. Previously omitted, which
+# left prod with an empty venue catalog and /venues/nearby returning
+# items=[] for every sport.
+COPY apps/api/data ./data
 
 # Activate the venv for all subsequent RUN / CMD invocations.
 ENV PATH="/app/.venv/bin:$PATH"
