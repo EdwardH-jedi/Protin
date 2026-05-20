@@ -12,7 +12,12 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.services.places import PlaceResult
+from app.services.places import (
+    PlaceDetails,
+    PlaceDetailsResult,
+    PlaceResult,
+    SearchResult,
+)
 
 from app.db.base import Base
 from app.db.redis import get_redis
@@ -45,6 +50,13 @@ async def create_tables():
     yield
     async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    # Dispose the engine so every pooled aiosqlite Connection is
+    # closed. Each aiosqlite Connection runs SQL on a NON-daemon
+    # background ``_connection_worker_thread`` (see aiosqlite/core.py).
+    # Without ``engine.dispose()`` those threads stay alive and the
+    # pytest process never exits cleanly — assertions pass but the
+    # process hangs on shutdown.
+    await _engine.dispose()
 
 
 async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -762,8 +774,8 @@ async def test_source_default_is_seed_and_does_not_call_places(
 
     token = await _register(client, "venue_source_default@example.com")
     with patch(
-        "app.services.venues.places_service.search_sport_places",
-        new=AsyncMock(return_value=[]),
+        "app.services.venues.places_service.search_sport_places_v2",
+        new=AsyncMock(return_value=SearchResult(status="disabled", results=[], next_page_token=None)),
     ) as mock_places:
         r = await client.get(
             "/venues/nearby",
@@ -786,8 +798,8 @@ async def test_source_seed_explicit_skips_places_provider(client: AsyncClient) -
 
     token = await _register(client, "venue_source_seed@example.com")
     with patch(
-        "app.services.venues.places_service.search_sport_places",
-        new=AsyncMock(return_value=[_place(name="Should-not-appear")]),
+        "app.services.venues.places_service.search_sport_places_v2",
+        new=AsyncMock(return_value=SearchResult(status="ok", results=[_place(name="Should-not-appear")], next_page_token=None)),
     ) as mock_places:
         r = await client.get(
             "/venues/nearby",
@@ -815,8 +827,8 @@ async def test_source_places_empty_provider_returns_200_empty_not_500(
 
     token = await _register(client, "venue_places_empty@example.com")
     with patch(
-        "app.services.venues.places_service.search_sport_places",
-        new=AsyncMock(return_value=[]),
+        "app.services.venues.places_service.search_sport_places_v2",
+        new=AsyncMock(return_value=SearchResult(status="disabled", results=[], next_page_token=None)),
     ):
         r = await client.get(
             "/venues/nearby",
@@ -845,9 +857,9 @@ async def test_source_places_with_mocked_provider_returns_normalized_rows(
 
     token = await _register(client, "venue_places_mock@example.com")
     with patch(
-        "app.services.venues.places_service.search_sport_places",
+        "app.services.venues.places_service.search_sport_places_v2",
         new=AsyncMock(
-            return_value=[
+            return_value=SearchResult(status="ok", results=[
                 _place(
                     place_id="places/PROV-1",
                     name="Newtown Tennis Centre",
@@ -855,7 +867,7 @@ async def test_source_places_with_mocked_provider_returns_normalized_rows(
                     lng=151.18,
                     address="Newtown NSW",
                 ),
-            ]
+            ], next_page_token=None)
         ),
     ) as mock_places:
         r = await client.get(
@@ -900,9 +912,9 @@ async def test_source_places_response_exposes_no_raw_google_fields(
     await _wipe_venues()
     token = await _register(client, "venue_places_no_raw@example.com")
     with patch(
-        "app.services.venues.places_service.search_sport_places",
+        "app.services.venues.places_service.search_sport_places_v2",
         new=AsyncMock(
-            return_value=[
+            return_value=SearchResult(status="ok", results=[
                 _place(
                     place_id="places/SHAPE",
                     name="Shape Court",
@@ -910,7 +922,7 @@ async def test_source_places_response_exposes_no_raw_google_fields(
                     lng=151.272,
                     types=("sports_complex", "tennis_court"),
                 ),
-            ]
+            ], next_page_token=None)
         ),
     ):
         r = await client.get(
@@ -928,11 +940,16 @@ async def test_source_places_response_exposes_no_raw_google_fields(
     assert body["items"], "expected one places-sourced item"
     item = body["items"][0]
     # Allowed keys mirror VenueResponse (apps/api/app/schemas/venues.py).
+    # v1.1 added the hybrid-search additions (primary_type / google_maps_uri
+    # / attributions) — explicit normalised fields rather than raw Google
+    # JSON, so they're part of the public contract.
     allowed = {
         "id", "name", "sport_tags", "area", "address", "latitude",
         "longitude", "booking_url", "notes", "is_bookable", "distance_km",
         "created_at", "updated_at", "source", "provider_place_id",
         "attribution_required",
+        "primary_type", "google_maps_uri", "attributions",
+        "confidence",
     }
     leaked = set(item.keys()) - allowed
     assert leaked == set(), f"unexpected fields on the wire: {leaked}"
@@ -954,12 +971,12 @@ async def test_source_both_merges_seed_and_places(client: AsyncClient) -> None:
 
     token = await _register(client, "venue_both_merge@example.com")
     with patch(
-        "app.services.venues.places_service.search_sport_places",
+        "app.services.venues.places_service.search_sport_places_v2",
         new=AsyncMock(
-            return_value=[
+            return_value=SearchResult(status="ok", results=[
                 _place(place_id="places/A", name="Places Court A", lat=-33.90, lng=151.25),
                 _place(place_id="places/B", name="Places Court B", lat=-33.92, lng=151.20),
-            ]
+            ], next_page_token=None)
         ),
     ):
         r = await client.get(
@@ -995,7 +1012,7 @@ async def test_source_both_falls_back_to_seed_when_provider_raises(
 
     token = await _register(client, "venue_both_fallback@example.com")
     with patch(
-        "app.services.venues.places_service.search_sport_places",
+        "app.services.venues.places_service.search_sport_places_v2",
         new=AsyncMock(side_effect=RuntimeError("upstream exploded")),
     ):
         r = await client.get(
@@ -1032,9 +1049,9 @@ async def test_source_both_dedupes_places_matching_seed_by_name_and_proximity(
 
     token = await _register(client, "venue_both_dedupe@example.com")
     with patch(
-        "app.services.venues.places_service.search_sport_places",
+        "app.services.venues.places_service.search_sport_places_v2",
         new=AsyncMock(
-            return_value=[
+            return_value=SearchResult(status="ok", results=[
                 # ~50m away from the seed row, same name with punctuation
                 # difference → should be deduped.
                 _place(
@@ -1051,7 +1068,7 @@ async def test_source_both_dedupes_places_matching_seed_by_name_and_proximity(
                     lat=-33.875,
                     lng=151.20,
                 ),
-            ]
+            ], next_page_token=None)
         ),
     ):
         r = await client.get(
@@ -1087,13 +1104,13 @@ async def test_source_both_applies_limit_after_merge(client: AsyncClient) -> Non
 
     token = await _register(client, "venue_both_limit@example.com")
     with patch(
-        "app.services.venues.places_service.search_sport_places",
+        "app.services.venues.places_service.search_sport_places_v2",
         new=AsyncMock(
-            return_value=[
+            return_value=SearchResult(status="ok", results=[
                 _place(place_id="places/P1", name="Places P1", lat=-33.893, lng=151.273),
                 _place(place_id="places/P2", name="Places P2", lat=-33.894, lng=151.274),
                 _place(place_id="places/P3", name="Places P3", lat=-33.895, lng=151.275),
-            ]
+            ], next_page_token=None)
         ),
     ):
         r = await client.get(
@@ -1127,12 +1144,12 @@ async def test_source_both_sorts_by_distance_across_seed_and_places(
 
     token = await _register(client, "venue_both_sort@example.com")
     with patch(
-        "app.services.venues.places_service.search_sport_places",
+        "app.services.venues.places_service.search_sport_places_v2",
         new=AsyncMock(
-            return_value=[
+            return_value=SearchResult(status="ok", results=[
                 # Right next to the query origin → should sort FIRST.
                 _place(place_id="places/NEAREST", name="Places Nearest", lat=-33.891, lng=151.271),
-            ]
+            ], next_page_token=None)
         ),
     ):
         r = await client.get(
@@ -1175,8 +1192,8 @@ async def test_source_both_without_coords_falls_back_to_seed_catalog(
 
     token = await _register(client, "venue_both_nocoords@example.com")
     with patch(
-        "app.services.venues.places_service.search_sport_places",
-        new=AsyncMock(return_value=[_place(name="Should-not-appear")]),
+        "app.services.venues.places_service.search_sport_places_v2",
+        new=AsyncMock(return_value=SearchResult(status="ok", results=[_place(name="Should-not-appear")], next_page_token=None)),
     ) as mock_places:
         r = await client.get(
             "/venues/nearby",
@@ -1203,9 +1220,9 @@ async def test_source_places_excludes_places_outside_radius_km(
     # Query origin: Sydney CBD. radius_km=5 makes the in/out distinction
     # unambiguous: ~1.1 km vs ~7.8 km from origin.
     with patch(
-        "app.services.venues.places_service.search_sport_places",
+        "app.services.venues.places_service.search_sport_places_v2",
         new=AsyncMock(
-            return_value=[
+            return_value=SearchResult(status="ok", results=[
                 _place(
                     place_id="places/IN",
                     name="In-Radius Court",
@@ -1218,7 +1235,7 @@ async def test_source_places_excludes_places_outside_radius_km(
                     lat=-33.96,
                     lng=151.27,
                 ),  # ~7.8 km — outside the 5 km cap
-            ]
+            ], next_page_token=None)
         ),
     ):
         r = await client.get(
@@ -1259,16 +1276,16 @@ async def test_source_both_excludes_places_outside_radius_km_but_keeps_seed(
 
     token = await _register(client, "venue_both_radius_outside@example.com")
     with patch(
-        "app.services.venues.places_service.search_sport_places",
+        "app.services.venues.places_service.search_sport_places_v2",
         new=AsyncMock(
-            return_value=[
+            return_value=SearchResult(status="ok", results=[
                 _place(
                     place_id="places/FAR",
                     name="Way Too Far Court",
                     lat=-33.96,
                     lng=151.27,
                 ),  # ~7.8 km from origin — outside the 5 km cap
-            ]
+            ], next_page_token=None)
         ),
     ):
         r = await client.get(
@@ -1308,16 +1325,16 @@ async def test_source_both_includes_in_radius_places_with_tight_radius(
 
     token = await _register(client, "venue_both_radius_inside@example.com")
     with patch(
-        "app.services.venues.places_service.search_sport_places",
+        "app.services.venues.places_service.search_sport_places_v2",
         new=AsyncMock(
-            return_value=[
+            return_value=SearchResult(status="ok", results=[
                 _place(
                     place_id="places/CLOSE",
                     name="Right Next Door",
                     lat=-33.892,
                     lng=151.272,
                 ),  # ~280 m from origin — well inside 5 km
-            ]
+            ], next_page_token=None)
         ),
     ):
         r = await client.get(
@@ -1349,8 +1366,8 @@ async def test_source_places_without_coords_returns_empty_not_error(
 
     token = await _register(client, "venue_places_nocoords@example.com")
     with patch(
-        "app.services.venues.places_service.search_sport_places",
-        new=AsyncMock(return_value=[_place(name="Should-not-appear")]),
+        "app.services.venues.places_service.search_sport_places_v2",
+        new=AsyncMock(return_value=SearchResult(status="ok", results=[_place(name="Should-not-appear")], next_page_token=None)),
     ) as mock_places:
         r = await client.get(
             "/venues/nearby",
@@ -1362,3 +1379,343 @@ async def test_source_places_without_coords_returns_empty_not_error(
     assert body["items"] == []
     assert body["total"] == 0
     mock_places.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Cursor pagination — source=both must NOT re-include seed rows on a
+# continuation page (Codex fix).
+# ---------------------------------------------------------------------------
+
+
+async def test_source_both_first_page_returns_seed_plus_places_with_cursor(
+    client: AsyncClient,
+) -> None:
+    """First page of source=both returns seed + first Places page and a
+    next_cursor when Google's Text Search surfaced a pageToken."""
+    await _wipe_venues()
+    await _seed_venue(name="Seed A", sport_tags=["tennis"], lat=-33.890, lng=151.270)
+
+    token = await _register(client, "venue_both_p1@example.com")
+    with patch(
+        "app.services.venues.places_service.search_sport_places_v2",
+        new=AsyncMock(
+            return_value=SearchResult(
+                status="ok",
+                results=[
+                    _place(place_id="places/P1", name="Places P1", lat=-33.891, lng=151.271),
+                    _place(place_id="places/P2", name="Places P2", lat=-33.892, lng=151.272),
+                ],
+                next_page_token="OPAQUE_CURSOR_FOR_PAGE_2",
+            )
+        ),
+    ):
+        r = await client.get(
+            "/venues/nearby",
+            params={
+                "sport": "tennis",
+                "lat": -33.89,
+                "lng": 151.27,
+                "source": "both",
+                "radius_km": 5,
+            },
+            headers=_auth(token),
+        )
+    assert r.status_code == 200
+    body = r.json()
+    names = {v["name"] for v in body["items"]}
+    assert names == {"Seed A", "Places P1", "Places P2"}
+    assert body["next_cursor"] == "OPAQUE_CURSOR_FOR_PAGE_2"
+
+
+async def test_source_both_cursor_page_returns_only_places_continuation(
+    client: AsyncClient,
+) -> None:
+    """Codex fix — when a cursor is provided with source=both the
+    response must contain ONLY the Places continuation rows. Re-loading
+    seed on every page would eat the limit and make Load More silently
+    return repeat rows."""
+    await _wipe_venues()
+    # Three seed rows that WOULD eat the limit if re-loaded on the
+    # cursor page. They must NOT appear in the response.
+    await _seed_venue(name="Seed A", sport_tags=["tennis"], lat=-33.890, lng=151.270)
+    await _seed_venue(name="Seed B", sport_tags=["tennis"], lat=-33.891, lng=151.271)
+    await _seed_venue(name="Seed C", sport_tags=["tennis"], lat=-33.892, lng=151.272)
+
+    token = await _register(client, "venue_both_p2@example.com")
+    mock = AsyncMock(
+        return_value=SearchResult(
+            status="ok",
+            results=[
+                _place(place_id="places/P3", name="Places P3", lat=-33.893, lng=151.273),
+                _place(place_id="places/P4", name="Places P4", lat=-33.894, lng=151.274),
+            ],
+            next_page_token=None,
+        )
+    )
+    with patch(
+        "app.services.venues.places_service.search_sport_places_v2",
+        new=mock,
+    ):
+        r = await client.get(
+            "/venues/nearby",
+            params={
+                "sport": "tennis",
+                "lat": -33.89,
+                "lng": 151.27,
+                "source": "both",
+                "radius_km": 5,
+                "cursor": "OPAQUE_CURSOR_FOR_PAGE_2",
+            },
+            headers=_auth(token),
+        )
+    assert r.status_code == 200
+    body = r.json()
+    names = [v["name"] for v in body["items"]]
+    # Only the continuation Places rows — no seed rows re-included.
+    assert names == ["Places P3", "Places P4"]
+    assert body["total"] == 2
+    # The provider got the cursor; the limit slots aren't eaten by seed.
+    kwargs = mock.await_args.kwargs
+    assert kwargs["cursor"] == "OPAQUE_CURSOR_FOR_PAGE_2"
+
+
+async def test_source_both_cursor_page_does_not_consume_limit_with_seed(
+    client: AsyncClient,
+) -> None:
+    """Concrete cost regression guard — with limit=4 and 5 seed rows,
+    the cursor page must return up to 4 PLACES rows, not 4 seed rows."""
+    await _wipe_venues()
+    for i, suffix in enumerate(("A", "B", "C", "D", "E")):
+        await _seed_venue(
+            name=f"Seed {suffix}",
+            sport_tags=["tennis"],
+            lat=-33.890 - 0.001 * i,
+            lng=151.270,
+        )
+
+    token = await _register(client, "venue_both_limit_cursor@example.com")
+    with patch(
+        "app.services.venues.places_service.search_sport_places_v2",
+        new=AsyncMock(
+            return_value=SearchResult(
+                status="ok",
+                results=[
+                    _place(place_id=f"places/PG{i}", name=f"Places PG{i}", lat=-33.89, lng=151.28 + 0.001 * i)
+                    for i in range(4)
+                ],
+                next_page_token=None,
+            )
+        ),
+    ):
+        r = await client.get(
+            "/venues/nearby",
+            params={
+                "sport": "tennis",
+                "lat": -33.89,
+                "lng": 151.27,
+                "source": "both",
+                "radius_km": 5,
+                "limit": 4,
+                "cursor": "OPAQUE_CURSOR_FOR_PAGE_2",
+            },
+            headers=_auth(token),
+        )
+    body = r.json()
+    sources = [v["source"] for v in body["items"]]
+    assert all(s == "google_places" for s in sources), sources
+    assert len(body["items"]) == 4
+
+
+async def test_source_places_cursor_page_unchanged(client: AsyncClient) -> None:
+    """source=places with cursor was already correct; pin it so the
+    seed-skip fix doesn't accidentally change this surface."""
+    await _wipe_venues()
+    await _seed_venue(name="Seed Should Stay Hidden", sport_tags=["tennis"], lat=-33.89, lng=151.27)
+
+    token = await _register(client, "venue_places_cursor@example.com")
+    with patch(
+        "app.services.venues.places_service.search_sport_places_v2",
+        new=AsyncMock(
+            return_value=SearchResult(
+                status="ok",
+                results=[_place(place_id="places/P9", name="Places P9", lat=-33.89, lng=151.28)],
+                next_page_token=None,
+            )
+        ),
+    ):
+        r = await client.get(
+            "/venues/nearby",
+            params={
+                "sport": "tennis",
+                "lat": -33.89,
+                "lng": 151.27,
+                "source": "places",
+                "cursor": "OPAQUE_CURSOR",
+            },
+            headers=_auth(token),
+        )
+    items = r.json()["items"]
+    assert [v["name"] for v in items] == ["Places P9"]
+
+
+async def test_invalid_cursor_does_not_crash_returns_error_status(
+    client: AsyncClient,
+) -> None:
+    """Garbage cursor must not 500. The provider returns status='error'
+    and the venues route surfaces an empty page with provider_status='error'."""
+    await _wipe_venues()
+
+    token = await _register(client, "venue_bad_cursor@example.com")
+    # Don't patch the provider — let it actually try to decode the
+    # cursor and return error. This is the production path.
+    r = await client.get(
+        "/venues/nearby",
+        params={
+            "sport": "tennis",
+            "lat": -33.89,
+            "lng": 151.27,
+            "source": "both",
+            "cursor": "!!!not-base64!!!",
+        },
+        headers=_auth(token),
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["items"] == []
+    assert body["provider_status"] == "error"
+    assert body["next_cursor"] is None
+
+
+async def test_seed_source_ignores_cursor(client: AsyncClient) -> None:
+    """source=seed with cursor: cursor is meaningless for the static
+    catalog. We document the behaviour as "ignored" — the page is the
+    same as the cursor-less seed request, the provider is not called."""
+    await _wipe_venues()
+    await _seed_venue(name="Seed Only", sport_tags=["tennis"], lat=-33.89, lng=151.27)
+
+    token = await _register(client, "venue_seed_cursor@example.com")
+    with patch(
+        "app.services.venues.places_service.search_sport_places_v2",
+        new=AsyncMock(return_value=SearchResult(status="ok", results=[], next_page_token=None)),
+    ) as mock_places:
+        r = await client.get(
+            "/venues/nearby",
+            params={
+                "sport": "tennis",
+                "source": "seed",
+                "cursor": "ignored",
+            },
+            headers=_auth(token),
+        )
+    body = r.json()
+    assert [v["name"] for v in body["items"]] == ["Seed Only"]
+    mock_places.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Place Details lazy-load — GET /venues/places/{place_id}
+# ---------------------------------------------------------------------------
+
+
+def _details(**overrides) -> PlaceDetails:
+    base = {
+        "place_id": "places/ChIJDETAIL",
+        "name": "Sydney Park Tennis Centre",
+        "latitude": -33.91,
+        "longitude": 151.18,
+        "address": "Sydney Park Rd, Alexandria",
+        "types": ("tennis_court", "sports_complex"),
+        "primary_type": "tennis_court",
+        "google_maps_uri": "https://maps.google.com/?cid=123",
+        "website_uri": "https://example.com/syd",
+        "phone_national": "(02) 9999 0000",
+        "phone_international": "+61 2 9999 0000",
+        "business_status": "OPERATIONAL",
+        "rating": 4.4,
+        "user_rating_count": 312,
+        "opening_hours_weekday_text": ("Monday: 6:00 AM – 10:00 PM",),
+        "attributions": ('<a href="https://example.com">Listed by Syd Sport</a>',),
+    }
+    base.update(overrides)
+    return PlaceDetails(**base)
+
+
+async def test_place_details_requires_auth(client: AsyncClient) -> None:
+    r = await client.get("/venues/places/ChIJX")
+    assert r.status_code in (401, 403)
+
+
+async def test_place_details_returns_normalised_payload(client: AsyncClient) -> None:
+    token = await _register(client, "venue_detail_ok@example.com")
+    with patch(
+        "app.routers.venues.places_service.fetch_place_details",
+        new=AsyncMock(return_value=PlaceDetailsResult(status="ok", details=_details())),
+    ) as mock_details:
+        r = await client.get(
+            "/venues/places/ChIJDETAIL",
+            headers=_auth(token),
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["place_id"] == "places/ChIJDETAIL"
+    assert body["name"] == "Sydney Park Tennis Centre"
+    assert body["primary_type"] == "tennis_court"
+    assert body["rating"] == 4.4
+    assert body["user_rating_count"] == 312
+    assert body["business_status"] == "OPERATIONAL"
+    assert body["national_phone_number"] == "(02) 9999 0000"
+    assert body["opening_hours"] == ["Monday: 6:00 AM – 10:00 PM"]
+    assert body["attribution_required"] is True
+    assert body["attributions"]
+    mock_details.assert_awaited_once()
+    kwargs = mock_details.await_args.kwargs
+    assert kwargs["place_id"] == "ChIJDETAIL"
+
+
+async def test_place_details_503_when_provider_disabled(client: AsyncClient) -> None:
+    """Empty server-side key → provider returns disabled → 503 (not 200).
+    The mobile picker can render a soft "Details unavailable" without
+    leaking the fact that the key is missing."""
+    token = await _register(client, "venue_detail_disabled@example.com")
+    with patch(
+        "app.routers.venues.places_service.fetch_place_details",
+        new=AsyncMock(return_value=PlaceDetailsResult(status="disabled")),
+    ):
+        r = await client.get(
+            "/venues/places/ChIJDETAIL",
+            headers=_auth(token),
+        )
+    assert r.status_code == 503
+
+
+async def test_place_details_503_when_quota_exceeded(client: AsyncClient) -> None:
+    token = await _register(client, "venue_detail_quota@example.com")
+    with patch(
+        "app.routers.venues.places_service.fetch_place_details",
+        new=AsyncMock(return_value=PlaceDetailsResult(status="quota_exceeded")),
+    ):
+        r = await client.get(
+            "/venues/places/ChIJDETAIL",
+            headers=_auth(token),
+        )
+    assert r.status_code == 503
+
+
+async def test_place_details_502_when_provider_error(client: AsyncClient) -> None:
+    """Timeout / non-2xx / malformed → 502 Bad Gateway. Body must NOT
+    echo any Google internals — just a stable detail string."""
+    token = await _register(client, "venue_detail_error@example.com")
+    with patch(
+        "app.routers.venues.places_service.fetch_place_details",
+        new=AsyncMock(return_value=PlaceDetailsResult(status="error")),
+    ):
+        r = await client.get(
+            "/venues/places/ChIJDETAIL",
+            headers=_auth(token),
+        )
+    assert r.status_code == 502
+    body = r.json()
+    assert "Places" in body["detail"]
+    # No leaked raw Google keys / error payloads.
+    leaked = set(body) - {"detail"}
+    assert leaked == set(), f"unexpected fields on the wire: {leaked}"

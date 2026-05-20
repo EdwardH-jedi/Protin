@@ -6,7 +6,16 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
 
-Sport = Literal["gym", "golf", "tennis", "running"]
+Sport = Literal[
+    "gym",
+    "golf",
+    "tennis",
+    "running",
+    "basketball",
+    "badminton",
+    "soccer",
+    "football",
+]
 
 # Source mode for /venues/nearby. Default is "seed" — pure v1.0 behaviour
 # preserved. "places" hits the Google Places provider only. "both" merges
@@ -18,6 +27,24 @@ VenueSource = Literal["seed", "places", "both"]
 # behaviour; "google_places" identifies rows synthesised from the
 # Stream 1 provider.
 VenueSourceTag = Literal["seed", "google_places"]
+
+# Coarse status of the Google Places provider on a nearby response.
+# Designed so the mobile picker can pick a single, non-leaky message
+# per state without ever seeing raw Google error text. Mapping rules
+# live in app.services.venues.list_nearby_venues.
+ProviderStatus = Literal[
+    "ok",
+    "disabled",
+    "missing_coordinates",
+    "quota_exceeded",
+    "error",
+]
+
+# Advisory per-row match confidence vs the requested sport. Always
+# emitted; defaults to "medium" on seed rows (curated catalog — neither
+# strongly sport-tagged nor uncertain). See places.py:_classify_confidence
+# for the Places-derived classification rules.
+VenueConfidence = Literal["high", "medium", "low"]
 
 
 class VenueResponse(BaseModel):
@@ -49,6 +76,21 @@ class VenueResponse(BaseModel):
     # this flag in v1.1+ to decide whether to render the attribution
     # chip; seed rows do not require it.
     attribution_required: bool = False
+    # Google's primary type classification (e.g. "tennis_court", "gym")
+    # — echoed verbatim so the picker can label rows beyond the
+    # requested sport. Null for seed rows.
+    primary_type: str | None = None
+    # Deep link into the Google Maps app/web for this place. Populated
+    # only on Places rows; used by the picker's "Open in Maps" entry.
+    google_maps_uri: str | None = None
+    # HTML attribution snippets Google requires alongside Places content
+    # in addition to the global "Powered by Google" chip. Empty list
+    # for seed rows.
+    attributions: list[str] = Field(default_factory=list)
+    # Advisory match confidence vs the requested sport. Picker may use
+    # this to fade low-confidence rows; venues are never filtered out
+    # solely on confidence.
+    confidence: VenueConfidence = "medium"
 
     model_config = {"from_attributes": True}
 
@@ -56,6 +98,52 @@ class VenueResponse(BaseModel):
 class NearbyVenuesResponse(BaseModel):
     items: list[VenueResponse]
     total: int
+    # Coarse provider state — see ProviderStatus. Default "disabled"
+    # keeps the wire shape compatible with v1.0 callers that didn't ask
+    # for Places and ignore the field.
+    provider_status: ProviderStatus = "disabled"
+    # Opaque cursor for the next page of Places (Text Search) results.
+    # Mobile passes the value back as cursor=<value> on the next call.
+    # Null when no further pages are available.
+    next_cursor: str | None = None
+
+
+class PlaceDetailsResponse(BaseModel):
+    """Normalised Google Place Details (New) response.
+
+    Returned from ``GET /venues/places/{place_id}`` — a lazy-load
+    endpoint that is called only when the user opens a Google-Places
+    venue from the picker. Never used during list/search because Place
+    Details is on a heavier SKU bracket; deferring it keeps per-session
+    Places spend bounded by the number of taps, not the number of
+    visible rows.
+    """
+
+    place_id: str
+    name: str
+    latitude: float
+    longitude: float
+    address: str | None = None
+    types: list[str] = Field(default_factory=list)
+    primary_type: str | None = None
+    google_maps_uri: str | None = None
+    website_uri: str | None = None
+    national_phone_number: str | None = None
+    international_phone_number: str | None = None
+    business_status: str | None = None
+    rating: float | None = None
+    user_rating_count: int | None = None
+    # Weekday-formatted opening hours (e.g. "Monday: 6:00 AM – 10:00 PM").
+    # Plural strings rather than the raw timeslot grid keeps the mobile
+    # render trivial and avoids importing Google's timezone semantics.
+    opening_hours: list[str] = Field(default_factory=list)
+    # Google requires these attribution snippets be shown alongside any
+    # surfaced Place Details content (in addition to the global
+    # "Powered by Google" chip).
+    attributions: list[str] = Field(default_factory=list)
+    # Always true for this endpoint — mirror of NearbyVenue rows so
+    # mobile can use one rendering rule for "show attribution".
+    attribution_required: bool = True
 
 
 class NearbyVenuesQuery(BaseModel):
@@ -70,6 +158,14 @@ class NearbyVenuesQuery(BaseModel):
     # Default "seed" preserves v1.0 wire shape exactly — clients that
     # never pass this param get the unchanged behaviour.
     source: VenueSource = "seed"
+    # Free-text Google Places (Text Search) override. When present the
+    # backend uses this string instead of the default sport-based phrase
+    # ("tennis court", "gym", …).
+    q: str | None = None
+    # Opaque pagination cursor returned from a prior response as
+    # next_cursor. Passed back to Google Places Text Search as
+    # pageToken.
+    cursor: str | None = None
 
     @model_validator(mode="after")
     def _both_or_neither(self) -> "NearbyVenuesQuery":

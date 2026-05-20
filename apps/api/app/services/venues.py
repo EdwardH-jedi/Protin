@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.venue import Venue
-from app.schemas.venues import NearbyVenuesResponse, VenueResponse
+from app.schemas.venues import NearbyVenuesResponse, ProviderStatus, VenueResponse
 from app.services import places as places_service
 
 _log = logging.getLogger(__name__)
@@ -69,6 +69,8 @@ def _to_response(venue: Venue, distance_km: float | None) -> VenueResponse:
         source="seed",
         provider_place_id=None,
         attribution_required=False,
+        # Seed rows are curated; assume the sport tag is correct.
+        confidence="high",
     )
 
 
@@ -107,6 +109,10 @@ def _place_to_response(
         source="google_places",
         provider_place_id=place.place_id,
         attribution_required=True,
+        primary_type=place.primary_type,
+        google_maps_uri=place.google_maps_uri,
+        attributions=list(place.attributions),
+        confidence=place.confidence,
     )
 
 
@@ -144,6 +150,8 @@ async def list_nearby_venues(
     radius_km: float = 10.0,
     limit: int = 20,
     source: Literal["seed", "places", "both"] = "seed",
+    q: str | None = None,
+    cursor: str | None = None,
 ) -> NearbyVenuesResponse:
     """
     Return venues that serve the requested sport.
@@ -181,13 +189,35 @@ async def list_nearby_venues(
       degrades to seed-only behaviour because Places cannot be called.
 
     ``total`` reflects the post-merge, post-dedup pre-limit count.
+
+    Cursor pagination (Codex fix):
+
+    A non-empty ``cursor`` is always a Google Places Text Search
+    continuation token. Including the seed catalog again on every page
+    would let already-loaded seed rows eat up the ``limit`` slots
+    intended for the next Places page — the mobile picker would tap
+    "Load more" and see no new venues even when Google had more to
+    offer. So on a cursor request we skip the seed branch entirely:
+
+    * ``source="seed"`` + cursor: ignored — cursor has no meaning for
+      the static catalog. Behaves like the cursor-less seed request.
+    * ``source="places"`` + cursor: Places continuation only (already
+      worked, but pinned).
+    * ``source="both"`` + cursor: treated as Places continuation only;
+      no seed rows are returned on this page.
+
+    First page (no cursor) keeps the merge behaviour described above.
     """
     has_coords = lat is not None and lng is not None
+    is_cursor_page = source in ("places", "both") and bool(cursor)
 
     # ── Seed branch ─────────────────────────────────────────────────────
     seed_items: list[VenueResponse]
     seed_total: int
-    if source in ("seed", "both"):
+    # Skip the seed catalog on a cursor page so the mobile "Load more"
+    # caller doesn't get the same seed rows repeatedly (and so the
+    # ``limit`` slots go to the new Places page).
+    if source in ("seed", "both") and not is_cursor_page:
         rows = (await db.execute(select(Venue))).scalars().all()
         matching = [v for v in rows if sport in (v.sport_tags or [])]
 
@@ -213,24 +243,36 @@ async def list_nearby_venues(
 
     # ── Places branch ───────────────────────────────────────────────────
     place_items: list[VenueResponse] = []
+    provider_status: ProviderStatus = "disabled"
+    next_cursor: str | None = None
+
+    if source in ("places", "both"):
+        provider_status = "missing_coordinates" if not has_coords else "disabled"
+
     if source in ("places", "both") and has_coords:
         # Defence in depth — Stream 1's provider already fails closed,
         # but a second guard keeps any future regression contained to
         # the v1.0 seed path.
         try:
-            place_rows = await places_service.search_sport_places(
+            places_result = await places_service.search_sport_places_v2(
                 sport=sport,
                 lat=lat,
                 lng=lng,
                 radius_km=radius_km,
                 limit=limit,
+                q=q,
+                cursor=cursor,
             )
+            provider_status = places_result.status
+            next_cursor = places_result.next_page_token
+            place_rows = places_result.results
         except Exception as exc:  # noqa: BLE001 — boundary guard
             _log.warning(
                 "Places provider raised for sport=%s; falling back to seed only: %s",
                 sport,
                 exc,
             )
+            provider_status = "error"
             place_rows = []
 
         # source="both": drop Places rows that look like a seed entry.
@@ -265,7 +307,13 @@ async def list_nearby_venues(
     elif source == "places":
         merged = place_items
         total = len(place_items)
-    else:  # "both"
+    elif is_cursor_page:
+        # source="both" cursor page: seed_items is empty by construction
+        # above. Return only the continuation Places rows so the mobile
+        # caller sees just the new page.
+        merged = place_items
+        total = len(place_items)
+    else:  # "both", first page
         merged = seed_items + place_items
         total = len(merged)
 
@@ -281,7 +329,12 @@ async def list_nearby_venues(
         )
 
     items = merged[:limit]
-    return NearbyVenuesResponse(items=items, total=total)
+    return NearbyVenuesResponse(
+        items=items,
+        total=total,
+        provider_status=provider_status,
+        next_cursor=next_cursor,
+    )
 
 
 async def get_venue_or_404(db: AsyncSession, venue_id: UUID) -> Venue:

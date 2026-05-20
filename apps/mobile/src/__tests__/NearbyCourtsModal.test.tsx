@@ -128,7 +128,7 @@ describe('NearbyCourtsModal', () => {
       // No coords → modal picks source=seed (catalog-only honesty;
       // server can't query Google without a centre).
       expect(mockApiGet).toHaveBeenCalledWith(
-        '/venues/nearby?sport=tennis&source=seed'
+        '/venues/nearby?sport=tennis&source=seed&limit=50'
       );
     });
   });
@@ -149,7 +149,7 @@ describe('NearbyCourtsModal', () => {
       // Coords present → modal opts into source=both so the picker is
       // densified by Google Places results merged server-side.
       expect(mockApiGet).toHaveBeenCalledWith(
-        '/venues/nearby?sport=running&lat=-33.89&lng=151.27&source=both'
+        '/venues/nearby?sport=running&lat=-33.89&lng=151.27&source=both&limit=50'
       );
     });
   });
@@ -773,7 +773,7 @@ describe('NearbyCourtsModal', () => {
       // Default URL — no radius_km param; coords present so source=both.
       await waitFor(() => {
         expect(mockApiGet).toHaveBeenCalledWith(
-          '/venues/nearby?sport=tennis&lat=-33.89&lng=151.27&source=both'
+          '/venues/nearby?sport=tennis&lat=-33.89&lng=151.27&source=both&limit=50'
         );
       });
       const wider = await findByLabelText('Show wider results');
@@ -783,7 +783,7 @@ describe('NearbyCourtsModal', () => {
       // Once toggled, the next fetch includes radius_km=50 + source=both.
       await waitFor(() => {
         expect(mockApiGet).toHaveBeenCalledWith(
-          '/venues/nearby?sport=tennis&lat=-33.89&lng=151.27&radius_km=50&source=both'
+          '/venues/nearby?sport=tennis&lat=-33.89&lng=151.27&radius_km=50&source=both&limit=50'
         );
       });
     });
@@ -851,7 +851,7 @@ describe('NearbyCourtsModal', () => {
       await waitFor(() => {
         const lastCall = mockApiGet.mock.calls.at(-1)?.[0];
         expect(lastCall).toBe(
-          '/venues/nearby?sport=running&lat=-33.89&lng=151.27&source=both'
+          '/venues/nearby?sport=running&lat=-33.89&lng=151.27&source=both&limit=50'
         );
       });
     });
