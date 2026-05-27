@@ -1,9 +1,19 @@
-from __future__ import annotations
+# NOTE: Do NOT add `from __future__ import annotations` here.
+#
+# With it, every annotation becomes a string (ForwardRef). FastAPI
+# 0.115 + Pydantic 2.10 + slowapi 0.1.9 cannot resolve a ForwardRef
+# wrapped inside the slowapi `@limiter.limit` decorator: it builds a
+# `TypeAdapter[Annotated[ForwardRef('RegisterRequest'), Body(...)]]`
+# whose ForwardRef can never be resolved against the decorated
+# function's globals, and every POST against /auth/register raises
+# PydanticUserError ("class not fully defined") at request time.
+# Eager annotations make `RegisterRequest` an actual class reference,
+# which the rest of the stack handles correctly.
 
 from uuid import UUID
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -60,7 +70,15 @@ async def get_current_user(
 @limiter.limit("3/minute")
 async def register(
     request: Request,
-    body: RegisterRequest,
+    # Explicit Body(...) belt-and-braces against the slowapi @limiter.limit
+    # wrapper. The header-level note above this module forbids
+    # `from __future__ import annotations` (which would re-introduce the
+    # ForwardRef failure that originally surfaced as
+    # loc=["query","body"] 422 on /auth/register). Pinning `Body(...)`
+    # here is unconditionally correct — there's no other reasonable way
+    # to read RegisterRequest off the wire — and keeps the contract
+    # robust even if someone re-adds the future-import by accident.
+    body: RegisterRequest = Body(...),
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     existing = await db.execute(select(User).where(User.email == body.email))
@@ -80,7 +98,10 @@ async def register(
 @limiter.limit("5/minute")
 async def login(
     request: Request,
-    body: LoginRequest,
+    # Explicit Body(...) — see comment on register() above. This module
+    # intentionally avoids `from __future__ import annotations`; pinning
+    # Body() here is the belt-and-braces backstop.
+    body: LoginRequest = Body(...),
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     result = await db.execute(select(User).where(User.email == body.email))
@@ -98,7 +119,10 @@ async def login(
 @limiter.limit("5/minute")
 async def apple_sign_in(
     request: Request,
-    body: AppleSignInRequest,
+    # Explicit Body(...) — see comment on register() above. This module
+    # intentionally avoids `from __future__ import annotations`; pinning
+    # Body() here is the belt-and-braces backstop.
+    body: AppleSignInRequest = Body(...),
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     settings = get_settings()

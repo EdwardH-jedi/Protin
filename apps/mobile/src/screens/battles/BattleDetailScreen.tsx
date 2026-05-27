@@ -440,26 +440,6 @@ export function BattleDetailScreen({ navigation, route }: BattleDetailScreenProp
             ) : null}
           </View>
         ) : null}
-
-        <View style={styles.secondaryActions}>
-          <SecondaryAction
-            label="Share"
-            onPress={() =>
-              Alert.alert('Share', 'Sharing is coming in a later release.')
-            }
-            accessibilityLabel="Share this game"
-          />
-          <SecondaryAction
-            label="Report game"
-            onPress={() =>
-              Alert.alert(
-                'Report',
-                'Event reporting is coming in the next release.'
-              )
-            }
-            accessibilityLabel="Report this game"
-          />
-        </View>
       </ScrollView>
 
       <View style={styles.ctaBar}>
@@ -541,27 +521,6 @@ function ModeBadge({ mode }: { mode: 'casual' | 'ranked' }) {
         {isRanked ? 'RANKED' : 'CASUAL'}
       </Text>
     </View>
-  );
-}
-
-function SecondaryAction({
-  label,
-  onPress,
-  accessibilityLabel,
-}: {
-  label: string;
-  onPress: () => void;
-  accessibilityLabel: string;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}
-    >
-      <Text style={styles.secondaryActionText}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -677,26 +636,6 @@ const styles = StyleSheet.create({
   },
   warningText: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
-  },
-  secondaryActions: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    gap: spacing.sm,
-  },
-  secondaryAction: {
-    flex: 1,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-  },
-  secondaryActionText: {
-    ...typography.button,
-    fontSize: 13,
     color: colors.textSecondary,
   },
   ctaBar: {

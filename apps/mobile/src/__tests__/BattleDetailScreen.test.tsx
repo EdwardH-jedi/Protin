@@ -199,10 +199,22 @@ describe('BattleDetailScreen', () => {
     getByText('Bring shoes');
   });
 
-  it('renders Report and Share placeholder buttons', () => {
-    const { getByLabelText } = renderScreen(makeDetail());
-    getByLabelText('Report this game');
-    getByLabelText('Share this game');
+  it('does not render the Share / Report game placeholder buttons', () => {
+    // App Review risk: the previous Share / Report game buttons were
+    // wired to placeholder Alerts ("Sharing is coming in a later
+    // release." / "Event reporting is coming in the next release.")
+    // — non-functional UI Apple flags as misleading. Both have been
+    // removed from the detail screen. This test locks that in so a
+    // regression that re-adds either button (or the placeholder copy)
+    // fails CI before reaching review. Real chat-side Report / Block
+    // safety surfaces (PublicProfileScreen, SafetyCenterScreen,
+    // BlockedUsersScreen) are unaffected and covered by their own
+    // suites.
+    const { queryByLabelText, queryByText } = renderScreen(makeDetail());
+    expect(queryByLabelText('Share this game')).toBeNull();
+    expect(queryByLabelText('Report this game')).toBeNull();
+    expect(queryByText('Sharing is coming in a later release.')).toBeNull();
+    expect(queryByText('Event reporting is coming in the next release.')).toBeNull();
   });
 
   it('calls navigation.goBack when Back is pressed', () => {

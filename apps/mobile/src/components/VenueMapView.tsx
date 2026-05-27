@@ -1,9 +1,56 @@
+import Constants from 'expo-constants';
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT, type Region } from 'react-native-maps';
+import { Platform, StyleSheet, Text, View } from 'react-native';
+import MapView, {
+  Marker,
+  PROVIDER_DEFAULT,
+  PROVIDER_GOOGLE,
+  type Region,
+} from 'react-native-maps';
 
 import { colors, radii, spacing, typography } from '../theme';
 import type { Venue } from '@protin/shared-types';
+
+/**
+ * Whether the Google Maps SDK key is configured for the CURRENT
+ * platform (iOS vs Android vs web).
+ *
+ * The mobile bundle never sees the key value itself — `app.config.js`
+ * surfaces only per-platform booleans via
+ * `extra.googleMapsConfiguredIos` / `extra.googleMapsConfiguredAndroid`.
+ * The native key value is wired into `ios.config.googleMapsApiKey`
+ * and `android.config.googleMaps.apiKey` where react-native-maps
+ * actually consumes it.
+ *
+ * Why platform-aware (not a single union boolean): a build may ship
+ * with only the iOS Maps key configured. Without a per-platform
+ * gate, the Android user opening the same OTA bundle would force
+ * `PROVIDER_GOOGLE` and see a blank grey tile surface (no native
+ * Android key to render against). The reverse symmetrical risk
+ * applies on iOS. On web / other platforms we never force the
+ * provider — react-native-maps web shim does not honour
+ * `PROVIDER_GOOGLE` the same way and falling through to the default
+ * keeps the picker rendering predictable surfaces.
+ *
+ * Tradeoff: when Places-sourced rows are visible AND the Maps key is
+ * not configured for the current platform, the map uses non-Google
+ * tiles. The "Powered by Google" attribution chip still appears next
+ * to the visible rows via NearbyCourtsModal — Google's terms cover
+ * *Places content* attribution; map-tile provider is independent.
+ */
+function isGoogleMapsProviderAvailableForPlatform(): boolean {
+  const extra = Constants.expoConfig?.extra ?? {};
+  if (Platform.OS === 'ios') {
+    return Boolean(extra.googleMapsConfiguredIos);
+  }
+  if (Platform.OS === 'android') {
+    return Boolean(extra.googleMapsConfiguredAndroid);
+  }
+  // web / other — never force PROVIDER_GOOGLE.
+  return false;
+}
+
+const IS_GOOGLE_MAPS_PROVIDER_AVAILABLE = isGoogleMapsProviderAvailableForPlatform();
 
 interface VenueMapViewProps {
   /** Venues to render as map pins. Markers are skipped for any venue
@@ -43,6 +90,14 @@ export function VenueMapView({
   onMarkerPress,
 }: VenueMapViewProps) {
   const hasUserCoords = userLat !== undefined && userLng !== undefined;
+  const hasGooglePlacesRows = venues.some(
+    (venue) => venue.source === 'google_places' || venue.attributionRequired === true,
+  );
+  // Only switch to Google tiles when both (a) the current result set
+  // contains Places-sourced rows AND (b) the CURRENT platform has a
+  // Maps SDK key configured. Without (b), PROVIDER_GOOGLE renders a
+  // blank map — see isGoogleMapsProviderAvailableForPlatform above.
+  const useGoogleProvider = hasGooglePlacesRows && IS_GOOGLE_MAPS_PROVIDER_AVAILABLE;
 
   // Frame the visible region around either the user pin (preferred,
   // since results are sorted by distance from them) or the centroid of
@@ -89,7 +144,7 @@ export function VenueMapView({
   return (
     <View style={styles.container} accessibilityLabel="Venue map">
       <MapView
-        provider={PROVIDER_DEFAULT}
+        provider={useGoogleProvider ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
         style={styles.map}
         initialRegion={initialRegion}
         // Disable surfaces we don't use in the MVP — pure pin-picker.

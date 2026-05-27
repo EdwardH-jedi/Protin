@@ -110,6 +110,41 @@ function resolveGoogleServicesFile(relativePath, platform) {
   return undefined;
 }
 
+/**
+ * Google Maps SDK rendering key.
+ *
+ * IMPORTANT: this is the MOBILE Maps SDK key (renders map tiles on
+ * iOS / Android via react-native-maps + PROVIDER_GOOGLE). It is
+ * **NOT** the backend GOOGLE_PLACES_API_KEY (Places Web Service —
+ * lives on the FastAPI server, never shipped to mobile).
+ *
+ * Restrictions in Google Cloud Console:
+ *   * API: Maps SDK for iOS + Maps SDK for Android only
+ *   * Application: iOS bundle ID + Android package + SHA-1
+ *   * Same key may be used for both platforms when configured by
+ *     bundle ID restriction; use platform-specific keys if a stricter
+ *     blast-radius split is required (override below by passing
+ *     EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY /
+ *     EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY).
+ *
+ * EXPO_PUBLIC_* means the value is bundled into the mobile JS. The
+ * key MUST be application-restricted in GCP so a leaked bundle key
+ * can't be reused outside the SportsGang bundle ID. Never paste a
+ * real key into source / docs / chat.
+ *
+ * When unset (local dev, App Store reviewer environment): the picker
+ * falls back to PROVIDER_DEFAULT (Apple Maps on iOS, Google native on
+ * Android) so the map never goes blank. VenueMapView reads the
+ * ``googleMapsConfigured`` flag below to decide.
+ */
+function resolveMapsKey(platform) {
+  const platformKey =
+    platform === "ios"
+      ? process.env.EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY
+      : process.env.EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY;
+  return platformKey || process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || undefined;
+}
+
 module.exports = () => {
   const androidGoogleServicesFile = resolveGoogleServicesFile(
     "./google-services.json",
@@ -119,6 +154,15 @@ module.exports = () => {
     "./GoogleService-Info.plist",
     "ios"
   );
+
+  const iosMapsKey = resolveMapsKey("ios");
+  const androidMapsKey = resolveMapsKey("android");
+  // Per-platform flags — VenueMapView gates PROVIDER_GOOGLE on the
+  // CURRENT platform's flag, not the union. Configuring only one
+  // platform must NOT cause the other platform to switch to
+  // PROVIDER_GOOGLE without a native key (blank map risk).
+  const googleMapsConfiguredIos = Boolean(iosMapsKey);
+  const googleMapsConfiguredAndroid = Boolean(androidMapsKey);
 
   return {
     expo: {
@@ -148,15 +192,26 @@ module.exports = () => {
           NSCalendarsUsageDescription:
             "SportsGang uses your calendar to add confirmed workout sessions.",
           // Foreground-only. We never request always/background — venue
-          // sorting only needs a single fix when the picker opens.
+          // sorting only needs a single fix when the picker opens. The
+          // copy explicitly names the surface (sports courts, gyms,
+          // parks, venues) and re-states the foreground constraint so
+          // App Store reviewers can map the request to the permitted
+          // use case without inferring it from the key name alone.
           NSLocationWhenInUseUsageDescription:
-            "SportsGang uses your location to show nearby courts and venues.",
+            "SportsGang uses your location to show nearby sports courts, gyms, parks, and venues. Your location is used only while you are using the app.",
           // Required because expo-notifications is declared in plugins and
           // relies on silent remote push delivery in the background.
           UIBackgroundModes: ["remote-notification"],
         },
         ...(iosGoogleServicesFile
           ? { googleServicesFile: iosGoogleServicesFile }
+          : {}),
+        // Google Maps SDK key for iOS (tile rendering only — NOT the
+        // backend Places key). Omit the config block when no key is
+        // configured so iOS falls back to Apple Maps via
+        // PROVIDER_DEFAULT — the map will never go blank.
+        ...(iosMapsKey
+          ? { config: { googleMapsApiKey: iosMapsKey } }
           : {}),
       },
       android: {
@@ -173,6 +228,13 @@ module.exports = () => {
         ],
         ...(androidGoogleServicesFile
           ? { googleServicesFile: androidGoogleServicesFile }
+          : {}),
+        // Google Maps SDK key for Android (tile rendering only — NOT
+        // the backend Places key). Without it, react-native-maps with
+        // PROVIDER_GOOGLE renders a blank grey screen, so VenueMapView
+        // gates the provider switch on ``googleMapsConfigured``.
+        ...(androidMapsKey
+          ? { config: { googleMaps: { apiKey: androidMapsKey } } }
           : {}),
       },
       plugins: [
@@ -193,6 +255,22 @@ module.exports = () => {
         googleRedirectUri:
           process.env.EXPO_PUBLIC_GOOGLE_REDIRECT_URI ??
           "http://localhost:8000/users/me/google-calendar/callback",
+        // Per-platform Maps SDK configuration flags. The Maps SDK key
+        // itself is NOT exposed via ``extra`` because the native config
+        // block above is the only place it needs to live; surfacing it
+        // to JS would invite accidental misuse. VenueMapView reads
+        // these flags AT RUNTIME using Platform.OS to decide between
+        // PROVIDER_GOOGLE (key configured for THIS platform — safe to
+        // render Google tiles) and PROVIDER_DEFAULT (no key — map must
+        // fall back so it never goes blank with Places rows visible).
+        //
+        // Why both, not one boolean: a build may ship with only the
+        // iOS Maps key set. The Android user opening the same OTA
+        // bundle must NOT get PROVIDER_GOOGLE without an Android key
+        // — that's a blank-map regression. Per-platform flags keep
+        // the gate honest on whichever OS is actually running.
+        googleMapsConfiguredIos,
+        googleMapsConfiguredAndroid,
         // EAS project link. Required for `eas build` because dynamic
         // configs cannot be auto-written by `eas init` — the project ID
         // must live in this file directly.
