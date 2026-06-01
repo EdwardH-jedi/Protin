@@ -194,6 +194,13 @@ const sampleMessages = [
   },
 ];
 
+function renderChatScreen(opts: { route?: any; navigation?: any } = {}) {
+  const navigation = opts.navigation ?? makeNavigation();
+  const route = opts.route ?? makeRoute();
+  const utils = render(<ChatScreen route={route as any} navigation={navigation as any} />);
+  return { ...utils, navigation, route };
+}
+
 function getBubbleAlignSelf(UNSAFE_getAllByType: any, textNode: any): string | undefined {
   const { StyleSheet, View } = require('react-native');
   const allViews = UNSAFE_getAllByType(View);
@@ -218,26 +225,20 @@ describe('ChatScreen', () => {
   it('shows a loading indicator on mount before messages load', () => {
     // Never resolves during this test
     mockApiGet.mockReturnValue(new Promise(() => {}));
-    const { UNSAFE_queryAllByType } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { UNSAFE_queryAllByType } = renderChatScreen();
     const { ActivityIndicator } = require('react-native');
     expect(UNSAFE_queryAllByType(ActivityIndicator).length).toBeGreaterThan(0);
   });
 
   it('renders partner name in the header', async () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
-    const { getByText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByText } = renderChatScreen();
     await waitFor(() => getByText('Jordan Lee'));
   });
 
   it('fetches messages from the correct endpoint', async () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
-    render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    renderChatScreen();
     await waitFor(() => {
       expect(mockApiGet).toHaveBeenCalledWith('/matches/match-1/messages?limit=100');
     });
@@ -247,9 +248,7 @@ describe('ChatScreen', () => {
 
   it('shows the empty state prompt when there are no messages', async () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
-    const { getByText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByText } = renderChatScreen();
     await waitFor(() => {
       getByText('Say hello to Jordan Lee to get things started.');
     });
@@ -259,9 +258,7 @@ describe('ChatScreen', () => {
 
   it('renders messages returned by the API', async () => {
     mockApiGet.mockResolvedValue({ items: sampleMessages, total: 2, limit: 100, offset: 0 });
-    const { getByText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByText } = renderChatScreen();
     await waitFor(() => {
       getByText('Hey! Want to train tomorrow?');
       getByText('Absolutely, sounds great!');
@@ -298,9 +295,7 @@ describe('ChatScreen', () => {
       offset: 0,
     });
 
-    const { findByText, UNSAFE_getAllByType } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { findByText, UNSAFE_getAllByType } = renderChatScreen();
 
     const chrisFirst = await findByText('Want to train this weekend?');
     const sarah = await findByText("Let's plan a session.");
@@ -319,12 +314,7 @@ describe('ChatScreen', () => {
       offset: 0,
     });
 
-    const { findByText, UNSAFE_getAllByType } = render(
-      <ChatScreen
-        route={makeRoute({ partnerId: undefined }) as any}
-        navigation={makeNavigation() as any}
-      />
-    );
+    const { findByText, UNSAFE_getAllByType } = renderChatScreen({ route: makeRoute({ partnerId: undefined }) });
 
     const partnerText = await findByText('Hey! Want to train tomorrow?');
     const ownText = await findByText('Absolutely, sounds great!');
@@ -353,12 +343,7 @@ describe('ChatScreen', () => {
         offset: 0,
       });
 
-      const { findByText, UNSAFE_getAllByType } = render(
-        <ChatScreen
-          route={makeRoute({ partnerId: undefined }) as any}
-          navigation={makeNavigation() as any}
-        />
-      );
+      const { findByText, UNSAFE_getAllByType } = renderChatScreen({ route: makeRoute({ partnerId: undefined }) });
 
       const unknown = await findByText('Unknown sender');
       expect(getBubbleAlignSelf(UNSAFE_getAllByType, unknown)).toBe('flex-start');
@@ -385,9 +370,7 @@ describe('ChatScreen', () => {
         limit: 100,
         offset: 0,
       });
-      const { findByText, UNSAFE_getAllByType } = render(
-        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-      );
+      const { findByText, UNSAFE_getAllByType } = renderChatScreen();
 
       // Both bubbles render. Both must land on the partner/left side: with
       // no auth user, the screen refuses to attribute any message to "me".
@@ -433,9 +416,7 @@ describe('ChatScreen', () => {
         limit: 100,
         offset: 0,
       });
-      const { findByText, UNSAFE_getAllByType } = render(
-        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-      );
+      const { findByText, UNSAFE_getAllByType } = renderChatScreen();
       const chris = await findByText('Want to train this weekend?');
       const sarah = await findByText("Let's plan a session.");
       expect(getBubbleAlignSelf(UNSAFE_getAllByType, chris)).toBe('flex-start');
@@ -470,12 +451,7 @@ describe('ChatScreen', () => {
       limit: 100,
       offset: 0,
     });
-    const { findByText, UNSAFE_getAllByType } = render(
-      <ChatScreen
-        route={makeRoute({ partnerId: '   ' }) as any}
-        navigation={makeNavigation() as any}
-      />
-    );
+    const { findByText, UNSAFE_getAllByType } = renderChatScreen({ route: makeRoute({ partnerId: '   ' }) });
     const chris = await findByText('Want to train this weekend?');
     const sarah = await findByText("Let's plan a session.");
     // Default authMock: user.id = 'me-123' (Chris). Chris on right, Sarah on
@@ -507,9 +483,7 @@ describe('ChatScreen', () => {
         limit: 100,
         offset: 0,
       });
-      const { findByText, UNSAFE_getAllByType } = render(
-        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-      );
+      const { findByText, UNSAFE_getAllByType } = renderChatScreen();
       const node = await findByText('Pre-hydrate own message');
       // Even though senderId === 'me-123' (the value the auth user *would*
       // have if it were hydrated), with `user: null` the screen refuses to
@@ -524,9 +498,7 @@ describe('ChatScreen', () => {
 
   it('shows an error message and a retry button when fetch fails', async () => {
     mockApiGet.mockRejectedValue(new Error('Connection refused'));
-    const { getByText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByText } = renderChatScreen();
     await waitFor(() => {
       getByText('Connection refused');
       getByText('Try again');
@@ -538,9 +510,7 @@ describe('ChatScreen', () => {
       .mockRejectedValueOnce(new Error('Connection refused'))
       .mockResolvedValue(emptyMessageResponse);
 
-    const { getByText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByText } = renderChatScreen();
     await waitFor(() => getByText('Try again'));
     await act(async () => {
       fireEvent.press(getByText('Try again'));
@@ -563,9 +533,7 @@ describe('ChatScreen', () => {
     };
     mockApiPost.mockResolvedValue(sentMsg);
 
-    const { getByPlaceholderText, getByLabelText, findByText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByPlaceholderText, getByLabelText, findByText } = renderChatScreen();
 
     await waitFor(() => getByPlaceholderText('Message…'));
 
@@ -584,9 +552,7 @@ describe('ChatScreen', () => {
       id: 'msg-x', matchId: 'match-1', senderId: 'me-123', body: 'Hi', createdAt: '2026-04-08T09:00:00Z',
     });
 
-    const { getByPlaceholderText, getByLabelText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByPlaceholderText, getByLabelText } = renderChatScreen();
 
     await waitFor(() => getByPlaceholderText('Message…'));
     fireEvent.changeText(getByPlaceholderText('Message…'), 'Hi');
@@ -607,9 +573,7 @@ describe('ChatScreen', () => {
     mockApiPost.mockRejectedValue(new Error('Network down'));
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
-    const { getByPlaceholderText, getByLabelText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByPlaceholderText, getByLabelText } = renderChatScreen();
 
     await waitFor(() => getByPlaceholderText('Message…'));
     fireEvent.changeText(getByPlaceholderText('Message…'), 'Will retry this');
@@ -636,9 +600,7 @@ describe('ChatScreen', () => {
         resolveFetch = res;
       })
     );
-    const { findByText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { findByText } = renderChatScreen();
 
     // WS opens and a frame arrives BEFORE the fetch resolves. The list is
     // still hidden behind the loading spinner at this point.
@@ -667,9 +629,7 @@ describe('ChatScreen', () => {
 
   it('does not call api.post when the draft is empty', async () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
-    const { getByLabelText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByLabelText } = renderChatScreen();
     await waitFor(() => getByLabelText('Send'));
     fireEvent.press(getByLabelText('Send'));
     expect(mockApiPost).not.toHaveBeenCalled();
@@ -680,9 +640,7 @@ describe('ChatScreen', () => {
   it('calls navigation.goBack when the Back button is pressed', async () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
     const navigation = makeNavigation();
-    const { getByLabelText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={navigation as any} />
-    );
+    const { getByLabelText } = renderChatScreen({ navigation });
     await waitFor(() => getByLabelText('Back'));
     fireEvent.press(getByLabelText('Back'));
     expect(navigation.goBack).toHaveBeenCalledTimes(1);
@@ -691,9 +649,7 @@ describe('ChatScreen', () => {
   it('navigates to BookingComposer when + Session is pressed', async () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
     const navigation = makeNavigation();
-    const { getByLabelText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={navigation as any} />
-    );
+    const { getByLabelText } = renderChatScreen({ navigation });
     await waitFor(() => getByLabelText('Propose a session'));
     fireEvent.press(getByLabelText('Propose a session'));
     expect(navigation.navigate).toHaveBeenCalledWith('BookingComposer', {
@@ -704,9 +660,7 @@ describe('ChatScreen', () => {
 
   it('shows the "Plan a session" banner with a Find a court CTA', async () => {
     mockApiGet.mockReturnValue(new Promise(() => {})); // banner is rendered above the loader
-    const { getByText, getByLabelText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByText, getByLabelText } = renderChatScreen();
     getByText('Plan a session');
     getByText('Find a court and propose a time.');
     getByLabelText('Find a court');
@@ -715,9 +669,7 @@ describe('ChatScreen', () => {
   it('navigates to BookingComposer when Find a court is pressed', async () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
     const navigation = makeNavigation();
-    const { getByLabelText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={navigation as any} />
-    );
+    const { getByLabelText } = renderChatScreen({ navigation });
     await waitFor(() => getByLabelText('Find a court'));
     fireEvent.press(getByLabelText('Find a court'));
     expect(navigation.navigate).toHaveBeenCalledWith('BookingComposer', {
@@ -728,9 +680,7 @@ describe('ChatScreen', () => {
 
   it('does not surface any Google Calendar copy in the chat', async () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
-    const { queryByText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { queryByText } = renderChatScreen();
     await waitFor(() => queryByText('Plan a session'));
     expect(queryByText(/google calendar/i)).toBeNull();
     expect(queryByText(/calendar/i)).toBeNull();
@@ -740,9 +690,7 @@ describe('ChatScreen', () => {
 
   it('renders the composer as multiline with a readable minHeight and a capped maxHeight', async () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
-    const { getByPlaceholderText, getByLabelText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByPlaceholderText, getByLabelText } = renderChatScreen();
     await waitFor(() => getByPlaceholderText('Message…'));
 
     const { StyleSheet } = require('react-native');
@@ -775,9 +723,7 @@ describe('ChatScreen', () => {
     // open. The repair restores a single normal-flow composer rendered for
     // both platforms. These assertions guard against re-introducing the bug.
     mockApiGet.mockResolvedValue(emptyMessageResponse);
-    const { getByPlaceholderText, getByLabelText, UNSAFE_queryAllByType } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByPlaceholderText, getByLabelText, UNSAFE_queryAllByType } = renderChatScreen();
     await waitFor(() => getByPlaceholderText('Message…'));
 
     // 1) The composer TextInput is visible / non-hidden / editable.
@@ -811,9 +757,7 @@ describe('ChatScreen', () => {
     Object.defineProperty(RN.Platform, 'OS', { value: 'android', configurable: true });
     try {
       mockApiGet.mockResolvedValue(emptyMessageResponse);
-      const { getByPlaceholderText, getByLabelText, UNSAFE_queryAllByType } = render(
-        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-      );
+      const { getByPlaceholderText, getByLabelText, UNSAFE_queryAllByType } = renderChatScreen();
       await waitFor(() => getByPlaceholderText('Message…'));
 
       expect(UNSAFE_queryAllByType(RN.InputAccessoryView).length).toBe(0);
@@ -836,9 +780,7 @@ describe('ChatScreen', () => {
     // This assertion pins the structural contract: exactly one composer
     // TextInput exists at initial mount, before any focus event.
     mockApiGet.mockResolvedValue(emptyMessageResponse);
-    const { getByPlaceholderText, UNSAFE_getAllByType } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByPlaceholderText, UNSAFE_getAllByType } = renderChatScreen();
     await waitFor(() => getByPlaceholderText('Message…'));
 
     const RN = require('react-native');
@@ -853,9 +795,7 @@ describe('ChatScreen', () => {
     // out of normal flow (absolute / overlay) so it never gets a real
     // tappable rect. Pin the inputRow to normal flow.
     mockApiGet.mockResolvedValue(emptyMessageResponse);
-    const { getByPlaceholderText, UNSAFE_getAllByType } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByPlaceholderText, UNSAFE_getAllByType } = renderChatScreen();
     await waitFor(() => getByPlaceholderText('Message…'));
 
     const { StyleSheet, View } = require('react-native');
@@ -882,7 +822,7 @@ describe('ChatScreen', () => {
 
   it('opens a WebSocket connection on mount with the correct URL', async () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
-    render(<ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />);
+    renderChatScreen();
     await waitFor(() => expect(mockWsInstances.length).toBe(1));
     expect(mockWsInstances[0].url).toBe(
       'ws://localhost:8000/matches/match-1/ws?token=test-jwt-token'
@@ -891,9 +831,7 @@ describe('ChatScreen', () => {
 
   it('appends a message received via WebSocket to the list', async () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
-    const { findByText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { findByText } = renderChatScreen();
 
     await waitFor(() => expect(mockWsInstances.length).toBe(1));
 
@@ -928,9 +866,7 @@ describe('ChatScreen', () => {
     };
     mockApiPost.mockResolvedValue(sentMsg);
 
-    const { getByPlaceholderText, getByLabelText, getAllByText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getByPlaceholderText, getByLabelText, getAllByText } = renderChatScreen();
 
     await waitFor(() => getByPlaceholderText('Message…'));
     await waitFor(() => expect(mockWsInstances.length).toBe(1));
@@ -968,9 +904,7 @@ describe('ChatScreen', () => {
       limit: 100,
       offset: 0,
     });
-    const { getAllByText, queryByText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getAllByText, queryByText } = renderChatScreen();
     await waitFor(() => {
       expect(getAllByText('Once is enough').length).toBe(1);
     });
@@ -987,9 +921,7 @@ describe('ChatScreen', () => {
       createdAt: '2026-04-08T08:00:00Z',
     };
     mockApiGet.mockResolvedValue({ items: [existingMsg], total: 1, limit: 100, offset: 0 });
-    const { getAllByText } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { getAllByText } = renderChatScreen();
 
     await waitFor(() => expect(mockWsInstances.length).toBe(1));
 
@@ -1005,9 +937,7 @@ describe('ChatScreen', () => {
 
   it('closes the WebSocket on unmount', async () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
-    const { unmount } = render(
-      <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-    );
+    const { unmount } = renderChatScreen();
 
     await waitFor(() => expect(mockWsInstances.length).toBe(1));
     unmount();
@@ -1016,7 +946,7 @@ describe('ChatScreen', () => {
 
   it('ignores malformed WebSocket frames', async () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
-    render(<ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />);
+    renderChatScreen();
 
     await waitFor(() => expect(mockWsInstances.length).toBe(1));
 
@@ -1056,9 +986,7 @@ describe('ChatScreen', () => {
     }
 
     async function openMenuAndPressBlock(navigation: ReturnType<typeof makeNavigation>) {
-      const utils = render(
-        <ChatScreen route={makeRoute() as any} navigation={navigation as any} />
-      );
+      const utils = renderChatScreen({ navigation });
       await waitFor(() => utils.getByLabelText('More options'));
       fireEvent.press(utils.getByLabelText('More options'));
       // The first Alert is the safety menu — press its Block option.
@@ -1147,9 +1075,7 @@ describe('ChatScreen', () => {
       setupMessagesAndBookingsMock({
         bookings: { items: [makeProposal()], total: 1, limit: 50, offset: 0 },
       });
-      const { findByText, getByLabelText } = render(
-        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-      );
+      const { findByText, getByLabelText } = renderChatScreen();
       // Title appears + Accept/Decline buttons rendered for the receiver.
       await findByText('Session proposal');
       expect(getByLabelText('Accept session proposal')).toBeTruthy();
@@ -1166,9 +1092,7 @@ describe('ChatScreen', () => {
           offset: 0,
         },
       });
-      const { findByText, queryByLabelText } = render(
-        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-      );
+      const { findByText, queryByLabelText } = renderChatScreen();
       await findByText('Session proposal sent');
       await findByText('AWAITING CONFIRMATION');
       expect(queryByLabelText('Accept session proposal')).toBeNull();
@@ -1190,9 +1114,7 @@ describe('ChatScreen', () => {
           offset: 0,
         },
       });
-      const { findByText, queryByText } = render(
-        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-      );
+      const { findByText, queryByText } = renderChatScreen();
       await findByText('Session proposal sent');
       // Truncated "Session pro..." must not appear anywhere.
       expect(queryByText(/^Session pro\.\.\./)).toBeNull();
@@ -1208,9 +1130,7 @@ describe('ChatScreen', () => {
           offset: 0,
         },
       });
-      const { findByText, queryByLabelText } = render(
-        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-      );
+      const { findByText, queryByLabelText } = renderChatScreen();
       await findByText('Session confirmed');
       expect(queryByLabelText('Accept session proposal')).toBeNull();
       expect(queryByLabelText('Decline session proposal')).toBeNull();
@@ -1225,9 +1145,7 @@ describe('ChatScreen', () => {
           offset: 0,
         },
       });
-      const { findByText, queryByLabelText } = render(
-        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-      );
+      const { findByText, queryByLabelText } = renderChatScreen();
       await findByText('Session declined');
       expect(queryByLabelText('Accept session proposal')).toBeNull();
     });
@@ -1240,9 +1158,7 @@ describe('ChatScreen', () => {
         ...makeProposal(),
         status: 'confirmed',
       });
-      const { findByText, getByLabelText } = render(
-        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-      );
+      const { findByText, getByLabelText } = renderChatScreen();
       await findByText('Session proposal');
       await act(async () => {
         fireEvent.press(getByLabelText('Accept session proposal'));
@@ -1259,9 +1175,7 @@ describe('ChatScreen', () => {
         ...makeProposal(),
         status: 'declined',
       });
-      const { findByText, getByLabelText } = render(
-        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-      );
+      const { findByText, getByLabelText } = renderChatScreen();
       await findByText('Session proposal');
       await act(async () => {
         fireEvent.press(getByLabelText('Decline session proposal'));
@@ -1276,9 +1190,7 @@ describe('ChatScreen', () => {
       });
       mockApiPost.mockRejectedValueOnce(new Error('Server down'));
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-      const { findByText, getByLabelText } = render(
-        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-      );
+      const { findByText, getByLabelText } = renderChatScreen();
       await findByText('Session proposal');
       await act(async () => {
         fireEvent.press(getByLabelText('Accept session proposal'));
@@ -1293,9 +1205,7 @@ describe('ChatScreen', () => {
 
     it('renders no proposal card when /bookings is empty', async () => {
       setupMessagesAndBookingsMock();
-      const { queryByText } = render(
-        <ChatScreen route={makeRoute() as any} navigation={makeNavigation() as any} />
-      );
+      const { queryByText } = renderChatScreen();
       // Wait for any fetch settling; assert NO card text appears.
       await waitFor(() => {
         expect(queryByText('Session proposal')).toBeNull();
@@ -1308,9 +1218,7 @@ describe('ChatScreen', () => {
         bookings: { items: [makeProposal()], total: 1, limit: 50, offset: 0 },
       });
       const navigation = makeNavigation();
-      const { findByLabelText } = render(
-        <ChatScreen route={makeRoute() as any} navigation={navigation as any} />
-      );
+      const { findByLabelText } = renderChatScreen({ navigation });
       const card = await findByLabelText('Open session proposal');
       fireEvent.press(card);
       expect(navigation.navigate).toHaveBeenCalledWith('BookingDetail', {

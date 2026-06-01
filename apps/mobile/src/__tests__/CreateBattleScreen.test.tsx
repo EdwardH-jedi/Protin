@@ -123,29 +123,27 @@ function makeNavigation() {
   };
 }
 
+function renderCreateBattle(opts: { navigation?: any } = {}) {
+  const navigation = opts.navigation ?? makeNavigation();
+  const utils = render(
+    <CreateBattleScreen navigation={navigation as any} route={{} as any} />
+  );
+  return { ...utils, navigation };
+}
+
 describe('CreateBattleScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('renders the Host a game header and subcopy', () => {
-    const { getByText } = render(
-      <CreateBattleScreen
-        navigation={makeNavigation() as any}
-        route={{} as any}
-      />
-    );
+    const { getByText } = renderCreateBattle();
     getByText('Host a game');
     getByText('Set the details. Reliable hosts build higher Honor.');
   });
 
   it('renders mode and sport options', () => {
-    const { getByLabelText } = render(
-      <CreateBattleScreen
-        navigation={makeNavigation() as any}
-        route={{} as any}
-      />
-    );
+    const { getByLabelText } = renderCreateBattle();
     getByLabelText('Select Casual Game');
     getByLabelText('Select Ranked Battle');
     getByLabelText('Select sport Basketball');
@@ -154,9 +152,7 @@ describe('CreateBattleScreen', () => {
 
   it('Create game button stays disabled until title and location are filled', async () => {
     const navigation = makeNavigation();
-    const { getByLabelText } = render(
-      <CreateBattleScreen navigation={navigation as any} route={{} as any} />
-    );
+    const { getByLabelText } = renderCreateBattle({ navigation });
     const cta = getByLabelText('Create game');
     await act(async () => {
       fireEvent.press(cta);
@@ -167,9 +163,7 @@ describe('CreateBattleScreen', () => {
   it('calls createEvent and navigates to BattleDetail on success', async () => {
     mockCreateEvent.mockResolvedValueOnce({ id: 'new-event-1' });
     const navigation = makeNavigation();
-    const { getByLabelText } = render(
-      <CreateBattleScreen navigation={navigation as any} route={{} as any} />
-    );
+    const { getByLabelText } = renderCreateBattle({ navigation });
 
     fireEvent.changeText(getByLabelText('Game title'), 'Friday Hoops');
     fireEvent.changeText(getByLabelText('Game location'), 'Bondi Court');
@@ -192,12 +186,7 @@ describe('CreateBattleScreen', () => {
   });
 
   it('updates capacity default when sport changes (tennis → 2)', async () => {
-    const { getByLabelText } = render(
-      <CreateBattleScreen
-        navigation={makeNavigation() as any}
-        route={{} as any}
-      />
-    );
+    const { getByLabelText } = renderCreateBattle();
     fireEvent.press(getByLabelText('Select sport Tennis'));
     const capacityInput = getByLabelText('Game capacity');
     // Default for tennis is 2.
@@ -206,9 +195,7 @@ describe('CreateBattleScreen', () => {
 
   it('calls navigation.goBack when Back is pressed', () => {
     const navigation = makeNavigation();
-    const { getByLabelText } = render(
-      <CreateBattleScreen navigation={navigation as any} route={{} as any} />
-    );
+    const { getByLabelText } = renderCreateBattle({ navigation });
     fireEvent.press(getByLabelText('Back'));
     expect(navigation.goBack).toHaveBeenCalled();
   });
@@ -217,12 +204,7 @@ describe('CreateBattleScreen', () => {
 
   describe('venue picker', () => {
     it('shows the Choose court or venue button for tennis (sport-specific label)', () => {
-      const { getByLabelText } = render(
-        <CreateBattleScreen
-          navigation={makeNavigation() as any}
-          route={{} as any}
-        />
-      );
+      const { getByLabelText } = renderCreateBattle();
       fireEvent.press(getByLabelText('Select sport Tennis'));
       expect(getByLabelText('Choose court or venue')).toBeTruthy();
     });
@@ -233,12 +215,7 @@ describe('CreateBattleScreen', () => {
       // free-text input. Backend accepts any sport string; the modal's
       // manual-venue footer covers the "no seed data" case, so the
       // picker now renders for every sport.
-      const { getByLabelText } = render(
-        <CreateBattleScreen
-          navigation={makeNavigation() as any}
-          route={{} as any}
-        />
-      );
+      const { getByLabelText } = renderCreateBattle();
       // Basketball is BATTLE_SPORTS[0] — default selection on mount.
       expect(getByLabelText('Choose court, field, or venue')).toBeTruthy();
       // Free-text fallback is also still present below it.
@@ -246,45 +223,25 @@ describe('CreateBattleScreen', () => {
     });
 
     it('shows the venue picker for soccer (court/field copy)', () => {
-      const { getByLabelText } = render(
-        <CreateBattleScreen
-          navigation={makeNavigation() as any}
-          route={{} as any}
-        />
-      );
+      const { getByLabelText } = renderCreateBattle();
       fireEvent.press(getByLabelText('Select sport Soccer'));
       expect(getByLabelText('Choose court, field, or venue')).toBeTruthy();
     });
 
     it('shows the venue picker for badminton (court/venue copy, shared with tennis)', () => {
-      const { getByLabelText } = render(
-        <CreateBattleScreen
-          navigation={makeNavigation() as any}
-          route={{} as any}
-        />
-      );
+      const { getByLabelText } = renderCreateBattle();
       fireEvent.press(getByLabelText('Select sport Badminton'));
       expect(getByLabelText('Choose court or venue')).toBeTruthy();
     });
 
     it('shows running-specific picker copy (park/route/meeting-spot)', () => {
-      const { getByLabelText } = render(
-        <CreateBattleScreen
-          navigation={makeNavigation() as any}
-          route={{} as any}
-        />
-      );
+      const { getByLabelText } = renderCreateBattle();
       fireEvent.press(getByLabelText('Select sport Run'));
       expect(getByLabelText('Choose park, route, or meeting spot')).toBeTruthy();
     });
 
     it('opens the modal and forwards sport + location status when picker is tapped', async () => {
-      const { getByLabelText } = render(
-        <CreateBattleScreen
-          navigation={makeNavigation() as any}
-          route={{} as any}
-        />
-      );
+      const { getByLabelText } = renderCreateBattle();
       fireEvent.press(getByLabelText('Select sport Tennis'));
       await act(async () => {
         fireEvent.press(getByLabelText('Choose court or venue'));
@@ -303,9 +260,7 @@ describe('CreateBattleScreen', () => {
     it('selecting a venue populates the form and submit sends a venue-derived locationText', async () => {
       mockCreateEvent.mockResolvedValueOnce({ id: 'event-with-venue' });
       const navigation = makeNavigation();
-      const { getByLabelText, getByText, queryByLabelText } = render(
-        <CreateBattleScreen navigation={navigation as any} route={{} as any} />
-      );
+      const { getByLabelText, getByText, queryByLabelText } = renderCreateBattle({ navigation });
       fireEvent.press(getByLabelText('Select sport Tennis'));
       fireEvent.changeText(getByLabelText('Game title'), 'Annandale Tennis Hit');
 
@@ -333,9 +288,7 @@ describe('CreateBattleScreen', () => {
     });
 
     it('Change clears the selected venue back to the free-text fallback', async () => {
-      const { getByLabelText, getByPlaceholderText } = render(
-        <CreateBattleScreen navigation={makeNavigation() as any} route={{} as any} />
-      );
+      const { getByLabelText, getByPlaceholderText } = renderCreateBattle();
       fireEvent.press(getByLabelText('Select sport Tennis'));
       await act(async () => {
         fireEvent.press(getByLabelText('Choose court or venue'));
@@ -348,9 +301,7 @@ describe('CreateBattleScreen', () => {
     });
 
     it('switching sport drops the selected venue chip (mismatched-payload guard)', async () => {
-      const { getByLabelText, queryByText } = render(
-        <CreateBattleScreen navigation={makeNavigation() as any} route={{} as any} />
-      );
+      const { getByLabelText, queryByText } = renderCreateBattle();
       fireEvent.press(getByLabelText('Select sport Tennis'));
       await act(async () => {
         fireEvent.press(getByLabelText('Choose court or venue'));
@@ -370,9 +321,7 @@ describe('CreateBattleScreen', () => {
 
     it('still allows submit using only the free-text input (picker is optional)', async () => {
       mockCreateEvent.mockResolvedValueOnce({ id: 'event-no-picker' });
-      const { getByLabelText } = render(
-        <CreateBattleScreen navigation={makeNavigation() as any} route={{} as any} />
-      );
+      const { getByLabelText } = renderCreateBattle();
       // Sport defaults to basketball — the picker CTA is rendered, but
       // the host can ignore it and type into the free-text field. The
       // payload still uses the existing-compatible locationText shape.
@@ -388,9 +337,7 @@ describe('CreateBattleScreen', () => {
 
     it('basketball: selecting a venue from the picker populates locationText', async () => {
       mockCreateEvent.mockResolvedValueOnce({ id: 'event-basketball-venue' });
-      const { getByLabelText } = render(
-        <CreateBattleScreen navigation={makeNavigation() as any} route={{} as any} />
-      );
+      const { getByLabelText } = renderCreateBattle();
       // Stay on basketball (default).
       fireEvent.changeText(getByLabelText('Game title'), 'Bondi pickup hoops');
       await act(async () => {
@@ -412,9 +359,7 @@ describe('CreateBattleScreen', () => {
 
     it('basketball: manual venue fallback from the picker populates locationText', async () => {
       mockCreateEvent.mockResolvedValueOnce({ id: 'event-basketball-manual' });
-      const { getByLabelText } = render(
-        <CreateBattleScreen navigation={makeNavigation() as any} route={{} as any} />
-      );
+      const { getByLabelText } = renderCreateBattle();
       fireEvent.changeText(getByLabelText('Game title'), 'Driveway hoops');
       await act(async () => {
         fireEvent.press(getByLabelText('Choose court, field, or venue'));
@@ -431,9 +376,7 @@ describe('CreateBattleScreen', () => {
     });
 
     it('soccer: opens the modal and forwards the soccer sport string', async () => {
-      const { getByLabelText } = render(
-        <CreateBattleScreen navigation={makeNavigation() as any} route={{} as any} />
-      );
+      const { getByLabelText } = renderCreateBattle();
       fireEvent.press(getByLabelText('Select sport Soccer'));
       await act(async () => {
         fireEvent.press(getByLabelText('Choose court, field, or venue'));
@@ -446,9 +389,7 @@ describe('CreateBattleScreen', () => {
     });
 
     it('badminton: opens the modal and forwards the badminton sport string', async () => {
-      const { getByLabelText } = render(
-        <CreateBattleScreen navigation={makeNavigation() as any} route={{} as any} />
-      );
+      const { getByLabelText } = renderCreateBattle();
       fireEvent.press(getByLabelText('Select sport Badminton'));
       await act(async () => {
         fireEvent.press(getByLabelText('Choose court or venue'));
@@ -461,9 +402,7 @@ describe('CreateBattleScreen', () => {
     });
 
     it('forwards enableWiderResults and onSelectManual to the modal', async () => {
-      const { getByLabelText } = render(
-        <CreateBattleScreen navigation={makeNavigation() as any} route={{} as any} />
-      );
+      const { getByLabelText } = renderCreateBattle();
       fireEvent.press(getByLabelText('Select sport Tennis'));
       await act(async () => {
         fireEvent.press(getByLabelText('Choose court or venue'));
@@ -478,9 +417,7 @@ describe('CreateBattleScreen', () => {
     it('manual venue from the modal becomes the locationText on submit', async () => {
       mockCreateEvent.mockResolvedValueOnce({ id: 'event-manual-venue' });
       const navigation = makeNavigation();
-      const { getByLabelText, queryByText } = render(
-        <CreateBattleScreen navigation={navigation as any} route={{} as any} />
-      );
+      const { getByLabelText, queryByText } = renderCreateBattle({ navigation });
       fireEvent.press(getByLabelText('Select sport Tennis'));
       fireEvent.changeText(getByLabelText('Game title'), 'Tennis at the back court');
 
@@ -510,9 +447,7 @@ describe('CreateBattleScreen', () => {
 
     it('manual venue overrides a previously selected structured venue', async () => {
       mockCreateEvent.mockResolvedValueOnce({ id: 'event-manual-overrides' });
-      const { getByLabelText, queryByText } = render(
-        <CreateBattleScreen navigation={makeNavigation() as any} route={{} as any} />
-      );
+      const { getByLabelText, queryByText } = renderCreateBattle();
       fireEvent.press(getByLabelText('Select sport Tennis'));
       fireEvent.changeText(getByLabelText('Game title'), 'Tennis hit');
 
