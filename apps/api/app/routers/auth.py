@@ -10,6 +10,7 @@
 # Eager annotations make `RegisterRequest` an actual class reference,
 # which the rest of the stack handles correctly.
 
+import logging
 from uuid import UUID
 
 import jwt
@@ -43,10 +44,17 @@ from app.schemas.auth import (
     TokenResponse,
     UserResponse,
 )
-from app.services.apple_auth import AppleIdentityTokenError, verify_identity_token
+from app.services.apple_auth import (
+    AppleIdentityTokenError,
+    apple_revocation_configured,
+    exchange_authorization_code,
+    revoke_refresh_token,
+    verify_identity_token,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 _bearer = HTTPBearer()
+_log = logging.getLogger(__name__)
 
 
 async def get_current_user(
@@ -186,6 +194,26 @@ async def apple_sign_in(
         user = User(email=verified_email, apple_sub=apple_sub, hashed_password=None)
         db.add(user)
 
+    # Best-effort: exchange the one-time authorization code for a refresh token
+    # and store it so account deletion can later revoke the user's Apple tokens
+    # (App Store 5.1.1(v)). A failure here must NEVER block sign-in — the user
+    # is already authenticated via the verified identity token. The loud warning
+    # exists because a silent miss leaves the account with no revocable token.
+    if body.authorization_code and apple_revocation_configured(settings):
+        try:
+            refresh_token = await exchange_authorization_code(
+                body.authorization_code, settings=settings
+            )
+            if refresh_token:
+                user.apple_refresh_token = refresh_token
+        except Exception:  # noqa: BLE001 — best-effort enrichment, never fatal
+            _log.warning(
+                "Apple token exchange failed for sub=%s; account deletion cannot "
+                "revoke this user's Apple tokens until a later sign-in succeeds.",
+                apple_sub,
+                exc_info=True,
+            )
+
     try:
         await db.commit()
     except IntegrityError as e:
@@ -218,8 +246,28 @@ async def delete_me(
     Child rows are removed explicitly (in dependency order) rather than
     relying on DB-level cascade, so the behaviour is identical regardless
     of dialect (Postgres in prod, SQLite in tests).
+
+    For Sign in with Apple users we additionally revoke the stored Apple
+    refresh token first — Apple requires apps that offer Sign in with Apple to
+    revoke tokens on account deletion. Revocation is best-effort: a failure is
+    logged but never aborts the deletion, so the user can always delete their
+    account even during an Apple outage.
     """
     user_id = current_user.id
+
+    # --- Sign in with Apple token revocation (best-effort, before delete) ---
+    settings = get_settings()
+    apple_refresh_token = current_user.apple_refresh_token
+    if apple_refresh_token and apple_revocation_configured(settings):
+        try:
+            await revoke_refresh_token(apple_refresh_token, settings=settings)
+        except Exception:  # noqa: BLE001 — revoke failure must not block deletion
+            _log.warning(
+                "Apple token revocation failed for user=%s during account "
+                "deletion; continuing with local data deletion.",
+                user_id,
+                exc_info=True,
+            )
 
     # Match IDs owned by this user — need them to scrub messages and booking syncs
     # that reference matches / bookings this user participates in.

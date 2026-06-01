@@ -612,3 +612,225 @@ def test_secret_key_warns_in_local(monkeypatch: pytest.MonkeyPatch, caplog: pyte
         importlib.reload(security_module)
 
     assert any("SECRET_KEY" in rec.message for rec in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# Sign in with Apple token revocation on account deletion (App Store 5.1.1(v))
+# ---------------------------------------------------------------------------
+
+
+def _configure_apple_revocation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the four Apple-revocation settings so ``apple_revocation_configured``
+    returns True. The exchange/revoke helpers themselves are monkeypatched in
+    these route tests, so the private key value is never actually signed."""
+    from app.core import config as config_module
+
+    settings = config_module.get_settings()
+    monkeypatch.setattr(settings, "apple_client_id", "com.protin.app")
+    monkeypatch.setattr(settings, "apple_team_id", "TEAM123456")
+    monkeypatch.setattr(settings, "apple_key_id", "KEY1234567")
+    monkeypatch.setattr(settings, "apple_private_key", "dummy-pem")
+
+
+async def test_apple_sign_in_stores_refresh_token_when_code_provided(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When the client forwards an authorization_code and Apple is configured,
+    the backend exchanges it and persists the refresh token for later revoke."""
+    from sqlalchemy import select
+
+    from app.models.user import User
+    from app.routers import auth as auth_router
+    from app.services import apple_auth as apple_auth_module
+
+    _configure_apple_revocation(monkeypatch)
+
+    async def fake_verify(identity_token, *, audience, nonce=None, http_client=None):
+        return {
+            "sub": "00aaaa.refresh-store-user",
+            "email": "refresh-store@example.com",
+            "aud": audience,
+            "iss": "https://appleid.apple.com",
+        }
+
+    monkeypatch.setattr(auth_router, "verify_identity_token", fake_verify)
+    monkeypatch.setattr(apple_auth_module, "verify_identity_token", fake_verify)
+
+    async def fake_exchange(code, *, settings, http_client=None):
+        assert code == "auth-code-xyz"
+        return "refresh-token-123"
+
+    monkeypatch.setattr(auth_router, "exchange_authorization_code", fake_exchange)
+
+    r = await client.post(
+        "/auth/apple",
+        json={"identity_token": "stub.jwt.value", "authorization_code": "auth-code-xyz"},
+    )
+    assert r.status_code == 200, r.text
+
+    async with _TestSession() as session:
+        user = (
+            await session.execute(select(User).where(User.apple_sub == "00aaaa.refresh-store-user"))
+        ).scalar_one()
+        # EncryptedString round-trips to plaintext on read.
+        assert user.apple_refresh_token == "refresh-token-123"
+
+
+async def test_apple_sign_in_succeeds_when_token_exchange_fails(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failing token exchange must NOT break sign-in — the refresh token is a
+    best-effort enrichment, not a precondition for authentication."""
+    from sqlalchemy import select
+
+    from app.models.user import User
+    from app.routers import auth as auth_router
+    from app.services import apple_auth as apple_auth_module
+
+    _configure_apple_revocation(monkeypatch)
+
+    async def fake_verify(identity_token, *, audience, nonce=None, http_client=None):
+        return {
+            "sub": "00bbbb.exchange-fail-user",
+            "email": "exchange-fail@example.com",
+            "aud": audience,
+            "iss": "https://appleid.apple.com",
+        }
+
+    monkeypatch.setattr(auth_router, "verify_identity_token", fake_verify)
+    monkeypatch.setattr(apple_auth_module, "verify_identity_token", fake_verify)
+
+    async def boom_exchange(code, *, settings, http_client=None):
+        raise RuntimeError("Apple token endpoint returned 400")
+
+    monkeypatch.setattr(auth_router, "exchange_authorization_code", boom_exchange)
+
+    r = await client.post(
+        "/auth/apple",
+        json={"identity_token": "stub.jwt.value", "authorization_code": "auth-code-xyz"},
+    )
+    assert r.status_code == 200, r.text
+
+    async with _TestSession() as session:
+        user = (
+            await session.execute(select(User).where(User.apple_sub == "00bbbb.exchange-fail-user"))
+        ).scalar_one()
+        assert user.apple_refresh_token is None
+
+
+async def test_delete_me_revokes_apple_token_then_deletes_user(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Deleting an Apple-linked account revokes the stored refresh token and
+    then removes the local user row."""
+    from sqlalchemy import select
+
+    from app.core.security import create_access_token
+    from app.models.user import User
+    from app.routers import auth as auth_router
+
+    _configure_apple_revocation(monkeypatch)
+
+    async with _TestSession() as session:
+        user = User(
+            email="apple-del@example.com",
+            hashed_password=None,
+            apple_sub="00cccc.apple-delete-user",
+            apple_refresh_token="rt-to-revoke",
+        )
+        session.add(user)
+        await session.flush()
+        user_id = user.id
+        await session.commit()
+
+    revoked: list[str] = []
+
+    async def fake_revoke(token, *, settings, http_client=None):
+        revoked.append(token)
+
+    monkeypatch.setattr(auth_router, "revoke_refresh_token", fake_revoke)
+
+    token = create_access_token(str(user_id))
+    r = await client.delete("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 204
+
+    # Revoke was called once, with the user's decrypted refresh token.
+    assert revoked == ["rt-to-revoke"]
+
+    async with _TestSession() as session:
+        assert (
+            await session.execute(select(User).where(User.id == user_id))
+        ).scalar_one_or_none() is None
+
+
+async def test_delete_me_does_not_revoke_for_email_user(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An email/password user (no apple_refresh_token) must not trigger any
+    Apple revoke call on deletion."""
+    from app.core.security import create_access_token
+    from app.models.user import User
+    from app.routers import auth as auth_router
+
+    # Apple IS configured — proving the skip is driven by the absent token,
+    # not by missing configuration.
+    _configure_apple_revocation(monkeypatch)
+
+    async with _TestSession() as session:
+        user = User(email="email-del@example.com", hashed_password="x" * 60)
+        session.add(user)
+        await session.flush()
+        user_id = user.id
+        await session.commit()
+
+    revoked: list[str] = []
+
+    async def fake_revoke(token, *, settings, http_client=None):
+        revoked.append(token)
+
+    monkeypatch.setattr(auth_router, "revoke_refresh_token", fake_revoke)
+
+    token = create_access_token(str(user_id))
+    r = await client.delete("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 204
+    assert revoked == []
+
+
+async def test_delete_me_completes_when_apple_revoke_fails(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If Apple's revoke endpoint fails, account deletion must still complete —
+    deletion is never weakened by a best-effort revocation step."""
+    from sqlalchemy import select
+
+    from app.core.security import create_access_token
+    from app.models.user import User
+    from app.routers import auth as auth_router
+
+    _configure_apple_revocation(monkeypatch)
+
+    async with _TestSession() as session:
+        user = User(
+            email="apple-del-fail@example.com",
+            hashed_password=None,
+            apple_sub="00dddd.apple-revoke-fail",
+            apple_refresh_token="rt-doomed",
+        )
+        session.add(user)
+        await session.flush()
+        user_id = user.id
+        await session.commit()
+
+    async def boom_revoke(token, *, settings, http_client=None):
+        raise RuntimeError("Apple revoke endpoint returned 500")
+
+    monkeypatch.setattr(auth_router, "revoke_refresh_token", boom_revoke)
+
+    token = create_access_token(str(user_id))
+    r = await client.delete("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 204
+
+    async with _TestSession() as session:
+        assert (
+            await session.execute(select(User).where(User.id == user_id))
+        ).scalar_one_or_none() is None

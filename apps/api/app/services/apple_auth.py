@@ -19,9 +19,16 @@ from jwt.algorithms import RSAAlgorithm
 
 APPLE_JWKS_URL = "https://appleid.apple.com/auth/keys"
 APPLE_ISSUER = "https://appleid.apple.com"
+# Apple Sign-in REST endpoints for the authorization-code grant and for
+# revoking issued tokens (used by account deletion — App Store 5.1.1(v)).
+APPLE_TOKEN_URL = "https://appleid.apple.com/auth/token"
+APPLE_REVOKE_URL = "https://appleid.apple.com/auth/revoke"
 # Cache Apple's public keys for 1 hour. Apple rotates infrequently; fetching
 # on every login would add ~200ms latency and hammer their endpoint.
 _JWKS_TTL_SECONDS = 3600
+# Apple accepts a client_secret valid for up to 6 months; we mint a short-lived
+# one per call since it is only used for a single immediate request.
+_CLIENT_SECRET_TTL_SECONDS = 300
 
 _log = logging.getLogger(__name__)
 
@@ -141,3 +148,136 @@ async def verify_identity_token(
         raise AppleIdentityTokenError("Identity token missing 'sub' claim")
 
     return claims
+
+
+# ---------------------------------------------------------------------------
+# Token exchange + revocation (account deletion — App Store 5.1.1(v))
+#
+# Identity tokens are NOT revocable. To revoke a user's Sign in with Apple on
+# account deletion, the backend must hold a refresh (or access) token, which is
+# obtained by exchanging the one-time native ``authorizationCode`` at login.
+#
+# NOTE on client_id reuse: ``apple_client_id`` (the iOS bundle identifier,
+# e.g. com.edh1223.protin) is used as the identity-token audience AND as the
+# token/revoke ``client_id`` AND as the client_secret ``sub``. This is correct
+# for a native-app authorization code. If a Services-ID web flow is ever added,
+# its requests would need that Services ID instead.
+# ---------------------------------------------------------------------------
+
+
+def build_client_secret(
+    *,
+    team_id: str,
+    key_id: str,
+    client_id: str,
+    private_key: str,
+) -> str:
+    """Build the ES256-signed client secret JWT Apple requires for the token
+    and revoke endpoints.
+
+    ``private_key`` is the ``.p8`` PEM contents. Values delivered via env vars
+    commonly arrive with literal ``\\n`` escapes instead of real newlines, so we
+    un-escape before handing the PEM to the signer.
+    """
+    pem = private_key.replace("\\n", "\n")
+    issued_at = int(time.time())
+    payload = {
+        "iss": team_id,
+        "iat": issued_at,
+        "exp": issued_at + _CLIENT_SECRET_TTL_SECONDS,
+        "aud": APPLE_ISSUER,
+        "sub": client_id,
+    }
+    return jwt.encode(payload, pem, algorithm="ES256", headers={"kid": key_id})
+
+
+def apple_revocation_configured(settings: Any) -> bool:
+    """True only when all four secrets needed to mint a client secret are set.
+
+    When False, callers skip the exchange/revoke steps so non-Apple flows and
+    unconfigured environments (local, CI, App Store reviewer) are unaffected.
+    """
+    return bool(
+        settings.apple_client_id
+        and settings.apple_team_id
+        and settings.apple_key_id
+        and settings.apple_private_key
+    )
+
+
+async def _post_form(
+    url: str,
+    data: dict[str, str],
+    *,
+    http_client: httpx.AsyncClient | None,
+) -> httpx.Response:
+    """POST an ``application/x-www-form-urlencoded`` body (Apple rejects JSON)
+    and raise on a non-2xx status."""
+    owns_client = http_client is None
+    if http_client is None:
+        http_client = httpx.AsyncClient(timeout=10.0)
+    try:
+        resp = await http_client.post(url, data=data)
+        resp.raise_for_status()
+        return resp
+    finally:
+        if owns_client:
+            await http_client.aclose()
+
+
+async def exchange_authorization_code(
+    code: str,
+    *,
+    settings: Any,
+    http_client: httpx.AsyncClient | None = None,
+) -> str | None:
+    """Exchange a native authorization code for tokens and return the
+    ``refresh_token`` (or None if Apple did not return one). Raises on transport
+    or non-2xx HTTP errors so the caller can decide best-effort handling.
+    """
+    client_secret = build_client_secret(
+        team_id=settings.apple_team_id,
+        key_id=settings.apple_key_id,
+        client_id=settings.apple_client_id,
+        private_key=settings.apple_private_key,
+    )
+    resp = await _post_form(
+        APPLE_TOKEN_URL,
+        {
+            "client_id": settings.apple_client_id,
+            "client_secret": client_secret,
+            "grant_type": "authorization_code",
+            "code": code,
+        },
+        http_client=http_client,
+    )
+    return resp.json().get("refresh_token")
+
+
+async def revoke_refresh_token(
+    refresh_token: str,
+    *,
+    settings: Any,
+    http_client: httpx.AsyncClient | None = None,
+) -> None:
+    """Revoke a Sign in with Apple refresh token via Apple's revoke endpoint.
+
+    Raises on transport or non-2xx HTTP errors so the caller can log and decide
+    whether to proceed (account deletion proceeds regardless).
+    """
+    client_secret = build_client_secret(
+        team_id=settings.apple_team_id,
+        key_id=settings.apple_key_id,
+        client_id=settings.apple_client_id,
+        private_key=settings.apple_private_key,
+    )
+    await _post_form(
+        APPLE_REVOKE_URL,
+        {
+            "client_id": settings.apple_client_id,
+            "client_secret": client_secret,
+            "token": refresh_token,
+            "token_type_hint": "refresh_token",
+        },
+        http_client=http_client,
+    )

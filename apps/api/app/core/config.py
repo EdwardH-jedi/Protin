@@ -30,6 +30,19 @@ class Settings(BaseSettings):
     # /auth/apple endpoint is enabled in staging/production.
     apple_client_id: str = ""
 
+    # Apple Sign-in token revocation (App Store 5.1.1(v)). Required ONLY to
+    # revoke a user's Apple tokens during account deletion. When any of the
+    # three are empty the backend skips the code-exchange/revoke steps
+    # entirely (local dev, CI, reviewer env), leaving email/password flows and
+    # identity-token verification unaffected.
+    #   * apple_team_id     — 10-char Apple Developer Team ID (client_secret iss)
+    #   * apple_key_id      — 10-char Key ID of the Sign in with Apple .p8 key
+    #   * apple_private_key — the .p8 private key PEM contents (ES256). Provided
+    #                         via secret/env; literal "\n" escapes are accepted.
+    apple_team_id: str = ""
+    apple_key_id: str = ""
+    apple_private_key: str = ""
+
     # JWT signing key — must be set in .env for staging/production.
     secret_key: str = "change-me-in-production"
 

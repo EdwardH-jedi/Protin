@@ -28,6 +28,10 @@ class AppleSignInRequest(BaseModel):
     # them as-is so we can persist them before they are lost forever.
     email: EmailStr | None = None
     name: str | None = Field(default=None, max_length=120)
+    # One-time native authorization code. When provided (and Apple revocation is
+    # configured), the server exchanges it for a refresh token and stores it so
+    # account deletion can revoke the user's Apple tokens (App Store 5.1.1(v)).
+    authorization_code: str | None = None
 
 
 class UserResponse(BaseModel):
