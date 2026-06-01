@@ -109,6 +109,9 @@ export function LoginScreen({ navigation }: Props) {
         nonce,
         email: credential.email ?? null,
         name: composedName,
+        // One-time code the backend exchanges for a refresh token so account
+        // deletion can revoke Apple tokens (App Store 5.1.1(v)).
+        authorizationCode: credential.authorizationCode ?? null,
       });
       await routeAfterAuth();
     } catch (err) {

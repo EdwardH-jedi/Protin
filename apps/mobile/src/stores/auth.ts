@@ -135,6 +135,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         nonce: payload.nonce,
         email: payload.email ?? undefined,
         name: payload.name ?? undefined,
+        // Forwarded for server-side token exchange so account deletion can
+        // revoke the user's Apple tokens (App Store 5.1.1(v)).
+        authorizationCode: payload.authorizationCode ?? undefined,
       });
       await hydrateUserAfterToken(set, data.accessToken, op);
     } finally {

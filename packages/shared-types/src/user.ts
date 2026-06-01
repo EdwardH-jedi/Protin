@@ -55,6 +55,10 @@ export interface AppleSignInRequest {
   nonce?: string;
   email?: string | null;
   name?: string | null;
+  // One-time authorization code from Apple. Forwarded so the API can exchange
+  // it for a refresh token and revoke it on account deletion (App Store
+  // 5.1.1(v)). Optional: older clients / cancelled flows may omit it.
+  authorizationCode?: string | null;
 }
 
 // ---------------------------------------------------------------------------

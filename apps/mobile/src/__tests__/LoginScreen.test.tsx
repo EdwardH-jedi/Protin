@@ -290,6 +290,7 @@ describe('LoginScreen', () => {
       setPlatform('ios');
       mockSignInAsync.mockResolvedValue({
         identityToken: 'apple.jwt.token',
+        authorizationCode: 'apple.auth.code',
         email: 'user@privaterelay.appleid.com',
         fullName: { givenName: 'Alex', familyName: 'Kim' },
       });
@@ -304,6 +305,7 @@ describe('LoginScreen', () => {
       await waitFor(() => expect(mockLoginWithApple).toHaveBeenCalled());
       const payload = mockLoginWithApple.mock.calls[0][0];
       expect(payload.identityToken).toBe('apple.jwt.token');
+      expect(payload.authorizationCode).toBe('apple.auth.code');
       expect(typeof payload.nonce).toBe('string');
       expect(payload.nonce.length).toBeGreaterThan(0);
       expect(payload.email).toBe('user@privaterelay.appleid.com');

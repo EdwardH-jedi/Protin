@@ -135,10 +135,14 @@ describe('useAuthStore — loginWithApple hydrates user via /auth/me', () => {
       nonce: 'nonce-1',
       email: 'sarah@example.com',
       name: 'Sarah',
+      authorizationCode: 'auth-code-1',
     });
 
     expect(mockApiPost).toHaveBeenCalledWith('/auth/apple', expect.objectContaining({
       identityToken: 'apple-identity-token',
+      // Forwarded so the backend can exchange it for a revocable refresh token
+      // (account deletion / App Store 5.1.1(v)).
+      authorizationCode: 'auth-code-1',
     }));
     expect(mockApiGet).toHaveBeenCalledWith('/auth/me');
     expect(useAuthStore.getState().user?.id).toBe('user-from-me-endpoint');
