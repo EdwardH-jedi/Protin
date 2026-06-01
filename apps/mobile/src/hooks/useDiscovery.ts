@@ -21,12 +21,12 @@ export interface PartnerCard {
   avatarUrl?: string;
   photoUrls?: string[];
   age?: number;
-  sportProfiles: Array<{
+  sportProfiles: {
     sport: string;
     level: string;
     gymName?: string;
     golfClub?: string;
-  }>;
+  }[];
 }
 
 interface ActionResponse {

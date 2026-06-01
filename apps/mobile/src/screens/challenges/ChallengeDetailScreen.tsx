@@ -13,10 +13,7 @@ import { Screen } from '../../components/Screen';
 import { ChallengeStatusBadge } from '../../components/ChallengeStatusBadge';
 import { useChallengeDetail } from '../../hooks/useChallenges';
 import { sportLabelForBattle } from '../../lib/events';
-import {
-  isChallengeTerminal,
-  type ChallengeRead,
-} from '../../lib/challenges';
+import { isChallengeTerminal } from '../../lib/challenges';
 import { useAuthStore } from '../../stores/auth';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { ChallengeDetailScreenProps } from '../../navigation/types';

@@ -15,10 +15,8 @@ import type {
   EventDetail,
   EventListResponse,
   EventMode,
-  EventSummary,
   HostAttendanceUpdateRequest,
   SelfAttendanceRequest,
-  SelfAttendanceStatus,
 } from '@protin/shared-types';
 
 export type {

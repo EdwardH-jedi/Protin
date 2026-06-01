@@ -89,7 +89,6 @@ export function VenueMapView({
   selectedVenueId,
   onMarkerPress,
 }: VenueMapViewProps) {
-  const hasUserCoords = userLat !== undefined && userLng !== undefined;
   const hasGooglePlacesRows = venues.some(
     (venue) => venue.source === 'google_places' || venue.attributionRequired === true,
   );
@@ -105,7 +104,7 @@ export function VenueMapView({
   // ~0.15° span over Sydney clears the eastern suburbs / inner west
   // belt without zooming so far in that "Bondi vs Annandale" feels far.
   const initialRegion: Region | undefined = useMemo(() => {
-    if (hasUserCoords && userLat !== undefined && userLng !== undefined) {
+    if (userLat !== undefined && userLng !== undefined) {
       return {
         latitude: userLat,
         longitude: userLng,
@@ -125,7 +124,7 @@ export function VenueMapView({
       latitudeDelta: 0.25,
       longitudeDelta: 0.25,
     };
-  }, [hasUserCoords, userLat, userLng, venues]);
+  }, [userLat, userLng, venues]);
 
   // Without a region we can't render a useful map — the caller should
   // have already gated this case behind a list-mode fallback, but
@@ -154,7 +153,7 @@ export function VenueMapView({
         showsScale={false}
         toolbarEnabled={false}
       >
-        {hasUserCoords && userLat !== undefined && userLng !== undefined ? (
+        {userLat !== undefined && userLng !== undefined ? (
           <Marker
             key="venue-map-user"
             coordinate={{ latitude: userLat, longitude: userLng }}

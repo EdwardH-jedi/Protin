@@ -189,7 +189,7 @@ export function BattlesScreen({ navigation }: BattlesScreenProps) {
 
 interface ChipRowProps<V extends string> {
   label: string;
-  chips: ReadonlyArray<{ value: V; label: string }>;
+  chips: readonly { value: V; label: string }[];
   value: V;
   onChange: (v: V) => void;
 }

@@ -47,7 +47,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 // Routes that are always safe to remain on without a token. Anything else is
 // treated as authenticated stack and is force-reset to AuthEntry the moment
 // the auth token clears (logout / delete account / future 401 interceptor).
-const UNAUTH_ROUTES: ReadonlyArray<keyof RootStackParamList> = [
+const UNAUTH_ROUTES: readonly (keyof RootStackParamList)[] = [
   'Splash',
   'AuthEntry',
   'LoginScreen',

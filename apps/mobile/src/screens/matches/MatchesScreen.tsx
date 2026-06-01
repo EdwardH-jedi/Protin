@@ -25,7 +25,7 @@ interface PartnerSummary {
   userId: string;
   displayName: string;
   suburb?: string;
-  sportProfiles: Array<{ sport: string; level: string }>;
+  sportProfiles: { sport: string; level: string }[];
 }
 
 interface Match {
