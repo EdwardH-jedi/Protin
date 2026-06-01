@@ -20,7 +20,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts import seed_venues
+
+
+@pytest.fixture
+def seed_payload() -> list[dict]:
+    """Parsed venue seed rows from the file the seed script reads."""
+    return json.loads(seed_venues.DATA_PATH.read_text(encoding="utf-8"))
 
 
 def test_seed_data_path_is_resolvable_from_scripts_layout() -> None:
@@ -54,18 +62,17 @@ def test_seed_data_path_is_under_scripts_parent() -> None:
     )
 
 
-def test_seed_data_file_is_non_empty_json_list() -> None:
+def test_seed_data_file_is_non_empty_json_list(seed_payload: list[dict]) -> None:
     """The JSON the seed reads must at least be parseable as a list.
 
     Catches accidental empty-file or garbled-content commits before
     they ride a prod deploy and result in a zero-row venue catalog.
     """
-    payload = json.loads(seed_venues.DATA_PATH.read_text(encoding="utf-8"))
-    assert isinstance(payload, list)
-    assert len(payload) > 0, "venues_sydney.json must contain at least one row"
+    assert isinstance(seed_payload, list)
+    assert len(seed_payload) > 0, "venues_sydney.json must contain at least one row"
 
 
-def test_seed_rows_carry_usable_coordinates() -> None:
+def test_seed_rows_carry_usable_coordinates(seed_payload: list[dict]) -> None:
     """Every row must expose float-coercible lat/lng in Sydney's range.
 
     ``/venues/nearby`` filters by haversine distance from the caller's
@@ -74,15 +81,14 @@ def test_seed_rows_carry_usable_coordinates() -> None:
     Pinning a coarse Sydney bounding box also catches the obvious
     string-typo class of regression (e.g. swapped lat/lng).
     """
-    payload = json.loads(seed_venues.DATA_PATH.read_text(encoding="utf-8"))
-    for entry in payload:
+    for entry in seed_payload:
         lat = float(entry["latitude"])
         lng = float(entry["longitude"])
         assert -35.0 <= lat <= -33.0, f"latitude {lat} for {entry.get('name')!r} outside Sydney"
         assert 150.0 <= lng <= 152.0, f"longitude {lng} for {entry.get('name')!r} outside Sydney"
 
 
-def test_seed_rows_cover_supported_sports() -> None:
+def test_seed_rows_cover_supported_sports(seed_payload: list[dict]) -> None:
     """Rows must carry ``sport_tags`` matching the app's supported sports.
 
     ``scripts/seed_venues.py`` reads ``entry["sport_tags"]`` unconditionally
@@ -90,10 +96,9 @@ def test_seed_rows_cover_supported_sports() -> None:
     field disappears or only contains unknown sports, the seed either
     crashes or produces a catalog that no sport tab can surface.
     """
-    payload = json.loads(seed_venues.DATA_PATH.read_text(encoding="utf-8"))
     supported = {"gym", "golf", "tennis", "running"}
     all_tags: set[str] = set()
-    for entry in payload:
+    for entry in seed_payload:
         tags = entry["sport_tags"]
         assert isinstance(tags, list) and tags, (
             f"{entry.get('name')!r} is missing sport_tags"

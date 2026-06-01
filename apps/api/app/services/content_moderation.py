@@ -165,8 +165,7 @@ def _normalize(text: str) -> str:
     # combining marks (V1) — a future stream can add NFKC.
     lowered = text.lower()
     spaced = re.sub(r"[._,;:!?\"'`/\\-]+", " ", lowered)
-    collapsed = re.sub(r"\s+", " ", spaced).strip()
-    return collapsed
+    return re.sub(r"\s+", " ", spaced).strip()
 
 
 def moderate_text(text: str, context: str | None = None) -> ModerationResult:
