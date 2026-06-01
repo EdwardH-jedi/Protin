@@ -154,14 +154,22 @@ async def test_notification_scheduled_on_booking_proposal(client: AsyncClient) -
     )
     match_id = r.json()["match_id"]
 
-    # Propose a booking — should schedule a notification for partner B
+    # Propose a booking — should schedule a notification for partner B.
+    # Use a dynamic future window: the booking service rejects a starts_at in
+    # the past, so a hard-coded date turns into a 422 the moment the wall clock
+    # passes it (a previously hard-coded 2026-06-01 did exactly that). now()+2d
+    # keeps the proposal valid indefinitely.
+    from datetime import datetime, timedelta, timezone
+
+    starts_at = (datetime.now(timezone.utc) + timedelta(days=2)).replace(microsecond=0)
+    ends_at = starts_at + timedelta(hours=1)
     book_r = await client.post(
         "/bookings",
         json={
             "match_id": match_id,
             "sport": "gym",
-            "starts_at": "2026-06-01T09:00:00Z",
-            "ends_at": "2026-06-01T10:00:00Z",
+            "starts_at": starts_at.isoformat(),
+            "ends_at": ends_at.isoformat(),
         },
         headers=_auth(token_a),
     )
