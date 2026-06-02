@@ -129,8 +129,20 @@ async def test_process_notifications_endpoint(client: AsyncClient) -> None:
     assert "failed" in body
 
 
-async def test_notification_scheduled_on_booking_proposal(client: AsyncClient) -> None:
+async def test_notification_scheduled_on_booking_proposal(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Creating a booking enqueues a proposal_received notification for the partner."""
+    # Stub the Expo delivery so processing never makes a real outbound POST to
+    # exp.host — keeps the test hermetic and deterministic in a network-
+    # restricted sandbox/CI. Mirrors test_process_marks_sent_on_success.
+    import app.services.notifications as notif_svc
+
+    async def _always_ok(token, title, body, data) -> bool:
+        return True
+
+    monkeypatch.setattr(notif_svc, "_send_expo_push", _always_ok)
+
     token_a, uid_a = await _register(client, "notif_book_a@example.com")
     token_b, uid_b = await _register(client, "notif_book_b@example.com")
 
