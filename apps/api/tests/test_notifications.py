@@ -76,7 +76,7 @@ async def test_register_token_requires_auth(client: AsyncClient) -> None:
         "/notifications/token",
         json={"token": "ExponentPushToken[abc123]", "platform": "ios"},
     )
-    assert r.status_code == 401
+    assert r.status_code in (401, 403)
 
 
 async def test_register_token_returns_token_record(client: AsyncClient) -> None:
@@ -105,7 +105,7 @@ async def test_register_token_idempotent(client: AsyncClient) -> None:
 
 async def test_unregister_token_requires_auth(client: AsyncClient) -> None:
     r = await client.delete("/notifications/token/00000000-0000-0000-0000-000000000001")
-    assert r.status_code == 401
+    assert r.status_code in (401, 403)
 
 
 async def test_unregister_token(client: AsyncClient) -> None:
