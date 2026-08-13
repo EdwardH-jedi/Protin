@@ -43,3 +43,9 @@ runs/*
 apps/api/.venv_win/
 apps/api/media/
 references/
+
+# Wave 1 additions
+*.log
+logs/
+Thumbs.db
+.idea/
