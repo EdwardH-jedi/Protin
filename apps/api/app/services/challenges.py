@@ -46,34 +46,22 @@ from app.services.honor_system import record_match_result_for_honor
 
 
 async def _user_or_404(db: AsyncSession, user_id: UUID) -> User:
-    user = (
-        await db.execute(select(User).where(User.id == user_id))
-    ).scalar_one_or_none()
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if user is None or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return user
 
 
-async def _challenge_or_404(
-    db: AsyncSession, challenge_id: UUID
-) -> SportsChallenge:
+async def _challenge_or_404(db: AsyncSession, challenge_id: UUID) -> SportsChallenge:
     challenge = (
-        await db.execute(
-            select(SportsChallenge).where(SportsChallenge.id == challenge_id)
-        )
+        await db.execute(select(SportsChallenge).where(SportsChallenge.id == challenge_id))
     ).scalar_one_or_none()
     if challenge is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Challenge not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Challenge not found")
     return challenge
 
 
-def _require_participant(
-    challenge: SportsChallenge, user_id: UUID
-) -> None:
+def _require_participant(challenge: SportsChallenge, user_id: UUID) -> None:
     if user_id not in (challenge.challenger_user_id, challenge.opponent_user_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -121,9 +109,7 @@ async def create_challenge(
     return _to_read(challenge)
 
 
-async def get_challenge(
-    db: AsyncSession, *, current_user_id: UUID, challenge_id: UUID
-) -> ChallengeRead:
+async def get_challenge(db: AsyncSession, *, current_user_id: UUID, challenge_id: UUID) -> ChallengeRead:
     challenge = await _challenge_or_404(db, challenge_id)
     _require_participant(challenge, current_user_id)
     return _to_read(challenge)
@@ -147,19 +133,9 @@ async def list_my_challenges(
         base = base.where(SportsChallenge.status == status_filter)
     base = base.order_by(SportsChallenge.created_at.desc())
 
-    total = int(
-        (
-            await db.execute(
-                select(func.count()).select_from(base.subquery())
-            )
-        ).scalar_one()
-    )
-    rows = list(
-        (await db.execute(base.offset(offset).limit(limit))).scalars().all()
-    )
-    return ChallengeListResponse(
-        items=[_to_read(r) for r in rows], total=total
-    )
+    total = int((await db.execute(select(func.count()).select_from(base.subquery()))).scalar_one())
+    rows = list((await db.execute(base.offset(offset).limit(limit))).scalars().all())
+    return ChallengeListResponse(items=[_to_read(r) for r in rows], total=total)
 
 
 # ---------------------------------------------------------------------------
@@ -167,9 +143,7 @@ async def list_my_challenges(
 # ---------------------------------------------------------------------------
 
 
-async def accept_challenge(
-    db: AsyncSession, *, current_user_id: UUID, challenge_id: UUID
-) -> ChallengeRead:
+async def accept_challenge(db: AsyncSession, *, current_user_id: UUID, challenge_id: UUID) -> ChallengeRead:
     challenge = await _challenge_or_404(db, challenge_id)
     if current_user_id != challenge.opponent_user_id:
         raise HTTPException(
@@ -189,9 +163,7 @@ async def accept_challenge(
     return _to_read(challenge)
 
 
-async def decline_challenge(
-    db: AsyncSession, *, current_user_id: UUID, challenge_id: UUID
-) -> ChallengeRead:
+async def decline_challenge(db: AsyncSession, *, current_user_id: UUID, challenge_id: UUID) -> ChallengeRead:
     challenge = await _challenge_or_404(db, challenge_id)
     if current_user_id != challenge.opponent_user_id:
         raise HTTPException(
@@ -211,9 +183,7 @@ async def decline_challenge(
     return _to_read(challenge)
 
 
-async def cancel_challenge(
-    db: AsyncSession, *, current_user_id: UUID, challenge_id: UUID
-) -> ChallengeRead:
+async def cancel_challenge(db: AsyncSession, *, current_user_id: UUID, challenge_id: UUID) -> ChallengeRead:
     challenge = await _challenge_or_404(db, challenge_id)
     if current_user_id != challenge.challenger_user_id:
         raise HTTPException(
@@ -282,16 +252,10 @@ async def submit_challenge_result(
       * second conflicting submission       → status=disputed; no
                                               rank/honor side effect
     """
-    locked_stmt = (
-        select(SportsChallenge)
-        .where(SportsChallenge.id == challenge_id)
-        .with_for_update()
-    )
+    locked_stmt = select(SportsChallenge).where(SportsChallenge.id == challenge_id).with_for_update()
     challenge = (await db.execute(locked_stmt)).scalar_one_or_none()
     if challenge is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Challenge not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Challenge not found")
 
     _require_participant(challenge, current_user_id)
 
@@ -303,9 +267,7 @@ async def submit_challenge_result(
     if challenge.status != "accepted":
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
-                "Challenge must be accepted before a result can be submitted"
-            ),
+            detail=("Challenge must be accepted before a result can be submitted"),
         )
     if winner_user_id == loser_user_id:
         raise HTTPException(
@@ -320,24 +282,16 @@ async def submit_challenge_result(
     if {winner_user_id, loser_user_id} != participants:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
-                "winner and loser must be exactly the two challenge participants"
-            ),
+            detail=("winner and loser must be exactly the two challenge participants"),
         )
 
     # Pre-check duplicate submission under the lock. Clearer error than
     # letting the unique constraint raise; the constraint remains the
     # DB-level backstop and the IntegrityError below covers the race
     # where the lock is not honored (e.g. SQLite ignores ``FOR UPDATE``).
-    existing_stmt = select(ChallengeResultSubmission).where(
-        ChallengeResultSubmission.challenge_id == challenge.id
-    )
-    existing_before = list(
-        (await db.execute(existing_stmt)).scalars().all()
-    )
-    if any(
-        s.submitted_by_user_id == current_user_id for s in existing_before
-    ):
+    existing_stmt = select(ChallengeResultSubmission).where(ChallengeResultSubmission.challenge_id == challenge.id)
+    existing_before = list((await db.execute(existing_stmt)).scalars().all())
+    if any(s.submitted_by_user_id == current_user_id for s in existing_before):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="You have already submitted a result for this challenge",
@@ -369,15 +323,7 @@ async def submit_challenge_result(
     # pre-insert snapshot — which could be empty for both participants
     # in a race and leave the challenge stuck in "accepted".
     submissions = list(
-        (
-            await db.execute(
-                existing_stmt.order_by(
-                    ChallengeResultSubmission.created_at.asc()
-                )
-            )
-        )
-        .scalars()
-        .all()
+        (await db.execute(existing_stmt.order_by(ChallengeResultSubmission.created_at.asc()))).scalars().all()
     )
 
     if len(submissions) < 2:
@@ -388,10 +334,7 @@ async def submit_challenge_result(
     # Both participants have now submitted. Compare on the (winner, loser)
     # pair — both fields must match exactly for the challenge to verify.
     first, second = submissions[0], submissions[1]
-    agrees = (
-        first.winner_user_id == second.winner_user_id
-        and first.loser_user_id == second.loser_user_id
-    )
+    agrees = first.winner_user_id == second.winner_user_id and first.loser_user_id == second.loser_user_id
     now = datetime.now(tz=timezone.utc)
 
     if not agrees:

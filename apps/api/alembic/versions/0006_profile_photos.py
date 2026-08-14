@@ -30,20 +30,14 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.ForeignKeyConstraint(
-            ["profile_id"], ["user_profiles.id"], ondelete="CASCADE"
-        ),
-        sa.UniqueConstraint(
-            "profile_id", "position", name="uq_profile_photos_profile_position"
-        ),
+        sa.ForeignKeyConstraint(["profile_id"], ["user_profiles.id"], ondelete="CASCADE"),
+        sa.UniqueConstraint("profile_id", "position", name="uq_profile_photos_profile_position"),
         sa.CheckConstraint(
             "position >= 0 AND position <= 3",
             name="ck_profile_photos_position_range",
         ),
     )
-    op.create_index(
-        "ix_profile_photos_profile_id", "profile_photos", ["profile_id"]
-    )
+    op.create_index("ix_profile_photos_profile_id", "profile_photos", ["profile_id"])
 
 
 def downgrade() -> None:

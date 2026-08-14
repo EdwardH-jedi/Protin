@@ -577,9 +577,7 @@ def _classify_playability(
     sport_lower = sport.strip().lower()
 
     # 1. Type-based hard reject — Google has tagged this as retail.
-    candidate_types = (
-        (primary_lower, *types_lower) if primary_lower else types_lower
-    )
+    candidate_types = (primary_lower, *types_lower) if primary_lower else types_lower
     for t in candidate_types:
         if t in _REJECT_TYPES:
             return "rejected", f"reject_type:{t}"
@@ -619,9 +617,7 @@ def _classify_playability(
     has_sport_specific_signal = False
 
     sport_types = _SPORT_TYPE_SIGNALS.get(sport_lower, ())
-    if sport_types and (
-        primary_lower in sport_types or any(t in sport_types for t in types_lower)
-    ):
+    if sport_types and (primary_lower in sport_types or any(t in sport_types for t in types_lower)):
         sport_specific_score += 3
         has_sport_specific_signal = True
 
@@ -630,9 +626,7 @@ def _classify_playability(
         sport_specific_score += 2
         has_sport_specific_signal = True
 
-    if address_lower and any(
-        _kw_in_text(kw, address_lower) for kw in allow_keywords
-    ):
+    if address_lower and any(_kw_in_text(kw, address_lower) for kw in allow_keywords):
         sport_specific_score += 1
         has_sport_specific_signal = True
 
@@ -1251,17 +1245,9 @@ def _normalize_places_payload(payload: Any) -> list[PlaceResult]:
                 longitude=float(lng),
                 address=address if isinstance(address, str) else None,
                 types=tuple(t for t in types if isinstance(t, str)),
-                primary_type=raw.get("primaryType")
-                if isinstance(raw.get("primaryType"), str)
-                else None,
-                google_maps_uri=raw.get("googleMapsUri")
-                if isinstance(raw.get("googleMapsUri"), str)
-                else None,
-                attributions=tuple(
-                    _normalise_attribution(a)
-                    for a in attributions
-                    if _normalise_attribution(a)
-                ),
+                primary_type=raw.get("primaryType") if isinstance(raw.get("primaryType"), str) else None,
+                google_maps_uri=raw.get("googleMapsUri") if isinstance(raw.get("googleMapsUri"), str) else None,
+                attributions=tuple(_normalise_attribution(a) for a in attributions if _normalise_attribution(a)),
             )
         )
     return out
@@ -1406,9 +1392,7 @@ async def fetch_place_details(
             _log.warning("Google Place Details transport error (%s): %s", normalised_id, exc)
             return PlaceDetailsResult(status="error")
         except Exception as exc:  # noqa: BLE001 - provider boundary must not raise
-            _log.warning(
-                "Google Place Details unexpected error (%s): %s", normalised_id, exc
-            )
+            _log.warning("Google Place Details unexpected error (%s): %s", normalised_id, exc)
             return PlaceDetailsResult(status="error")
     finally:
         if owns_client:
@@ -1478,15 +1462,9 @@ def _normalize_place_details_payload(payload: Any) -> PlaceDetails | None:
         longitude=float(lng),
         address=address if isinstance(address, str) else None,
         types=tuple(t for t in types if isinstance(t, str)),
-        primary_type=payload.get("primaryType")
-        if isinstance(payload.get("primaryType"), str)
-        else None,
-        google_maps_uri=payload.get("googleMapsUri")
-        if isinstance(payload.get("googleMapsUri"), str)
-        else None,
-        website_uri=payload.get("websiteUri")
-        if isinstance(payload.get("websiteUri"), str)
-        else None,
+        primary_type=payload.get("primaryType") if isinstance(payload.get("primaryType"), str) else None,
+        google_maps_uri=payload.get("googleMapsUri") if isinstance(payload.get("googleMapsUri"), str) else None,
+        website_uri=payload.get("websiteUri") if isinstance(payload.get("websiteUri"), str) else None,
         phone_national=payload.get("nationalPhoneNumber")
         if isinstance(payload.get("nationalPhoneNumber"), str)
         else None,
@@ -1495,17 +1473,9 @@ def _normalize_place_details_payload(payload: Any) -> PlaceDetails | None:
         else None,
         business_status=business_status if isinstance(business_status, str) else None,
         rating=float(rating) if isinstance(rating, (int, float)) else None,
-        user_rating_count=int(user_rating_count)
-        if isinstance(user_rating_count, int)
-        else None,
-        opening_hours_weekday_text=tuple(
-            t for t in weekday_text if isinstance(t, str)
-        ),
-        attributions=tuple(
-            _normalise_attribution(a)
-            for a in attributions
-            if _normalise_attribution(a)
-        ),
+        user_rating_count=int(user_rating_count) if isinstance(user_rating_count, int) else None,
+        opening_hours_weekday_text=tuple(t for t in weekday_text if isinstance(t, str)),
+        attributions=tuple(_normalise_attribution(a) for a in attributions if _normalise_attribution(a)),
     )
 
 

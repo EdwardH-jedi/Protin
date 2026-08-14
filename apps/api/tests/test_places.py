@@ -194,9 +194,7 @@ def _nearby_query_calls(client: MagicMock) -> list[dict[str, Any]]:
     ],
 )
 @pytest.mark.asyncio
-async def test_text_query_sports_send_searchtext_with_keyword(
-    sport: str, expected_text: str
-) -> None:
+async def test_text_query_sports_send_searchtext_with_keyword(sport: str, expected_text: str) -> None:
     """Hybrid model: each sport fans out into a Nearby Search + one or more
     Text Searches. At least one Text Search must carry the expected sport
     phrase, hit ``places:searchText``, and use ``locationBias``."""
@@ -211,8 +209,7 @@ async def test_text_query_sports_send_searchtext_with_keyword(
     text_bodies = _text_query_calls(client)
     assert text_bodies, f"expected at least one searchText call for sport={sport}"
     assert any(b["textQuery"] == expected_text for b in text_bodies), (
-        f"no Text Search with textQuery={expected_text!r}; "
-        f"saw {[b['textQuery'] for b in text_bodies]}"
+        f"no Text Search with textQuery={expected_text!r}; saw {[b['textQuery'] for b in text_bodies]}"
     )
     # Text Search uses locationBias (a soft hint) and pageSize (Google New
     # API rename of maxResultCount on the Text Search surface).
@@ -230,9 +227,7 @@ async def test_text_query_sports_send_searchtext_with_keyword(
     ],
 )
 @pytest.mark.asyncio
-async def test_type_mapped_sports_send_searchnearby_with_included_type(
-    sport: str, included_type: str
-) -> None:
+async def test_type_mapped_sports_send_searchnearby_with_included_type(sport: str, included_type: str) -> None:
     """Type-mapped sports fire a Nearby Search containing the canonical
     Google type (alongside any related types from the strategy table)."""
     client = _make_client(_ok_response({"places": []}))
@@ -246,9 +241,7 @@ async def test_type_mapped_sports_send_searchnearby_with_included_type(
     nearby_bodies = _nearby_query_calls(client)
     assert nearby_bodies, f"expected at least one searchNearby call for sport={sport}"
     body = nearby_bodies[0]
-    assert included_type in body["includedTypes"], (
-        f"includedTypes={body['includedTypes']!r} missing {included_type!r}"
-    )
+    assert included_type in body["includedTypes"], f"includedTypes={body['includedTypes']!r} missing {included_type!r}"
     assert "locationRestriction" in body
     assert "locationBias" not in body
     assert body["maxResultCount"] >= 1
@@ -516,40 +509,26 @@ async def test_cache_prevents_duplicate_calls_for_same_args() -> None:
         http_client=client,
     )
     assert first == second
-    assert client.post.await_count == initial, (
-        "second invocation must hit the cache and add zero new HTTP calls"
-    )
+    assert client.post.await_count == initial, "second invocation must hit the cache and add zero new HTTP calls"
 
 
 @pytest.mark.asyncio
 async def test_cache_misses_when_sport_differs() -> None:
     client = _make_client(_ok_response(_sample_places_payload()))
-    await search_sport_places(
-        sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    await search_sport_places(sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     tennis_count = client.post.await_count
-    await search_sport_places(
-        sport="basketball", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
-    assert client.post.await_count > tennis_count, (
-        "different sport must miss the cache and trigger new HTTP calls"
-    )
+    await search_sport_places(sport="basketball", lat=-33.89, lng=151.27, api_key="x", http_client=client)
+    assert client.post.await_count > tennis_count, "different sport must miss the cache and trigger new HTTP calls"
 
 
 @pytest.mark.asyncio
 async def test_cache_collapses_lat_lng_to_2dp() -> None:
     # 600m apart at Sydney latitude both round to (-33.89, 151.27) at 2 d.p.
     client = _make_client(_ok_response(_sample_places_payload()))
-    await search_sport_places(
-        sport="tennis", lat=-33.891, lng=151.271, api_key="x", http_client=client
-    )
+    await search_sport_places(sport="tennis", lat=-33.891, lng=151.271, api_key="x", http_client=client)
     initial = client.post.await_count
-    await search_sport_places(
-        sport="tennis", lat=-33.886, lng=151.273, api_key="x", http_client=client
-    )
-    assert client.post.await_count == initial, (
-        "near-identical coords must collapse to one cache key"
-    )
+    await search_sport_places(sport="tennis", lat=-33.886, lng=151.273, api_key="x", http_client=client)
+    assert client.post.await_count == initial, "near-identical coords must collapse to one cache key"
 
 
 @pytest.mark.asyncio
@@ -572,9 +551,7 @@ async def test_cache_misses_when_radius_changes() -> None:
         api_key="x",
         http_client=client,
     )
-    assert client.post.await_count > initial, (
-        "different radius must miss the cache and trigger new HTTP calls"
-    )
+    assert client.post.await_count > initial, "different radius must miss the cache and trigger new HTTP calls"
 
 
 # ─── request body smoke checks ───────────────────────────────────────────────
@@ -596,10 +573,7 @@ async def test_radius_km_passed_as_meters_and_capped_at_50km() -> None:
     # Text Search (locationBias) alike — must clamp to 50_000 m.
     for call in client.post.await_args_list:
         body = call.kwargs["json"]
-        circle = (
-            body.get("locationBias", {}).get("circle")
-            or body.get("locationRestriction", {}).get("circle")
-        )
+        circle = body.get("locationBias", {}).get("circle") or body.get("locationRestriction", {}).get("circle")
         assert circle is not None, f"no circle in body: {body!r}"
         assert circle["radius"] == 50_000
         assert circle["center"] == {"latitude": -33.89, "longitude": 151.27}
@@ -635,9 +609,7 @@ async def test_error_responses_are_not_cached() -> None:
         http_client=ok_client,
     )
     assert len(ok_out) == 2
-    assert ok_client.post.await_count >= 1, (
-        "second call after an error must NOT short-circuit on cache"
-    )
+    assert ok_client.post.await_count >= 1, "second call after an error must NOT short-circuit on cache"
 
 
 @pytest.mark.asyncio
@@ -664,9 +636,7 @@ async def test_quota_responses_are_not_cached() -> None:
         http_client=ok_client,
     )
     assert len(out_ok) == 2
-    assert ok_client.post.await_count >= 1, (
-        "quota_exceeded must not pin a cached empty response"
-    )
+    assert ok_client.post.await_count >= 1, "quota_exceeded must not pin a cached empty response"
 
 
 @pytest.mark.asyncio
@@ -732,9 +702,7 @@ def _details_payload(**overrides: Any) -> dict[str, Any]:
                 "Tuesday: 6:00 AM – 10:00 PM",
             ],
         },
-        "attributions": [
-            {"provider": "Listed by Syd Sport", "providerUri": "https://example.com"}
-        ],
+        "attributions": [{"provider": "Listed by Syd Sport", "providerUri": "https://example.com"}],
     }
     base.update(overrides)
     return base
@@ -884,6 +852,7 @@ async def test_hybrid_search_runs_all_text_queries_even_when_nearby_fills() -> N
     when Nearby Search filled its 20-row cap, the loop used to break
     before any Text Search query fired. We now run every text query so
     the sport-specific packs always contribute to the result set."""
+
     # Stub returns 20 distinct rows on every call so Nearby alone would
     # exceed any user limit. With the old early-exit code Text Search
     # never fired; the new code must dispatch all of them.
@@ -972,9 +941,7 @@ async def test_expanded_query_packs_include_spec_phrases() -> None:
         text_bodies = _text_query_calls(client)
         phrases = {b["textQuery"] for b in text_bodies}
         missing = required - phrases
-        assert not missing, (
-            f"sport={sport}: missing expanded query phrases {missing}; saw {phrases}"
-        )
+        assert not missing, f"sport={sport}: missing expanded query phrases {missing}; saw {phrases}"
 
 
 @pytest.mark.asyncio
@@ -1010,17 +977,13 @@ async def test_unknown_sport_with_q_uses_general_fallback() -> None:
         "park",
         "stadium",
     }
-    assert fallback_phrases & text_phrases, (
-        f"general fallback packs did not fire; saw text phrases {text_phrases}"
-    )
+    assert fallback_phrases & text_phrases, f"general fallback packs did not fire; saw text phrases {text_phrases}"
 
     # The fallback also runs a Nearby Search with generic types.
     nearby_bodies = _nearby_query_calls(client)
     assert nearby_bodies, "expected a Nearby Search from the general fallback"
     included = set(nearby_bodies[0]["includedTypes"])
-    assert included & {"sports_complex", "stadium", "park"}, (
-        f"fallback Nearby missing generic types: {included}"
-    )
+    assert included & {"sports_complex", "stadium", "park"}, f"fallback Nearby missing generic types: {included}"
 
 
 # ─── confidence classification ───────────────────────────────────────────────
@@ -1041,9 +1004,7 @@ async def test_confidence_high_when_primary_type_matches_sport() -> None:
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out and out[0].confidence == "high"
 
 
@@ -1062,9 +1023,7 @@ async def test_confidence_high_via_name_match() -> None:
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out and out[0].confidence == "high"
 
 
@@ -1090,9 +1049,7 @@ async def test_generic_sports_complex_without_sport_signal_is_low_not_medium() -
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out and out[0].confidence == "low"
 
 
@@ -1114,9 +1071,7 @@ async def test_confidence_low_for_weak_but_plausible_venue() -> None:
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out and out[0].confidence == "low"
 
 
@@ -1140,12 +1095,8 @@ async def test_classifier_rejects_unrelated_business() -> None:
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
-    assert out == [], (
-        f"expected cafe to be rejected as a tennis venue; got {[r.name for r in out]}"
-    )
+    out = await search_sport_places(sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client)
+    assert out == [], f"expected cafe to be rejected as a tennis venue; got {[r.name for r in out]}"
 
 
 @pytest.mark.asyncio
@@ -1165,9 +1116,7 @@ async def test_classifier_rejects_golf_pro_shop_by_keyword() -> None:
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == []
 
 
@@ -1188,9 +1137,7 @@ async def test_classifier_rejects_retail_type_even_with_sport_keyword() -> None:
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == []
 
 
@@ -1210,9 +1157,7 @@ async def test_classifier_rejects_bare_sport_keyword_without_signal() -> None:
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == []
 
 
@@ -1233,9 +1178,7 @@ async def test_classifier_returns_golf_course_at_high_confidence() -> None:
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].name == "Sydney Golf Course"
     assert out[0].confidence == "high"
@@ -1256,9 +1199,7 @@ async def test_classifier_rejects_tennis_shop() -> None:
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == []
 
 
@@ -1278,9 +1219,7 @@ async def test_classifier_returns_tennis_court_venue() -> None:
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence == "high"
 
@@ -1301,9 +1240,7 @@ async def test_classifier_rejects_basketball_apparel_store() -> None:
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="basketball", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="basketball", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == []
 
 
@@ -1325,9 +1262,7 @@ async def test_classifier_rejects_gym_supplement_store() -> None:
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="gym", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="gym", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == []
 
 
@@ -1348,9 +1283,7 @@ async def test_classifier_handles_missing_optional_fields_without_crashing() -> 
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == []
 
 
@@ -1371,9 +1304,7 @@ async def test_classifier_word_boundary_does_not_match_substring() -> None:
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     # "workshop" contains "shop" but is NOT a reject — the venue
     # survives because tennis_court signal is intact.
     assert len(out) == 1
@@ -1400,18 +1331,12 @@ async def test_classifier_logs_rejection_with_sport_name_reason(
     }
     client = _make_client(_ok_response(payload))
     caplog.set_level(logging.DEBUG, logger="app.services.places")
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == []
-    matching = [
-        r for r in caplog.records if "places_playability_rejected" in r.getMessage()
-    ]
+    matching = [r for r in caplog.records if "places_playability_rejected" in r.getMessage()]
     assert matching, "expected at least one rejection log line"
     record = matching[0]
-    assert record.levelno == logging.DEBUG, (
-        f"per-row rejection must log at DEBUG (was {record.levelname})"
-    )
+    assert record.levelno == logging.DEBUG, f"per-row rejection must log at DEBUG (was {record.levelname})"
     message = record.getMessage()
     assert "sport=golf" in message
     assert "Big Golf" in message
@@ -1436,9 +1361,7 @@ async def test_classifier_allow_keyword_in_address_only_is_weak_signal() -> None
         ]
     }
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence == "low"
 
@@ -1483,9 +1406,7 @@ async def test_golf_driving_range_is_returned_high() -> None:
         types=("golf_course",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence == "high"
 
@@ -1496,9 +1417,7 @@ async def test_golf_driving_range_without_type_is_at_least_medium() -> None:
     'driving range' allow keyword in the name — lands at medium."""
     payload = _single_place_payload(name="City Driving Range")
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence in {"high", "medium"}
 
@@ -1509,9 +1428,7 @@ async def test_mini_golf_is_returned() -> None:
     specific allow keyword."""
     payload = _single_place_payload(name="Centennial Mini Golf")
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence in {"high", "medium"}
 
@@ -1522,9 +1439,7 @@ async def test_pitch_and_putt_is_returned() -> None:
     sport-specific allow keyword."""
     payload = _single_place_payload(name="Bondi Pitch and Putt")
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence in {"high", "medium"}
 
@@ -1553,12 +1468,8 @@ async def test_golf_retail_names_are_rejected(name: str) -> None:
         types=("sports_complex",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
-    assert out == [], (
-        f"expected name={name!r} to be rejected as a golf venue"
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
+    assert out == [], f"expected name={name!r} to be rejected as a golf venue"
 
 
 @pytest.mark.asyncio
@@ -1573,9 +1484,7 @@ async def test_badminton_racquet_store_is_rejected() -> None:
         types=("sports_complex",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="badminton", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="badminton", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == []
 
 
@@ -1589,9 +1498,7 @@ async def test_running_shoe_store_is_rejected() -> None:
         types=("store",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="running", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="running", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == []
 
 
@@ -1605,9 +1512,7 @@ async def test_running_apparel_store_is_rejected_by_keyword_only() -> None:
         types=("sports_complex",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="running", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="running", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == []
 
 
@@ -1622,9 +1527,7 @@ async def test_soccer_football_apparel_store_is_rejected(sport: str) -> None:
         types=("sports_complex",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport=sport, lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport=sport, lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == []
 
 
@@ -1640,7 +1543,8 @@ async def test_soccer_football_apparel_store_is_rejected(sport: str) -> None:
 )
 @pytest.mark.asyncio
 async def test_generic_infrastructure_is_rejected_for_golf(
-    name: str, primary_type: str,
+    name: str,
+    primary_type: str,
 ) -> None:
     """Codex follow-up: golf is intentionally stricter than the other
     sports. Generic infrastructure (sports_complex / park / stadium /
@@ -1650,13 +1554,9 @@ async def test_generic_infrastructure_is_rejected_for_golf(
     in name or address) is rejected outright rather than surfaced as a
     misleading "low" match. Other sports still keep low-confidence
     generic infra for sparse-area coverage."""
-    payload = _single_place_payload(
-        name=name, primary_type=primary_type, types=(primary_type,)
-    )
+    payload = _single_place_payload(name=name, primary_type=primary_type, types=(primary_type,))
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == [], (
         f"name={name!r} primary_type={primary_type!r} should be rejected "
         f"for golf, got {[(r.name, r.confidence) for r in out]}"
@@ -1678,9 +1578,7 @@ async def test_big_golf_with_sports_complex_type_is_rejected() -> None:
         types=("sports_complex",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == [], (
         f"Big Golf without golf-specific signal must be rejected under "
         f"strict golf policy; got {[(r.name, r.confidence) for r in out]}"
@@ -1699,9 +1597,7 @@ async def test_strict_golf_policy_does_not_apply_to_other_sports() -> None:
         types=("sports_complex",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="basketball", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="basketball", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence == "low"
 
@@ -1721,9 +1617,7 @@ async def test_plain_golf_name_with_non_playable_type_is_rejected() -> None:
         types=("cafe", "food"),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     # cafe is not in _REJECT_TYPES, no reject keyword in name "golf",
     # no golf allow keyword in name → score 0 → rejected.
     assert out == []
@@ -1738,9 +1632,7 @@ async def test_soccer_field_returned() -> None:
         types=("athletic_field",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="soccer", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="soccer", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence in {"high", "medium"}
 
@@ -1754,9 +1646,7 @@ async def test_football_pitch_returned() -> None:
         types=("athletic_field",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="football", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="football", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence in {"high", "medium"}
 
@@ -1770,7 +1660,8 @@ async def test_football_pitch_returned() -> None:
 )
 @pytest.mark.asyncio
 async def test_soccer_football_retail_store_rejected(
-    sport: str, name: str,
+    sport: str,
+    name: str,
 ) -> None:
     """Soccer / football retail (apparel / boot / shop / store) is
     rejected by global retail keywords even when Google tags it with
@@ -1781,9 +1672,7 @@ async def test_soccer_football_retail_store_rejected(
         types=("sports_complex",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport=sport, lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport=sport, lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == []
 
 
@@ -1797,9 +1686,7 @@ async def test_basketball_court_returned() -> None:
         types=("basketball_court",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="basketball", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="basketball", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence == "high"
 
@@ -1814,9 +1701,7 @@ async def test_tennis_stringing_shop_rejected() -> None:
         types=("sports_complex",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="tennis", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == []
 
 
@@ -1829,9 +1714,7 @@ async def test_running_track_returned() -> None:
         types=("athletic_field",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="running", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="running", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence in {"high", "medium"}
 
@@ -1853,7 +1736,8 @@ async def test_running_track_returned() -> None:
 )
 @pytest.mark.asyncio
 async def test_global_retail_keywords_reject_across_sports(
-    sport: str, name: str,
+    sport: str,
+    name: str,
 ) -> None:
     """Global retail markers (warehouse / supplement / fitting / …)
     apply regardless of which sport the request came from."""
@@ -1863,9 +1747,7 @@ async def test_global_retail_keywords_reject_across_sports(
         types=("sports_complex",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport=sport, lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport=sport, lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == [], f"sport={sport} name={name!r} should be rejected"
 
 
@@ -1877,9 +1759,7 @@ async def test_classifier_does_not_crash_on_all_optional_fields_missing() -> Non
     crash."""
     payload = _single_place_payload(name="Nameless Spot")
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="soccer", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="soccer", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     # No crash. Empty result is fine — the point is the call returns.
     assert isinstance(out, list)
 
@@ -1928,9 +1808,7 @@ async def test_bare_q_golf_does_not_trigger_keyword_search(bare_q: str) -> None:
     assert "mini golf" in text_phrases
     # The bare sport word must NEVER be sent as a textQuery — that's the
     # exact false-positive the guard is preventing.
-    assert "golf" not in text_phrases, (
-        f"bare 'golf' must not be dispatched as a Text Search; saw {text_phrases}"
-    )
+    assert "golf" not in text_phrases, f"bare 'golf' must not be dispatched as a Text Search; saw {text_phrases}"
 
 
 @pytest.mark.parametrize(
@@ -1959,12 +1837,8 @@ async def test_bare_q_soccer_uses_playable_field_pitch_futsal_pack(
     # The expanded soccer playable pack must still fire.
     expected = {"soccer field", "football pitch", "futsal court"}
     missing = expected - text_phrases
-    assert not missing, (
-        f"bare q='soccer' should trigger soccer playable pack; missing {missing}"
-    )
-    assert "soccer" not in text_phrases, (
-        f"bare 'soccer' must not be sent as a Text Search; saw {text_phrases}"
-    )
+    assert not missing, f"bare q='soccer' should trigger soccer playable pack; missing {missing}"
+    assert "soccer" not in text_phrases, f"bare 'soccer' must not be sent as a Text Search; saw {text_phrases}"
     # Nearby Search still fires with soccer types.
     nearby_bodies = _nearby_query_calls(client)
     assert nearby_bodies, "Nearby Search must still fire under the bare-q guard"
@@ -1985,9 +1859,7 @@ async def test_specific_q_with_facility_words_is_not_dropped() -> None:
         http_client=client,
     )
     text_phrases = {b["textQuery"] for b in _text_query_calls(client)}
-    assert "Moore Park Golf Course" in text_phrases, (
-        f"specific q must be forwarded unchanged; saw {text_phrases}"
-    )
+    assert "Moore Park Golf Course" in text_phrases, f"specific q must be forwarded unchanged; saw {text_phrases}"
 
 
 @pytest.mark.asyncio
@@ -2000,9 +1872,7 @@ async def test_futsal_court_returned() -> None:
         types=("athletic_field",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="soccer", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="soccer", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence in {"high", "medium"}
 
@@ -2017,9 +1887,7 @@ async def test_badminton_court_returned() -> None:
         types=("badminton_court",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="badminton", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="badminton", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence == "high"
 
@@ -2034,9 +1902,7 @@ async def test_badminton_centre_returned() -> None:
         types=("sports_complex",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="badminton", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="badminton", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence in {"high", "medium"}
 
@@ -2052,9 +1918,7 @@ async def test_badminton_sports_hall_returned() -> None:
         types=("sports_complex",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="badminton", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="badminton", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence in {"high", "medium"}
 
@@ -2068,9 +1932,7 @@ async def test_gym_returned() -> None:
         types=("gym",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="gym", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="gym", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence == "high"
 
@@ -2085,9 +1947,7 @@ async def test_fitness_centre_returned() -> None:
         types=("fitness_center",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="gym", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="gym", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence in {"high", "medium"}
 
@@ -2102,21 +1962,16 @@ async def test_fitness_centre_returned() -> None:
 )
 @pytest.mark.asyncio
 async def test_running_trail_oval_park_returned(
-    name: str, primary_type: str,
+    name: str,
+    primary_type: str,
 ) -> None:
     """Running has the loosest allow-keyword pack (trail / oval / park /
     track / running track / athletics track). Parks and ovals around
     Sydney commonly host running loops; these survive the classifier."""
-    payload = _single_place_payload(
-        name=name, primary_type=primary_type, types=(primary_type,)
-    )
+    payload = _single_place_payload(name=name, primary_type=primary_type, types=(primary_type,))
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="running", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
-    assert len(out) == 1, (
-        f"running venue name={name!r} must not be rejected; got {out}"
-    )
+    out = await search_sport_places(sport="running", lat=-33.89, lng=151.27, api_key="x", http_client=client)
+    assert len(out) == 1, f"running venue name={name!r} must not be rejected; got {out}"
 
 
 @pytest.mark.asyncio
@@ -2132,12 +1987,8 @@ async def test_basketball_apparel_rejected_with_non_retail_type() -> None:
         types=("sports_complex",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="basketball", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
-    assert out == [], (
-        f"basketball apparel must be rejected regardless of Google type; got {out}"
-    )
+    out = await search_sport_places(sport="basketball", lat=-33.89, lng=151.27, api_key="x", http_client=client)
+    assert out == [], f"basketball apparel must be rejected regardless of Google type; got {out}"
 
 
 # ─── Codex follow-up — golf coverage / smoke-fix tests ──────────────────────
@@ -2179,9 +2030,7 @@ async def test_golf_indoor_golf_course_type_survives() -> None:
         types=("indoor_golf_course",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence == "high"
 
@@ -2197,9 +2046,7 @@ async def test_golf_club_name_survives_without_golf_type() -> None:
         types=("sports_complex",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1
     assert out[0].confidence in {"high", "medium"}
 
@@ -2217,13 +2064,8 @@ async def test_golf_something_establishment_is_rejected() -> None:
         types=("establishment",),
     )
     client = _make_client(_ok_response(payload))
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
-    assert out == [], (
-        f"generic 'Golf Something' establishment with no playable signal "
-        f"must be rejected; got {out}"
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
+    assert out == [], f"generic 'Golf Something' establishment with no playable signal must be rejected; got {out}"
 
 
 @pytest.mark.asyncio
@@ -2246,10 +2088,7 @@ async def test_golf_pro_shop_rejected_even_with_q_golf_course() -> None:
         api_key="x",
         http_client=client,
     )
-    assert out.results == [], (
-        f"Big Golf Pro Shop must be rejected even when q='golf course'; "
-        f"got {out.results}"
-    )
+    assert out.results == [], f"Big Golf Pro Shop must be rejected even when q='golf course'; got {out.results}"
 
 
 @pytest.mark.asyncio
@@ -2271,10 +2110,7 @@ async def test_golf_store_type_rejected_even_with_q_golf_course() -> None:
         api_key="x",
         http_client=client,
     )
-    assert out.results == [], (
-        f"store-type Big Golf must be rejected even when q='golf course'; "
-        f"got {out.results}"
-    )
+    assert out.results == [], f"store-type Big Golf must be rejected even when q='golf course'; got {out.results}"
 
 
 @pytest.mark.asyncio
@@ -2301,12 +2137,9 @@ async def test_golf_concord_style_survives_via_text_query_origin() -> None:
         nearby_payload={"places": []},
         text_payload=row_payload,
     )
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert len(out) == 1, (
-        f"row that surfaced only via Text Search 'golf course' must be "
-        f"kept at low confidence; got {out}"
+        f"row that surfaced only via Text Search 'golf course' must be kept at low confidence; got {out}"
     )
     assert out[0].confidence == "low"
 
@@ -2331,9 +2164,7 @@ async def test_golf_big_golf_rejected_with_nearby_only_origin() -> None:
         nearby_payload=row_payload,
         text_payload={"places": []},
     )
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == [], (
         f"Big Golf with only Nearby origin (no playable query signal) "
         f"must be rejected; got {[(r.name, r.confidence) for r in out]}"
@@ -2354,9 +2185,7 @@ async def test_golf_retail_keyword_rejected_via_text_query_origin() -> None:
         nearby_payload={"places": []},
         text_payload=row_payload,
     )
-    out = await search_sport_places(
-        sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client
-    )
+    out = await search_sport_places(sport="golf", lat=-33.89, lng=151.27, api_key="x", http_client=client)
     assert out == [], (
         f"golf warehouse must be rejected via the global 'warehouse' "
         f"keyword even when query origin is playable; got {out}"

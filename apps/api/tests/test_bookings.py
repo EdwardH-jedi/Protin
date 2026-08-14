@@ -528,9 +528,7 @@ async def test_list_bookings_filters_by_match_id(client: AsyncClient) -> None:
     assert r_all.json()["total"] == 2
 
     # Filtered to match_ab, A sees exactly the AB booking.
-    r_ab = await client.get(
-        f"/bookings?match_id={match_ab}", headers=_auth(token_a)
-    )
+    r_ab = await client.get(f"/bookings?match_id={match_ab}", headers=_auth(token_a))
     assert r_ab.status_code == 200
     body = r_ab.json()
     assert body["total"] == 1
@@ -595,9 +593,7 @@ async def test_list_bookings_match_filter_combines_with_status(
     confirmed_id = r2.json()["id"]
     await client.post(f"/bookings/{confirmed_id}/confirm", headers=_auth(token_b))
 
-    r = await client.get(
-        f"/bookings?match_id={match_ab}&status=proposed", headers=_auth(token_a)
-    )
+    r = await client.get(f"/bookings?match_id={match_ab}&status=proposed", headers=_auth(token_a))
     body = r.json()
     assert body["total"] == 1
     assert body["items"][0]["id"] == proposed_id

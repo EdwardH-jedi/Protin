@@ -95,9 +95,7 @@ EXPECTED_MATCH_ID = UUID("4a63317a-a24f-4c90-aab7-13bd7fe2f9ec")
 CANONICAL_USER1 = SARAH_ID
 CANONICAL_USER2 = CHRIS_ID
 
-DEFAULT_SUSPICIOUS_IDS: tuple[UUID, ...] = (
-    UUID("892c1bb5-e65a-49b4-ba96-bb9549c6b651"),
-)
+DEFAULT_SUSPICIOUS_IDS: tuple[UUID, ...] = (UUID("892c1bb5-e65a-49b4-ba96-bb9549c6b651"),)
 
 CANONICAL_SEED_MESSAGES: list[tuple[UUID, str]] = [
     # Screenshot-safe back-and-forth: Chris opens, Sarah confirms timing,
@@ -122,8 +120,7 @@ def _refuse_non_local_db_or_exit() -> None:
     settings = get_settings()
     if settings.app_env != "local":
         print(
-            f"[chat-seed] Refusing to run in app_env={settings.app_env!r}. "
-            "This script is local/dev only.",
+            f"[chat-seed] Refusing to run in app_env={settings.app_env!r}. This script is local/dev only.",
             file=sys.stderr,
         )
         sys.exit(2)
@@ -132,8 +129,7 @@ def _refuse_non_local_db_or_exit() -> None:
     host = (parsed.hostname or "").lower()
     if host not in {"localhost", "127.0.0.1", "::1", ""}:
         print(
-            f"[chat-seed] Refusing to operate on remote DB host {host!r}. "
-            "Only localhost is allowed.",
+            f"[chat-seed] Refusing to operate on remote DB host {host!r}. Only localhost is allowed.",
             file=sys.stderr,
         )
         sys.exit(2)
@@ -149,24 +145,15 @@ def _fmt_user(label: str, user: User | None) -> str:
         return f"  {label:<10} (NOT FOUND)"
     apple = " apple_sub=set" if user.apple_sub else ""
     pwd = "" if user.hashed_password else " password=NULL"
-    return (
-        f"  {label:<10} id={user.id} email={user.email}"
-        f" active={user.is_active}{apple}{pwd}"
-    )
+    return f"  {label:<10} id={user.id} email={user.email} active={user.is_active}{apple}{pwd}"
 
 
 def _fmt_match(m: Match) -> str:
-    return (
-        f"  match id={m.id} sport={m.sport} status={m.status}"
-        f" user1={m.user1_id} user2={m.user2_id}"
-    )
+    return f"  match id={m.id} sport={m.sport} status={m.status} user1={m.user1_id} user2={m.user2_id}"
 
 
 def _fmt_msg(msg: Message) -> str:
-    return (
-        f"    msg id={msg.id} match={msg.match_id} sender={msg.sender_id}"
-        f" created={msg.created_at} body={msg.body!r}"
-    )
+    return f"    msg id={msg.id} match={msg.match_id} sender={msg.sender_id} created={msg.created_at} body={msg.body!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -185,33 +172,21 @@ async def _load_user_by_id(session: AsyncSession, user_id: UUID) -> User | None:
 
 
 async def _load_profile(session: AsyncSession, user_id: UUID) -> UserProfile | None:
-    res = await session.execute(
-        select(UserProfile).where(UserProfile.user_id == user_id)
-    )
+    res = await session.execute(select(UserProfile).where(UserProfile.user_id == user_id))
     return res.scalar_one_or_none()
 
 
 async def _matches_involving(session: AsyncSession, user_id: UUID) -> list[Match]:
-    res = await session.execute(
-        select(Match).where(
-            (Match.user1_id == user_id) | (Match.user2_id == user_id)
-        )
-    )
+    res = await session.execute(select(Match).where((Match.user1_id == user_id) | (Match.user2_id == user_id)))
     return list(res.scalars().all())
 
 
 async def _messages_for_match(session: AsyncSession, match_id: UUID) -> list[Message]:
-    res = await session.execute(
-        select(Message)
-        .where(Message.match_id == match_id)
-        .order_by(Message.created_at.asc())
-    )
+    res = await session.execute(select(Message).where(Message.match_id == match_id).order_by(Message.created_at.asc()))
     return list(res.scalars().all())
 
 
-async def _find_canonical_match(
-    session: AsyncSession, sport: str
-) -> Match | None:
+async def _find_canonical_match(session: AsyncSession, sport: str) -> Match | None:
     res = await session.execute(
         select(Match).where(
             Match.user1_id == CANONICAL_USER1,
@@ -262,14 +237,12 @@ async def inspect(session: AsyncSession, suspicious_ids: Iterable[UUID]) -> dict
     # before doing anything destructive.
     if chris is not None and chris.id != CHRIS_ID:
         print(
-            f"  [WARN] Chris row id={chris.id} != expected {CHRIS_ID}."
-            " Aborting any mutation. Verify your local DB.",
+            f"  [WARN] Chris row id={chris.id} != expected {CHRIS_ID}. Aborting any mutation. Verify your local DB.",
             file=sys.stderr,
         )
     if sarah is not None and sarah.id != SARAH_ID:
         print(
-            f"  [WARN] Sarah row id={sarah.id} != expected {SARAH_ID}."
-            " Aborting any mutation. Verify your local DB.",
+            f"  [WARN] Sarah row id={sarah.id} != expected {SARAH_ID}. Aborting any mutation. Verify your local DB.",
             file=sys.stderr,
         )
 
@@ -296,17 +269,14 @@ async def inspect(session: AsyncSession, suspicious_ids: Iterable[UUID]) -> dict
     expected = next((m for m in cs_matches if m.id == EXPECTED_MATCH_ID), None)
     if expected is None and cs_matches:
         print(
-            f"  [INFO] expected match id {EXPECTED_MATCH_ID} not present;"
-            " a different Chris/Sarah match id is in use."
+            f"  [INFO] expected match id {EXPECTED_MATCH_ID} not present; a different Chris/Sarah match id is in use."
         )
 
     # Surface suspicious user's matches/messages too so QA can see how
     # entangled it is before deciding whether to delete it.
     for u in suspicious_found:
         ms = await _matches_involving(session, u.id)
-        print(
-            f"[chat-seed] Suspicious {u.id} participates in {len(ms)} match(es):"
-        )
+        print(f"[chat-seed] Suspicious {u.id} participates in {len(ms)} match(es):")
         for m in ms:
             print(_fmt_match(m))
             for msg in await _messages_for_match(session, m.id):
@@ -325,9 +295,7 @@ async def inspect(session: AsyncSession, suspicious_ids: Iterable[UUID]) -> dict
 # ---------------------------------------------------------------------------
 
 
-async def ensure_canonical_match(
-    session: AsyncSession, sport: str
-) -> Match:
+async def ensure_canonical_match(session: AsyncSession, sport: str) -> Match:
     """Return the canonical Chris/Sarah match for ``sport``, creating it
     if absent. If duplicate Chris/Sarah matches exist for the same sport,
     abort -- caller must hand-resolve."""
@@ -356,19 +324,13 @@ async def ensure_canonical_match(
     )
     session.add(m)
     await session.flush()
-    print(
-        f"[chat-seed] Created canonical Chris/Sarah match id={m.id} sport={sport}"
-    )
+    print(f"[chat-seed] Created canonical Chris/Sarah match id={m.id} sport={sport}")
     return m
 
 
 async def reset_messages_for_match(session: AsyncSession, match_id: UUID) -> int:
     """Wipe every message in the match. Returns rows deleted."""
-    before = (
-        await session.execute(
-            select(Message).where(Message.match_id == match_id)
-        )
-    ).scalars().all()
+    before = (await session.execute(select(Message).where(Message.match_id == match_id))).scalars().all()
     count = len(list(before))
     if count:
         await session.execute(delete(Message).where(Message.match_id == match_id))
@@ -380,60 +342,37 @@ async def seed_canonical_messages(session: AsyncSession, match_id: UUID) -> None
     for sender_id, body in CANONICAL_SEED_MESSAGES:
         session.add(Message(match_id=match_id, sender_id=sender_id, body=body))
         await session.flush()
-    print(
-        f"[chat-seed] Seeded {len(CANONICAL_SEED_MESSAGES)} canonical message(s)"
-        f" into match {match_id}"
-    )
+    print(f"[chat-seed] Seeded {len(CANONICAL_SEED_MESSAGES)} canonical message(s) into match {match_id}")
 
 
 async def hard_delete_user(session: AsyncSession, user_id: UUID) -> None:
     """Mirror DELETE /auth/me: scrub every table that references ``users.id``
     in dependency order, then delete the user row itself."""
     if user_id in PROTECTED_USER_IDS:
-        raise RuntimeError(
-            f"Refusing to delete protected user {user_id}"
-            f" (Chris/Sarah are off-limits)."
-        )
+        raise RuntimeError(f"Refusing to delete protected user {user_id} (Chris/Sarah are off-limits).")
 
     match_ids = [
         row[0]
         for row in (
-            await session.execute(
-                select(Match.id).where(
-                    (Match.user1_id == user_id) | (Match.user2_id == user_id)
-                )
-            )
+            await session.execute(select(Match.id).where((Match.user1_id == user_id) | (Match.user2_id == user_id)))
         ).all()
     ]
     booking_ids = [
         row[0]
         for row in (
             await session.execute(
-                select(Booking.id).where(
-                    (Booking.proposer_id == user_id)
-                    | (Booking.partner_id == user_id)
-                )
+                select(Booking.id).where((Booking.proposer_id == user_id) | (Booking.partner_id == user_id))
             )
         ).all()
     ]
 
-    await session.execute(
-        delete(NotificationEvent).where(NotificationEvent.user_id == user_id)
-    )
+    await session.execute(delete(NotificationEvent).where(NotificationEvent.user_id == user_id))
     await session.execute(delete(PushToken).where(PushToken.user_id == user_id))
 
-    await session.execute(
-        delete(CalendarBookingSync).where(CalendarBookingSync.user_id == user_id)
-    )
+    await session.execute(delete(CalendarBookingSync).where(CalendarBookingSync.user_id == user_id))
     if booking_ids:
-        await session.execute(
-            delete(CalendarBookingSync).where(
-                CalendarBookingSync.booking_id.in_(booking_ids)
-            )
-        )
-    await session.execute(
-        delete(GoogleCalendarToken).where(GoogleCalendarToken.user_id == user_id)
-    )
+        await session.execute(delete(CalendarBookingSync).where(CalendarBookingSync.booking_id.in_(booking_ids)))
+    await session.execute(delete(GoogleCalendarToken).where(GoogleCalendarToken.user_id == user_id))
 
     if match_ids:
         await session.execute(delete(Message).where(Message.match_id.in_(match_ids)))
@@ -445,30 +384,13 @@ async def hard_delete_user(session: AsyncSession, user_id: UUID) -> None:
         await session.execute(delete(Match).where(Match.id.in_(match_ids)))
 
     await session.execute(
-        delete(DiscoveryAction).where(
-            (DiscoveryAction.actor_id == user_id)
-            | (DiscoveryAction.target_id == user_id)
-        )
+        delete(DiscoveryAction).where((DiscoveryAction.actor_id == user_id) | (DiscoveryAction.target_id == user_id))
     )
-    await session.execute(
-        delete(Report).where(
-            (Report.reporter_id == user_id) | (Report.reported_id == user_id)
-        )
-    )
-    await session.execute(
-        delete(Block).where(
-            (Block.blocker_id == user_id) | (Block.blocked_id == user_id)
-        )
-    )
-    await session.execute(
-        delete(SportProfile).where(SportProfile.user_id == user_id)
-    )
-    await session.execute(
-        delete(IdentityPreferences).where(IdentityPreferences.user_id == user_id)
-    )
-    await session.execute(
-        delete(UserProfile).where(UserProfile.user_id == user_id)
-    )
+    await session.execute(delete(Report).where((Report.reporter_id == user_id) | (Report.reported_id == user_id)))
+    await session.execute(delete(Block).where((Block.blocker_id == user_id) | (Block.blocked_id == user_id)))
+    await session.execute(delete(SportProfile).where(SportProfile.user_id == user_id))
+    await session.execute(delete(IdentityPreferences).where(IdentityPreferences.user_id == user_id))
+    await session.execute(delete(UserProfile).where(UserProfile.user_id == user_id))
     await session.execute(delete(User).where(User.id == user_id))
     print(f"[chat-seed] Hard-deleted suspicious user {user_id}")
 
@@ -514,17 +436,10 @@ async def run(args: argparse.Namespace) -> int:
             chris = before["chris"]
             sarah = before["sarah"]
 
-            mutate = (
-                args.reset_messages
-                or args.seed_messages
-                or args.ensure_match
-                or args.delete_suspicious
-            )
+            mutate = args.reset_messages or args.seed_messages or args.ensure_match or args.delete_suspicious
 
             if not mutate:
-                print(
-                    "[chat-seed] No mutation flags passed -- inspection only."
-                )
+                print("[chat-seed] No mutation flags passed -- inspection only.")
                 return 0
 
             if chris is None or sarah is None:

@@ -59,12 +59,8 @@ from app.models import (  # noqa: F401
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-_engine = create_async_engine(
-    TEST_DATABASE_URL, connect_args={"check_same_thread": False}
-)
-_TestSession = async_sessionmaker(
-    _engine, expire_on_commit=False, class_=AsyncSession
-)
+_engine = create_async_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+_TestSession = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -92,9 +88,7 @@ async def _override_get_redis() -> AsyncGenerator:
 async def client() -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_redis] = _override_get_redis
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
 
@@ -111,14 +105,10 @@ async def _wipe_state() -> None:
 
 
 async def _register(client: AsyncClient, email: str) -> tuple[str, str]:
-    r = await client.post(
-        "/auth/register", json={"email": email, "password": "password123"}
-    )
+    r = await client.post("/auth/register", json={"email": email, "password": "password123"})
     assert r.status_code == 201, r.text
     token = r.json()["access_token"]
-    me = await client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {token}"}
-    )
+    me = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     return token, me.json()["id"]
 
 
@@ -148,9 +138,7 @@ async def _create_challenge(
 
 
 async def _accept(client: AsyncClient, token: str, challenge_id: str) -> dict:
-    r = await client.post(
-        f"/challenges/{challenge_id}/accept", headers=_auth(token)
-    )
+    r = await client.post(f"/challenges/{challenge_id}/accept", headers=_auth(token))
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -183,9 +171,7 @@ async def test_authenticated_user_can_create_challenge(
     token_a, uid_a = await _register(client, "ch_create_a@example.com")
     _, uid_b = await _register(client, "ch_create_b@example.com")
 
-    body = await _create_challenge(
-        client, token_a, opponent_user_id=uid_b, sport="tennis", area="annandale"
-    )
+    body = await _create_challenge(client, token_a, opponent_user_id=uid_b, sport="tennis", area="annandale")
     assert body["challenger_user_id"] == uid_a
     assert body["opponent_user_id"] == uid_b
     assert body["sport"] == "tennis"
@@ -220,15 +206,9 @@ async def test_create_challenge_does_not_touch_honor_state(
     await _create_challenge(client, token_a, opponent_user_id=uid_b)
 
     async with _TestSession() as db:
-        rank_rows = list(
-            (await db.execute(select(RankProfile))).scalars().all()
-        )
-        title_rows = list(
-            (await db.execute(select(HonorTitle))).scalars().all()
-        )
-        history_rows = list(
-            (await db.execute(select(HonorHistory))).scalars().all()
-        )
+        rank_rows = list((await db.execute(select(RankProfile))).scalars().all())
+        title_rows = list((await db.execute(select(HonorTitle))).scalars().all())
+        history_rows = list((await db.execute(select(HonorHistory))).scalars().all())
     assert rank_rows == []
     assert title_rows == []
     assert history_rows == []
@@ -247,21 +227,15 @@ async def test_only_opponent_can_accept(client: AsyncClient) -> None:
     body = await _create_challenge(client, token_a, opponent_user_id=uid_b)
 
     # Challenger cannot accept their own outgoing challenge.
-    r_self = await client.post(
-        f"/challenges/{body['id']}/accept", headers=_auth(token_a)
-    )
+    r_self = await client.post(f"/challenges/{body['id']}/accept", headers=_auth(token_a))
     assert r_self.status_code == 403
 
     # Unrelated third party cannot accept.
-    r_third = await client.post(
-        f"/challenges/{body['id']}/accept", headers=_auth(unrelated_tok)
-    )
+    r_third = await client.post(f"/challenges/{body['id']}/accept", headers=_auth(unrelated_tok))
     assert r_third.status_code == 403
 
     # Opponent can accept.
-    r_ok = await client.post(
-        f"/challenges/{body['id']}/accept", headers=_auth(token_b)
-    )
+    r_ok = await client.post(f"/challenges/{body['id']}/accept", headers=_auth(token_b))
     assert r_ok.status_code == 200, r_ok.text
     assert r_ok.json()["status"] == "accepted"
     assert r_ok.json()["accepted_at"] is not None
@@ -276,15 +250,11 @@ async def test_only_challenger_can_cancel_pending(
     body = await _create_challenge(client, token_a, opponent_user_id=uid_b)
 
     # Opponent cannot cancel.
-    r_b = await client.post(
-        f"/challenges/{body['id']}/cancel", headers=_auth(token_b)
-    )
+    r_b = await client.post(f"/challenges/{body['id']}/cancel", headers=_auth(token_b))
     assert r_b.status_code == 403
 
     # Challenger can cancel.
-    r_a = await client.post(
-        f"/challenges/{body['id']}/cancel", headers=_auth(token_a)
-    )
+    r_a = await client.post(f"/challenges/{body['id']}/cancel", headers=_auth(token_a))
     assert r_a.status_code == 200, r_a.text
     assert r_a.json()["status"] == "cancelled"
 
@@ -295,9 +265,7 @@ async def test_opponent_can_decline_pending(client: AsyncClient) -> None:
     token_b, uid_b = await _register(client, "ch_dec_b@example.com")
     body = await _create_challenge(client, token_a, opponent_user_id=uid_b)
 
-    r = await client.post(
-        f"/challenges/{body['id']}/decline", headers=_auth(token_b)
-    )
+    r = await client.post(f"/challenges/{body['id']}/decline", headers=_auth(token_b))
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "declined"
 
@@ -310,27 +278,15 @@ async def test_cannot_accept_declined_or_cancelled_challenge(
     token_b, uid_b = await _register(client, "ch_term_b@example.com")
 
     # Decline then try accept.
-    declined = await _create_challenge(
-        client, token_a, opponent_user_id=uid_b
-    )
-    await client.post(
-        f"/challenges/{declined['id']}/decline", headers=_auth(token_b)
-    )
-    r1 = await client.post(
-        f"/challenges/{declined['id']}/accept", headers=_auth(token_b)
-    )
+    declined = await _create_challenge(client, token_a, opponent_user_id=uid_b)
+    await client.post(f"/challenges/{declined['id']}/decline", headers=_auth(token_b))
+    r1 = await client.post(f"/challenges/{declined['id']}/accept", headers=_auth(token_b))
     assert r1.status_code == 422
 
     # Cancel then try accept.
-    cancelled = await _create_challenge(
-        client, token_a, opponent_user_id=uid_b
-    )
-    await client.post(
-        f"/challenges/{cancelled['id']}/cancel", headers=_auth(token_a)
-    )
-    r2 = await client.post(
-        f"/challenges/{cancelled['id']}/accept", headers=_auth(token_b)
-    )
+    cancelled = await _create_challenge(client, token_a, opponent_user_id=uid_b)
+    await client.post(f"/challenges/{cancelled['id']}/cancel", headers=_auth(token_a))
+    r2 = await client.post(f"/challenges/{cancelled['id']}/accept", headers=_auth(token_b))
     assert r2.status_code == 422
 
 
@@ -445,15 +401,9 @@ async def test_first_submission_does_not_update_honor(
     assert after["status"] == "accepted"  # still waiting on B
 
     async with _TestSession() as db:
-        rank_rows = list(
-            (await db.execute(select(RankProfile))).scalars().all()
-        )
-        title_rows = list(
-            (await db.execute(select(HonorTitle))).scalars().all()
-        )
-        history_rows = list(
-            (await db.execute(select(HonorHistory))).scalars().all()
-        )
+        rank_rows = list((await db.execute(select(RankProfile))).scalars().all())
+        title_rows = list((await db.execute(select(HonorTitle))).scalars().all())
+        history_rows = list((await db.execute(select(HonorHistory))).scalars().all())
     assert rank_rows == []
     assert title_rows == []
     assert history_rows == []
@@ -465,9 +415,7 @@ async def test_matching_second_submission_verifies_and_applies_honor(
     await _wipe_state()
     token_a, uid_a = await _register(client, "ch_ver_a@example.com")
     token_b, uid_b = await _register(client, "ch_ver_b@example.com")
-    body = await _create_challenge(
-        client, token_a, opponent_user_id=uid_b, sport="tennis", area="annandale"
-    )
+    body = await _create_challenge(client, token_a, opponent_user_id=uid_b, sport="tennis", area="annandale")
     await _accept(client, token_b, body["id"])
 
     # A submits: A wins.
@@ -519,9 +467,7 @@ async def test_matching_second_submission_verifies_and_applies_honor(
                 )
             )
         ).scalar_one()
-        history_rows = list(
-            (await db.execute(select(HonorHistory))).scalars().all()
-        )
+        history_rows = list((await db.execute(select(HonorHistory))).scalars().all())
 
     assert a_profile.rating == DEFAULT_RATING + RATING_WIN_DELTA
     assert a_profile.wins == 1
@@ -565,17 +511,9 @@ async def test_verified_challenge_cannot_double_apply_honor(
     # Snapshot the honor state after verification.
     async with _TestSession() as db:
         before_rating_a = (
-            await db.execute(
-                select(RankProfile.rating).where(
-                    RankProfile.user_id == UUID(uid_a)
-                )
-            )
+            await db.execute(select(RankProfile.rating).where(RankProfile.user_id == UUID(uid_a)))
         ).scalar_one()
-        before_history = int(
-            (
-                await db.execute(select(func.count(HonorHistory.id)))
-            ).scalar_one()
-        )
+        before_history = int((await db.execute(select(func.count(HonorHistory.id)))).scalar_one())
 
     # Either party retries the submit. Should be rejected and the honor
     # state must not change.
@@ -598,17 +536,9 @@ async def test_verified_challenge_cannot_double_apply_honor(
 
     async with _TestSession() as db:
         after_rating_a = (
-            await db.execute(
-                select(RankProfile.rating).where(
-                    RankProfile.user_id == UUID(uid_a)
-                )
-            )
+            await db.execute(select(RankProfile.rating).where(RankProfile.user_id == UUID(uid_a)))
         ).scalar_one()
-        after_history = int(
-            (
-                await db.execute(select(func.count(HonorHistory.id)))
-            ).scalar_one()
-        )
+        after_history = int((await db.execute(select(func.count(HonorHistory.id)))).scalar_one())
     assert after_rating_a == before_rating_a
     assert after_history == before_history
 
@@ -648,15 +578,9 @@ async def test_conflicting_submissions_mark_disputed_and_do_not_update_honor(
     assert after["completed_at"] is not None
 
     async with _TestSession() as db:
-        rank_rows = list(
-            (await db.execute(select(RankProfile))).scalars().all()
-        )
-        title_rows = list(
-            (await db.execute(select(HonorTitle))).scalars().all()
-        )
-        history_rows = list(
-            (await db.execute(select(HonorHistory))).scalars().all()
-        )
+        rank_rows = list((await db.execute(select(RankProfile))).scalars().all())
+        title_rows = list((await db.execute(select(HonorTitle))).scalars().all())
+        history_rows = list((await db.execute(select(HonorHistory))).scalars().all())
     assert rank_rows == []
     assert title_rows == []
     assert history_rows == []
@@ -724,15 +648,9 @@ async def test_unrelated_user_cannot_mutate_honor_via_challenge_result(
 
     # Snapshot honor state (which is empty so far).
     async with _TestSession() as db:
-        before_rank = list(
-            (await db.execute(select(RankProfile))).scalars().all()
-        )
-        before_titles = list(
-            (await db.execute(select(HonorTitle))).scalars().all()
-        )
-        before_history = list(
-            (await db.execute(select(HonorHistory))).scalars().all()
-        )
+        before_rank = list((await db.execute(select(RankProfile))).scalars().all())
+        before_titles = list((await db.execute(select(HonorTitle))).scalars().all())
+        before_history = list((await db.execute(select(HonorHistory))).scalars().all())
     assert before_rank == [] and before_titles == [] and before_history == []
 
     # Unrelated user attempts to submit.
@@ -747,21 +665,11 @@ async def test_unrelated_user_cannot_mutate_honor_via_challenge_result(
 
     # Nothing moved.
     async with _TestSession() as db:
-        after_rank = list(
-            (await db.execute(select(RankProfile))).scalars().all()
-        )
-        after_titles = list(
-            (await db.execute(select(HonorTitle))).scalars().all()
-        )
-        after_history = list(
-            (await db.execute(select(HonorHistory))).scalars().all()
-        )
+        after_rank = list((await db.execute(select(RankProfile))).scalars().all())
+        after_titles = list((await db.execute(select(HonorTitle))).scalars().all())
+        after_history = list((await db.execute(select(HonorHistory))).scalars().all())
         # And no submissions row landed.
-        subs = list(
-            (
-                await db.execute(select(ChallengeResultSubmission))
-            ).scalars().all()
-        )
+        subs = list((await db.execute(select(ChallengeResultSubmission))).scalars().all())
     assert after_rank == []
     assert after_titles == []
     assert after_history == []
@@ -801,15 +709,9 @@ async def test_list_returns_only_my_challenges(client: AsyncClient) -> None:
     # A creates against B (A is participant). C is unrelated.
     body = await _create_challenge(client, token_a, opponent_user_id=uid_b)
 
-    a_list = (
-        await client.get("/challenges", headers=_auth(token_a))
-    ).json()
-    b_list = (
-        await client.get("/challenges", headers=_auth(token_b))
-    ).json()
-    c_list = (
-        await client.get("/challenges", headers=_auth(token_c))
-    ).json()
+    a_list = (await client.get("/challenges", headers=_auth(token_a))).json()
+    b_list = (await client.get("/challenges", headers=_auth(token_b))).json()
+    c_list = (await client.get("/challenges", headers=_auth(token_c))).json()
 
     assert any(item["id"] == body["id"] for item in a_list["items"])
     assert any(item["id"] == body["id"] for item in b_list["items"])
@@ -825,9 +727,7 @@ async def test_unrelated_user_cannot_read_challenge_detail(
     unrelated_tok, _ = await _register(client, "ch_read_x@example.com")
     body = await _create_challenge(client, token_a, opponent_user_id=uid_b)
 
-    r = await client.get(
-        f"/challenges/{body['id']}", headers=_auth(unrelated_tok)
-    )
+    r = await client.get(f"/challenges/{body['id']}", headers=_auth(unrelated_tok))
     assert r.status_code == 403
 
 
@@ -864,9 +764,7 @@ async def test_concurrent_matching_submissions_verify_once(
     await _wipe_state()
     token_a, uid_a = await _register(client, "ch_conc_a@example.com")
     token_b, uid_b = await _register(client, "ch_conc_b@example.com")
-    body = await _create_challenge(
-        client, token_a, opponent_user_id=uid_b, sport="tennis", area="annandale"
-    )
+    body = await _create_challenge(client, token_a, opponent_user_id=uid_b, sport="tennis", area="annandale")
     await _accept(client, token_b, body["id"])
 
     # Fire both submissions concurrently via asyncio.gather. Either may
@@ -895,18 +793,12 @@ async def test_concurrent_matching_submissions_verify_once(
     # "accepted" with two orphan submissions.
     async with _TestSession() as db:
         challenge = (
-            await db.execute(
-                select(SportsChallenge).where(
-                    SportsChallenge.id == UUID(body["id"])
-                )
-            )
+            await db.execute(select(SportsChallenge).where(SportsChallenge.id == UUID(body["id"])))
         ).scalar_one()
         subs = list(
             (
                 await db.execute(
-                    select(ChallengeResultSubmission).where(
-                        ChallengeResultSubmission.challenge_id == challenge.id
-                    )
+                    select(ChallengeResultSubmission).where(ChallengeResultSubmission.challenge_id == challenge.id)
                 )
             )
             .scalars()
@@ -930,11 +822,7 @@ async def test_concurrent_matching_submissions_verify_once(
                 )
             )
         ).scalar_one()
-        history_count = int(
-            (
-                await db.execute(select(func.count(HonorHistory.id)))
-            ).scalar_one()
-        )
+        history_count = int((await db.execute(select(func.count(HonorHistory.id)))).scalar_one())
         title = (
             await db.execute(
                 select(HonorTitle).where(
@@ -986,13 +874,7 @@ async def test_concurrent_same_user_duplicate_submission_returns_409(
     # deterministic — registering token_b just to call /accept isn't
     # needed for the duplicate-submission race we're testing.
     async with _TestSession() as db:
-        ch = (
-            await db.execute(
-                select(SportsChallenge).where(
-                    SportsChallenge.id == UUID(body["id"])
-                )
-            )
-        ).scalar_one()
+        ch = (await db.execute(select(SportsChallenge).where(SportsChallenge.id == UUID(body["id"])))).scalar_one()
         ch.status = "accepted"
         await db.commit()
 

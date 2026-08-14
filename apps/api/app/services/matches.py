@@ -14,9 +14,7 @@ from app.schemas.matches import MatchListResponse, MatchResponse
 _CURRENT_YEAR = datetime.now().year
 
 
-async def _fetch_latest_message_by_match(
-    db: AsyncSession, match_ids: list[UUID]
-) -> dict[UUID, Message]:
+async def _fetch_latest_message_by_match(db: AsyncSession, match_ids: list[UUID]) -> dict[UUID, Message]:
     """Return a {match_id: latest Message} dict for the given match ids.
 
     Uses one ``IN`` query and groups in Python — portable across Postgres
@@ -25,11 +23,7 @@ async def _fetch_latest_message_by_match(
     """
     if not match_ids:
         return {}
-    stmt = (
-        select(Message)
-        .where(Message.match_id.in_(match_ids))
-        .order_by(Message.created_at.desc())
-    )
+    stmt = select(Message).where(Message.match_id.in_(match_ids)).order_by(Message.created_at.desc())
     rows = list((await db.execute(stmt)).scalars().all())
     latest: dict[UUID, Message] = {}
     for msg in rows:

@@ -134,10 +134,7 @@ def _is_likely_duplicate_of_seed(
     for seed in seed_items:
         if _normalise_name(seed.name) != needle:
             continue
-        if (
-            _haversine_km(place_lat, place_lng, seed.latitude, seed.longitude)
-            <= _DEDUPE_PROXIMITY_KM
-        ):
+        if _haversine_km(place_lat, place_lng, seed.latitude, seed.longitude) <= _DEDUPE_PROXIMITY_KM:
             return True
     return False
 
@@ -222,10 +219,7 @@ async def list_nearby_venues(
         matching = [v for v in rows if sport in (v.sport_tags or [])]
 
         if has_coords:
-            scored = [
-                (v, _haversine_km(lat, lng, v.latitude, v.longitude))
-                for v in matching
-            ]
+            scored = [(v, _haversine_km(lat, lng, v.latitude, v.longitude)) for v in matching]
             within = [(v, d) for (v, d) in scored if d <= radius_km]
             # (distance ASC, name ASC) — name is the deterministic
             # tie-breaker so equidistant venues return in stable
@@ -279,11 +273,7 @@ async def list_nearby_venues(
         # source="places": no seed to dedupe against, so trust Places.
         if source == "both":
             place_rows = [
-                p
-                for p in place_rows
-                if not _is_likely_duplicate_of_seed(
-                    p.name, p.latitude, p.longitude, seed_items
-                )
+                p for p in place_rows if not _is_likely_duplicate_of_seed(p.name, p.latitude, p.longitude, seed_items)
             ]
 
         for p in place_rows:

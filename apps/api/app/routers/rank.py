@@ -36,9 +36,7 @@ async def get_user_rank_summary(
     is blocked, but no match-existence check is enforced here so the
     Discovery preview can show the badge.
     """
-    target = (
-        await db.execute(select(User).where(User.id == user_id))
-    ).scalar_one_or_none()
+    target = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if target is None or not target.is_active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return await rank_service.compute_summary(db, user_id)
@@ -74,11 +72,7 @@ async def get_user_honor_summary(
     event participation rows. Auth is required so unauthenticated
     scraping is blocked.
     """
-    target = (
-        await db.execute(select(User).where(User.id == user_id))
-    ).scalar_one_or_none()
+    target = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if target is None or not target.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return await rank_service.compute_honor_summary(db, user_id)

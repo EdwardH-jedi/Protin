@@ -154,9 +154,7 @@ async def test_login_then_me_returns_logged_in_user_not_another(
     # Log in as A and pin identity.
     a_login = await client.post("/auth/login", json=a_payload)
     a_token = a_login.json()["access_token"]
-    a_me = await client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {a_token}"}
-    )
+    a_me = await client.get("/auth/me", headers={"Authorization": f"Bearer {a_token}"})
     assert a_me.status_code == 200
     assert a_me.json()["email"] == "switch_a@example.com"
 
@@ -164,9 +162,7 @@ async def test_login_then_me_returns_logged_in_user_not_another(
     b_login = await client.post("/auth/login", json=b_payload)
     b_token = b_login.json()["access_token"]
     assert b_token != a_token
-    b_me = await client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {b_token}"}
-    )
+    b_me = await client.get("/auth/me", headers={"Authorization": f"Bearer {b_token}"})
     assert b_me.status_code == 200
     assert b_me.json()["email"] == "switch_b@example.com"
     assert b_me.json()["id"] != a_me.json()["id"]
@@ -256,16 +252,16 @@ async def test_delete_me_removes_user_and_owned_rows(client: AsyncClient) -> Non
             rows = (await session.execute(select(model).where(col == alice_id))).scalars().all()
             assert rows == [], f"{model.__name__} not cleared"
         # Discovery / safety rows referencing Alice in either direction
-        assert (await session.execute(select(DiscoveryAction).where(DiscoveryAction.actor_id == alice_id))).scalars().all() == []
+        assert (
+            await session.execute(select(DiscoveryAction).where(DiscoveryAction.actor_id == alice_id))
+        ).scalars().all() == []
         assert (await session.execute(select(Report).where(Report.reporter_id == alice_id))).scalars().all() == []
         assert (await session.execute(select(Block).where(Block.blocker_id == alice_id))).scalars().all() == []
         # Messages she sent
         assert (await session.execute(select(Message).where(Message.sender_id == alice_id))).scalars().all() == []
         # Matches she participated in
         assert (
-            await session.execute(
-                select(Match).where((Match.user1_id == alice_id) | (Match.user2_id == alice_id))
-            )
+            await session.execute(select(Match).where((Match.user1_id == alice_id) | (Match.user2_id == alice_id)))
         ).scalars().all() == []
         # Bookings she participated in
         assert (
@@ -291,9 +287,7 @@ async def test_delete_me_requires_auth(client: AsyncClient) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_apple_sign_in_creates_user_on_first_call(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_apple_sign_in_creates_user_on_first_call(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
     from app.core import config as config_module
     from app.routers import auth as auth_router
     from app.services import apple_auth as apple_auth_module
@@ -333,17 +327,13 @@ async def test_apple_sign_in_creates_user_on_first_call(
     from app.models.user import User
 
     async with _TestSession() as session:
-        users = (
-            await session.execute(select(User).where(User.apple_sub == "001234.apple-user-id"))
-        ).scalars().all()
+        users = (await session.execute(select(User).where(User.apple_sub == "001234.apple-user-id"))).scalars().all()
         assert len(users) == 1
         assert users[0].email == "apple-user@example.com"
         assert users[0].hashed_password is None
 
 
-async def test_apple_sign_in_rejects_invalid_token(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_apple_sign_in_rejects_invalid_token(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
     from app.core import config as config_module
     from app.routers import auth as auth_router
     from app.services.apple_auth import AppleIdentityTokenError
@@ -364,9 +354,7 @@ async def test_apple_sign_in_rejects_invalid_token(
     assert "bad signature" in r.json()["detail"].lower()
 
 
-async def test_apple_sign_in_503_when_not_configured(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_apple_sign_in_503_when_not_configured(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
     from app.core import config as config_module
 
     settings = config_module.get_settings()
@@ -412,9 +400,7 @@ async def test_apple_sign_in_links_existing_user_by_verified_email(
     assert r.status_code == 200, r.text
 
     async with _TestSession() as session:
-        row = (
-            await session.execute(select(User).where(User.id == existing_id))
-        ).scalar_one()
+        row = (await session.execute(select(User).where(User.id == existing_id))).scalar_one()
         assert row.apple_sub == "002468.apple-link-user"
         # Original hashed_password is preserved — linking does not wipe credentials.
         assert row.hashed_password == "x" * 60
@@ -467,9 +453,7 @@ async def test_apple_sign_in_does_not_link_via_client_supplied_email(
     assert r.status_code in (400, 409), r.text
 
     async with _TestSession() as session:
-        row = (
-            await session.execute(select(User).where(User.id == victim_id))
-        ).scalar_one()
+        row = (await session.execute(select(User).where(User.id == victim_id))).scalar_one()
         assert row.apple_sub is None, "victim row was linked via forged body.email"
 
 
@@ -536,13 +520,11 @@ async def test_apple_sign_in_first_time_without_verified_email_is_rejected(
 
     # Confirm no row was created under either the body email or the apple_sub.
     async with _TestSession() as session:
-        rows_by_sub = (
-            await session.execute(select(User).where(User.apple_sub == apple_sub))
-        ).scalars().all()
+        rows_by_sub = (await session.execute(select(User).where(User.apple_sub == apple_sub))).scalars().all()
         assert rows_by_sub == []
         rows_by_email = (
-            await session.execute(select(User).where(User.email == "anything@example.com"))
-        ).scalars().all()
+            (await session.execute(select(User).where(User.email == "anything@example.com"))).scalars().all()
+        )
         assert rows_by_email == []
 
 
@@ -669,9 +651,7 @@ async def test_apple_sign_in_stores_refresh_token_when_code_provided(
     assert r.status_code == 200, r.text
 
     async with _TestSession() as session:
-        user = (
-            await session.execute(select(User).where(User.apple_sub == "00aaaa.refresh-store-user"))
-        ).scalar_one()
+        user = (await session.execute(select(User).where(User.apple_sub == "00aaaa.refresh-store-user"))).scalar_one()
         # EncryptedString round-trips to plaintext on read.
         assert user.apple_refresh_token == "refresh-token-123"
 
@@ -712,9 +692,7 @@ async def test_apple_sign_in_succeeds_when_token_exchange_fails(
     assert r.status_code == 200, r.text
 
     async with _TestSession() as session:
-        user = (
-            await session.execute(select(User).where(User.apple_sub == "00bbbb.exchange-fail-user"))
-        ).scalar_one()
+        user = (await session.execute(select(User).where(User.apple_sub == "00bbbb.exchange-fail-user"))).scalar_one()
         assert user.apple_refresh_token is None
 
 
@@ -758,14 +736,10 @@ async def test_delete_me_revokes_apple_token_then_deletes_user(
     assert revoked == ["rt-to-revoke"]
 
     async with _TestSession() as session:
-        assert (
-            await session.execute(select(User).where(User.id == user_id))
-        ).scalar_one_or_none() is None
+        assert (await session.execute(select(User).where(User.id == user_id))).scalar_one_or_none() is None
 
 
-async def test_delete_me_does_not_revoke_for_email_user(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_delete_me_does_not_revoke_for_email_user(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
     """An email/password user (no apple_refresh_token) must not trigger any
     Apple revoke call on deletion."""
     from app.core.security import create_access_token
@@ -831,6 +805,4 @@ async def test_delete_me_completes_when_apple_revoke_fails(
     assert r.status_code == 204
 
     async with _TestSession() as session:
-        assert (
-            await session.execute(select(User).where(User.id == user_id))
-        ).scalar_one_or_none() is None
+        assert (await session.execute(select(User).where(User.id == user_id))).scalar_one_or_none() is None

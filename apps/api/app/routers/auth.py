@@ -201,9 +201,7 @@ async def apple_sign_in(
     # exists because a silent miss leaves the account with no revocable token.
     if body.authorization_code and apple_revocation_configured(settings):
         try:
-            refresh_token = await exchange_authorization_code(
-                body.authorization_code, settings=settings
-            )
+            refresh_token = await exchange_authorization_code(body.authorization_code, settings=settings)
             if refresh_token:
                 user.apple_refresh_token = refresh_token
         except Exception:  # noqa: BLE001 — best-effort enrichment, never fatal

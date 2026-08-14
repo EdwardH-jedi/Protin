@@ -53,9 +53,7 @@ async def create_report(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Cannot report yourself.",
             )
-        target_user = (
-            await db.execute(select(User).where(User.id == req.reported_user_id))
-        ).scalar_one_or_none()
+        target_user = (await db.execute(select(User).where(User.id == req.reported_user_id))).scalar_one_or_none()
         if target_user is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -68,9 +66,7 @@ async def create_report(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="target_event_id is required for event reports",
             )
-        target_event = (
-            await db.execute(select(Event).where(Event.id == req.target_event_id))
-        ).scalar_one_or_none()
+        target_event = (await db.execute(select(Event).where(Event.id == req.target_event_id))).scalar_one_or_none()
         if target_event is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -78,10 +74,7 @@ async def create_report(
             )
         # Private-event hide-as-404: outsiders must not distinguish a
         # real private event from an unknown id by submitting a report.
-        if (
-            target_event.visibility == "private"
-            and reporter_id != target_event.host_user_id
-        ):
+        if target_event.visibility == "private" and reporter_id != target_event.host_user_id:
             active = (
                 await db.execute(
                     select(EventParticipant.id).where(
@@ -126,11 +119,7 @@ async def list_my_reports(
     reporter_id: UUID,
 ) -> ReportListResponse:
     """Return reports created by the caller — never expose others' reports."""
-    stmt = (
-        select(Report)
-        .where(Report.reporter_id == reporter_id)
-        .order_by(Report.created_at.desc())
-    )
+    stmt = select(Report).where(Report.reporter_id == reporter_id).order_by(Report.created_at.desc())
     reports = list((await db.execute(stmt)).scalars().all())
     return ReportListResponse(
         items=[ReportResponse.model_validate(r) for r in reports],

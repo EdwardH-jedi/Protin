@@ -198,10 +198,7 @@ def apple_revocation_configured(settings: Any) -> bool:
     unconfigured environments (local, CI, App Store reviewer) are unaffected.
     """
     return bool(
-        settings.apple_client_id
-        and settings.apple_team_id
-        and settings.apple_key_id
-        and settings.apple_private_key
+        settings.apple_client_id and settings.apple_team_id and settings.apple_key_id and settings.apple_private_key
     )
 
 

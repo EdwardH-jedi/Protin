@@ -64,12 +64,8 @@ from app.models import (  # noqa: F401
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-_engine = create_async_engine(
-    TEST_DATABASE_URL, connect_args={"check_same_thread": False}
-)
-_TestSession = async_sessionmaker(
-    _engine, expire_on_commit=False, class_=AsyncSession
-)
+_engine = create_async_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+_TestSession = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -97,9 +93,7 @@ async def _override_get_redis() -> AsyncGenerator:
 async def client() -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_redis] = _override_get_redis
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
 
@@ -114,14 +108,10 @@ async def _wipe_state() -> None:
 
 
 async def _register(client: AsyncClient, email: str) -> tuple[str, str]:
-    r = await client.post(
-        "/auth/register", json={"email": email, "password": "password123"}
-    )
+    r = await client.post("/auth/register", json={"email": email, "password": "password123"})
     assert r.status_code == 201, r.text
     token = r.json()["access_token"]
-    me = await client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {token}"}
-    )
+    me = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     return token, me.json()["id"]
 
 
@@ -177,15 +167,7 @@ async def test_new_user_gets_default_rank_profile_without_persisting(
 
     # Pre-condition: the DB has no profile for this user.
     async with _TestSession() as db:
-        before = list(
-            (
-                await db.execute(
-                    select(RankProfile).where(RankProfile.user_id == UUID(uid))
-                )
-            )
-            .scalars()
-            .all()
-        )
+        before = list((await db.execute(select(RankProfile).where(RankProfile.user_id == UUID(uid)))).scalars().all())
     assert before == []
 
     r = await client.get(
@@ -210,15 +192,7 @@ async def test_new_user_gets_default_rank_profile_without_persisting(
 
     # Post-condition: still no profile row — GET did not insert.
     async with _TestSession() as db:
-        after = list(
-            (
-                await db.execute(
-                    select(RankProfile).where(RankProfile.user_id == UUID(uid))
-                )
-            )
-            .scalars()
-            .all()
-        )
+        after = list((await db.execute(select(RankProfile).where(RankProfile.user_id == UUID(uid)))).scalars().all())
     assert after == []
 
 
@@ -441,9 +415,7 @@ async def test_current_holder_losing_transfers_title_to_winner(
     assert second["history_entry"]["new_holder_user_id"] == uid_b
 
     async with _TestSession() as db:
-        history_rows = list(
-            (await db.execute(select(HonorHistory))).scalars().all()
-        )
+        history_rows = list((await db.execute(select(HonorHistory))).scalars().all())
     assert len(history_rows) == 2
 
 
@@ -465,9 +437,7 @@ async def test_current_holder_not_involved_does_not_transfer(
     assert second["honor_title"]["current_holder_user_id"] == uid_a
 
     async with _TestSession() as db:
-        history_rows = list(
-            (await db.execute(select(HonorHistory))).scalars().all()
-        )
+        history_rows = list((await db.execute(select(HonorHistory))).scalars().all())
     # Only the inaugural award row exists.
     assert len(history_rows) == 1
 
@@ -487,9 +457,7 @@ async def test_champion_defending_keeps_title_without_history_row(
     assert second["honor_title"]["current_holder_user_id"] == uid_a
 
     async with _TestSession() as db:
-        history_rows = list(
-            (await db.execute(select(HonorHistory))).scalars().all()
-        )
+        history_rows = list((await db.execute(select(HonorHistory))).scalars().all())
     assert len(history_rows) == 1
 
 
@@ -557,12 +525,8 @@ async def test_honors_me_returns_titles_held_by_user(
     _, uid_c = await _register(client, "hs_me_c@example.com")
 
     # A wins tennis@annandale and badminton@newtown.
-    await _record_result(
-        winner_user_id=uid_a, loser_user_id=uid_b, sport="tennis", area="annandale"
-    )
-    await _record_result(
-        winner_user_id=uid_a, loser_user_id=uid_c, sport="badminton", area="newtown"
-    )
+    await _record_result(winner_user_id=uid_a, loser_user_id=uid_b, sport="tennis", area="annandale")
+    await _record_result(winner_user_id=uid_a, loser_user_id=uid_c, sport="badminton", area="newtown")
 
     r = await client.get("/honors/me", headers=_auth(token_a))
     assert r.status_code == 200, r.text
@@ -579,9 +543,7 @@ async def test_honors_me_returns_titles_held_by_user(
 
 
 async def test_rankings_me_requires_auth(client: AsyncClient) -> None:
-    r = await client.get(
-        "/rankings/me", params={"sport": "tennis", "area": "annandale"}
-    )
+    r = await client.get("/rankings/me", params={"sport": "tennis", "area": "annandale"})
     assert r.status_code in (401, 403)
 
 
@@ -626,9 +588,7 @@ async def test_unrelated_user_cannot_mutate_honor_state_via_public_api(
     await _wipe_state()
     _, uid_winner = await _register(client, "hs_sec_winner@example.com")
     _, uid_loser = await _register(client, "hs_sec_loser@example.com")
-    unrelated_token, _ = await _register(
-        client, "hs_sec_unrelated@example.com"
-    )
+    unrelated_token, _ = await _register(client, "hs_sec_unrelated@example.com")
 
     # Seed initial state via the service so the loser holds the title.
     # The service is the legitimate integration point; this stands in
@@ -668,11 +628,7 @@ async def test_unrelated_user_cannot_mutate_honor_state_via_public_api(
                 )
             )
         ).scalar_one()
-        history_count_before = int(
-            (
-                await db.execute(select(func.count(HonorHistory.id)))
-            ).scalar_one()
-        )
+        history_count_before = int((await db.execute(select(func.count(HonorHistory.id)))).scalar_one())
         winner_rating_before = winner_before.rating
         winner_wins_before = winner_before.wins
         winner_losses_before = winner_before.losses
@@ -726,11 +682,7 @@ async def test_unrelated_user_cannot_mutate_honor_state_via_public_api(
                 )
             )
         ).scalar_one()
-        history_count_after = int(
-            (
-                await db.execute(select(func.count(HonorHistory.id)))
-            ).scalar_one()
-        )
+        history_count_after = int((await db.execute(select(func.count(HonorHistory.id)))).scalar_one())
 
     assert winner_after.rating == winner_rating_before
     assert winner_after.wins == winner_wins_before

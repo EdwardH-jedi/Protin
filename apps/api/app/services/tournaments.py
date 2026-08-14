@@ -78,13 +78,9 @@ def _to_summary(t: Tournament, participant_count: int, has_joined: bool) -> Tour
 
 
 async def _get_tournament_or_404(db: AsyncSession, tournament_id: UUID) -> Tournament:
-    t = (
-        await db.execute(select(Tournament).where(Tournament.id == tournament_id))
-    ).scalar_one_or_none()
+    t = (await db.execute(select(Tournament).where(Tournament.id == tournament_id))).scalar_one_or_none()
     if t is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found")
     return t
 
 
@@ -118,16 +114,8 @@ async def list_tournaments(
 
     base = base.order_by(Tournament.starts_at.asc())
 
-    rows = list(
-        (await db.execute(base.offset(offset).limit(limit))).scalars().all()
-    )
-    total = int(
-        (
-            await db.execute(
-                select(func.count()).select_from(base.subquery())
-            )
-        ).scalar_one()
-    )
+    rows = list((await db.execute(base.offset(offset).limit(limit))).scalars().all())
+    total = int((await db.execute(select(func.count()).select_from(base.subquery()))).scalar_one())
 
     items: list[TournamentSummary] = []
     for t in rows:
@@ -138,16 +126,12 @@ async def list_tournaments(
     return TournamentListResponse(items=items, total=total)
 
 
-async def get_tournament(
-    db: AsyncSession, tournament_id: UUID, current_user_id: UUID
-) -> TournamentDetail:
+async def get_tournament(db: AsyncSession, tournament_id: UUID, current_user_id: UUID) -> TournamentDetail:
     t = await _get_tournament_or_404(db, tournament_id)
     if t.status == "draft":
         # Drafts are not yet visible — treat as not found so we don't leak
         # the existence of a tournament that hasn't been published.
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found")
 
     count = await _participant_count(db, t.id)
     joined = await _has_joined(db, t.id, current_user_id)
@@ -174,20 +158,14 @@ async def get_tournament(
     return TournamentDetail(**summary.model_dump(), participants=participants)
 
 
-async def join_tournament(
-    db: AsyncSession, tournament_id: UUID, current_user_id: UUID
-) -> TournamentDetail:
+async def join_tournament(db: AsyncSession, tournament_id: UUID, current_user_id: UUID) -> TournamentDetail:
     # Lock the tournament row so a concurrent join cannot win the capacity
     # check too. SQLite test harness ignores the lock hint, which is fine
     # for serial tests; production Postgres honors it.
-    locked_stmt = (
-        select(Tournament).where(Tournament.id == tournament_id).with_for_update()
-    )
+    locked_stmt = select(Tournament).where(Tournament.id == tournament_id).with_for_update()
     t = (await db.execute(locked_stmt)).scalar_one_or_none()
     if t is None or t.status == "draft":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found")
 
     if t.status != "open":
         raise HTTPException(
@@ -212,9 +190,7 @@ async def join_tournament(
             detail="Tournament is full",
         )
 
-    db.add(
-        TournamentParticipant(tournament_id=t.id, user_id=current_user_id)
-    )
+    db.add(TournamentParticipant(tournament_id=t.id, user_id=current_user_id))
     new_count = count + 1
     if new_count >= t.capacity:
         t.status = "full"
@@ -225,17 +201,11 @@ async def join_tournament(
     return await get_tournament(db, t.id, current_user_id)
 
 
-async def leave_tournament(
-    db: AsyncSession, tournament_id: UUID, current_user_id: UUID
-) -> TournamentDetail:
-    locked_stmt = (
-        select(Tournament).where(Tournament.id == tournament_id).with_for_update()
-    )
+async def leave_tournament(db: AsyncSession, tournament_id: UUID, current_user_id: UUID) -> TournamentDetail:
+    locked_stmt = select(Tournament).where(Tournament.id == tournament_id).with_for_update()
     t = (await db.execute(locked_stmt)).scalar_one_or_none()
     if t is None or t.status == "draft":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found")
 
     if t.status not in _LEAVABLE_STATUSES:
         raise HTTPException(

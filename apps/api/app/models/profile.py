@@ -37,9 +37,7 @@ class ProfilePhoto(Base):
     __tablename__ = "profile_photos"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    profile_id: Mapped[UUID] = mapped_column(
-        ForeignKey("user_profiles.id", ondelete="CASCADE"), nullable=False
-    )
+    profile_id: Mapped[UUID] = mapped_column(ForeignKey("user_profiles.id", ondelete="CASCADE"), nullable=False)
     photo_url: Mapped[str] = mapped_column(String(500), nullable=False)
     position: Mapped[int] = mapped_column(nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

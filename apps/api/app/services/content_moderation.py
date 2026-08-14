@@ -129,16 +129,12 @@ def _compile(entries: tuple[str, ...]) -> re.Pattern[str]:
     return re.compile(rf"\b(?:{joined})\b", re.IGNORECASE)
 
 
-_COMPILED: dict[str, re.Pattern[str]] = {
-    cat: _compile(entries) for cat, entries in _CATEGORIES.items()
-}
+_COMPILED: dict[str, re.Pattern[str]] = {cat: _compile(entries) for cat, entries in _CATEGORIES.items()}
 
 
 # Generic copy shown to clients. Do NOT include the matched fragment or
 # the firing category in this string — see "Safety properties" above.
-SAFE_USER_MESSAGE = (
-    "This message may violate our community guidelines. Please rephrase it."
-)
+SAFE_USER_MESSAGE = "This message may violate our community guidelines. Please rephrase it."
 
 
 # ---------------------------------------------------------------------------
@@ -195,10 +191,7 @@ def moderate_text(text: str, context: str | None = None) -> ModerationResult:
     return ModerationResult(
         allowed=False,
         categories=fired,
-        reason=(
-            f"context={context or '-'} categories={','.join(fired)} "
-            f"matched={first_match!r}"
-        ),
+        reason=(f"context={context or '-'} categories={','.join(fired)} matched={first_match!r}"),
     )
 
 

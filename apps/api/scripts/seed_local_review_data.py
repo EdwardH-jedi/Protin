@@ -64,8 +64,7 @@ REVIEWER_DISPLAY_NAME = "Review Player"
 REVIEWER_SUBURB = "Annandale"
 REVIEWER_BIRTH_YEAR = 1995
 REVIEWER_BIO = (
-    "Local QA reviewer account. Try Discover, Matches and Events. "
-    "Profile tab has account deletion and legal links."
+    "Local QA reviewer account. Try Discover, Matches and Events. Profile tab has account deletion and legal links."
 )
 
 
@@ -247,9 +246,7 @@ async def _upsert_profile(
     """Returns ``(was_created, previous_display_name_or_None)`` —
     the previous name is reported only when it changes, to surface
     cases like the ``Shsj`` corruption that motivated this script."""
-    res = await db.execute(
-        select(UserProfile).where(UserProfile.user_id == user_id)
-    )
+    res = await db.execute(select(UserProfile).where(UserProfile.user_id == user_id))
     profile = res.scalar_one_or_none()
     if profile is None:
         db.add(
@@ -304,12 +301,8 @@ async def _upsert_sport_profiles(
             sp.golf_club = sp_seed.golf_club
 
 
-async def _ensure_identity_preferences(
-    db: AsyncSession, *, user_id: UUID
-) -> None:
-    res = await db.execute(
-        select(IdentityPreferences).where(IdentityPreferences.user_id == user_id)
-    )
+async def _ensure_identity_preferences(db: AsyncSession, *, user_id: UUID) -> None:
+    res = await db.execute(select(IdentityPreferences).where(IdentityPreferences.user_id == user_id))
     if res.scalar_one_or_none() is None:
         db.add(IdentityPreferences(user_id=user_id))
 
@@ -343,14 +336,18 @@ async def _ensure_challenge(
     (faking a verified result would mutate Rank without a real match).
     """
     existing = (
-        await db.execute(
-            select(SportsChallenge).where(
-                SportsChallenge.challenger_user_id == challenger_id,
-                SportsChallenge.opponent_user_id == opponent_id,
-                SportsChallenge.sport == sport,
+        (
+            await db.execute(
+                select(SportsChallenge).where(
+                    SportsChallenge.challenger_user_id == challenger_id,
+                    SportsChallenge.opponent_user_id == opponent_id,
+                    SportsChallenge.sport == sport,
+                )
             )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     if existing is not None:
         return False, existing.status
 
@@ -365,9 +362,7 @@ async def _ensure_challenge(
     if not accept_after_create:
         return True, "pending"
 
-    accepted = await accept_challenge(
-        db, current_user_id=opponent_id, challenge_id=created.id
-    )
+    accepted = await accept_challenge(db, current_user_id=opponent_id, challenge_id=created.id)
     return True, accepted.status
 
 
@@ -386,11 +381,7 @@ async def _ensure_mutual_match(
     u1_str, u2_str = sorted([str(reviewer_id), str(partner_id)])
     u1, u2 = UUID(u1_str), UUID(u2_str)
     existing = (
-        await db.execute(
-            select(Match).where(
-                and_(Match.user1_id == u1, Match.user2_id == u2, Match.sport == sport)
-            )
-        )
+        await db.execute(select(Match).where(and_(Match.user1_id == u1, Match.user2_id == u2, Match.sport == sport)))
     ).scalar_one_or_none()
     if existing is not None:
         return False
@@ -447,17 +438,13 @@ async def _seed() -> int:
             bio=REVIEWER_BIO,
         )
         summary["reviewer_display_name_was"] = prev_name
-        await _upsert_sport_profiles(
-            db, user_id=reviewer.id, sport_seeds=REVIEWER_SPORTS
-        )
+        await _upsert_sport_profiles(db, user_id=reviewer.id, sport_seeds=REVIEWER_SPORTS)
         await _ensure_identity_preferences(db, user_id=reviewer.id)
         await db.commit()
 
         # --- Demo partners + mutual matches -------------------------------
         for seed in _DEMO_USERS:
-            partner, created = await _get_or_create_user(
-                db, email=seed.email, hashed_password=None
-            )
+            partner, created = await _get_or_create_user(db, email=seed.email, hashed_password=None)
             if created:
                 summary["demo_users_created"] += 1
             else:
@@ -471,9 +458,7 @@ async def _seed() -> int:
                 suburb=seed.suburb,
                 bio=seed.bio,
             )
-            await _upsert_sport_profiles(
-                db, user_id=partner.id, sport_seeds=seed.sport_profiles
-            )
+            await _upsert_sport_profiles(db, user_id=partner.id, sport_seeds=seed.sport_profiles)
             await _ensure_identity_preferences(db, user_id=partner.id)
             await db.commit()
 
@@ -542,32 +527,15 @@ async def _seed() -> int:
 
     # ---- Summary -----------------------------------------------------
     print("[seed_local_review_data] done.")
-    print(
-        f"  reviewer: {REVIEWER_EMAIL} "
-        f"({'created' if summary['reviewer_created'] else 'updated'})"
-    )
+    print(f"  reviewer: {REVIEWER_EMAIL} ({'created' if summary['reviewer_created'] else 'updated'})")
     if summary["reviewer_display_name_was"]:
         print(
-            f"  reviewer display_name was "
-            f"{summary['reviewer_display_name_was']!r} → "
-            f"reset to {REVIEWER_DISPLAY_NAME!r}"
+            f"  reviewer display_name was {summary['reviewer_display_name_was']!r} → reset to {REVIEWER_DISPLAY_NAME!r}"
         )
-    print(
-        f"  demo users:   created={summary['demo_users_created']} "
-        f"updated={summary['demo_users_updated']}"
-    )
-    print(
-        f"  matches:      created={summary['matches_created']} "
-        f"existing={summary['matches_existing']}"
-    )
-    print(
-        f"  challenges:   created={summary['challenges_created']} "
-        f"existing={summary['challenges_existing']}"
-    )
-    print(
-        f"  reviewer credentials: email={REVIEWER_EMAIL} "
-        f"password={REVIEWER_PASSWORD}"
-    )
+    print(f"  demo users:   created={summary['demo_users_created']} updated={summary['demo_users_updated']}")
+    print(f"  matches:      created={summary['matches_created']} existing={summary['matches_existing']}")
+    print(f"  challenges:   created={summary['challenges_created']} existing={summary['challenges_existing']}")
+    print(f"  reviewer credentials: email={REVIEWER_EMAIL} password={REVIEWER_PASSWORD}")
     return 0
 
 

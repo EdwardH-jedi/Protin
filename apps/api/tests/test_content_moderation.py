@@ -46,9 +46,7 @@ from app.services.content_moderation import (
 )
 def test_allowed_text_is_not_flagged(text: str) -> None:
     result = moderate_text(text, context="unit")
-    assert result.allowed is True, (
-        f"false positive: {text!r} → categories={result.categories}"
-    )
+    assert result.allowed is True, f"false positive: {text!r} → categories={result.categories}"
 
 
 # ---------------------------------------------------------------------------
@@ -68,9 +66,7 @@ def test_allowed_text_is_not_flagged(text: str) -> None:
         ("BANNED_SPAM_FIXTURE", "spam"),
     ],
 )
-def test_each_category_fires_on_its_sentinel(
-    fixture: str, category: str
-) -> None:
+def test_each_category_fires_on_its_sentinel(fixture: str, category: str) -> None:
     result = moderate_text(fixture, context="unit")
     assert result.allowed is False
     assert category in result.categories

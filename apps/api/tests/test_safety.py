@@ -317,9 +317,7 @@ def _event_payload(**overrides) -> dict:
         "title": "Friendly hoops",
         "sport": "basketball",
         "mode": "casual",
-        "starts_at": (
-            datetime.now(tz=timezone.utc) - timedelta(hours=1)
-        ).isoformat(),
+        "starts_at": (datetime.now(tz=timezone.utc) - timedelta(hours=1)).isoformat(),
         "location_text": "Bondi Court",
         "capacity": 10,
         "visibility": "public",
@@ -369,9 +367,7 @@ async def test_public_create_report_cannot_set_actioned(
 async def test_event_report_create(client: AsyncClient) -> None:
     host_tok, _ = await _register(client, "rep_evt_host@example.com")
     reporter_tok, _ = await _register(client, "rep_evt_reporter@example.com")
-    created = await client.post(
-        "/events", json=_event_payload(), headers=_auth(host_tok)
-    )
+    created = await client.post("/events", json=_event_payload(), headers=_auth(host_tok))
     event_id = created.json()["id"]
 
     r = await client.post(
@@ -407,9 +403,7 @@ async def test_event_report_unknown_event_404(client: AsyncClient) -> None:
 
 async def test_cannot_report_own_event(client: AsyncClient) -> None:
     host_tok, _ = await _register(client, "rep_own_evt@example.com")
-    created = await client.post(
-        "/events", json=_event_payload(), headers=_auth(host_tok)
-    )
+    created = await client.post("/events", json=_event_payload(), headers=_auth(host_tok))
     event_id = created.json()["id"]
     r = await client.post(
         "/reports",
@@ -429,9 +423,7 @@ async def test_event_report_user_target_mismatch_rejected(
     """target_type=user must omit target_event_id."""
     host_tok, _ = await _register(client, "rep_mix_host@example.com")
     other_tok, other_uid = await _register(client, "rep_mix_other@example.com")
-    created = await client.post(
-        "/events", json=_event_payload(), headers=_auth(host_tok)
-    )
+    created = await client.post("/events", json=_event_payload(), headers=_auth(host_tok))
     event_id = created.json()["id"]
     r = await client.post(
         "/reports",

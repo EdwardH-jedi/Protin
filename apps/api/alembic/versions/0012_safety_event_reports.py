@@ -65,17 +65,13 @@ def upgrade() -> None:
             ["id"],
             ondelete="CASCADE",
         )
-    op.create_index(
-        "ix_reports_target_event_id", "reports", ["target_event_id"]
-    )
+    op.create_index("ix_reports_target_event_id", "reports", ["target_event_id"])
 
 
 def downgrade() -> None:
     op.drop_index("ix_reports_target_event_id", table_name="reports")
     with op.batch_alter_table("reports") as batch:
-        batch.drop_constraint(
-            "fk_reports_target_event_id_events", type_="foreignkey"
-        )
+        batch.drop_constraint("fk_reports_target_event_id_events", type_="foreignkey")
         batch.alter_column("reported_id", existing_type=sa.UUID(), nullable=False)
         batch.drop_column("updated_at")
         batch.drop_column("status")

@@ -49,9 +49,7 @@ async def get_my_rank_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> RankProfileRead:
-    return await honor_system_service.get_my_rank_profile(
-        db, current_user.id, sport=sport, area=area
-    )
+    return await honor_system_service.get_my_rank_profile(db, current_user.id, sport=sport, area=area)
 
 
 @rankings_router.get("", response_model=RankingListResponse)
@@ -63,9 +61,7 @@ async def list_rankings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> RankingListResponse:
-    return await honor_system_service.list_rankings(
-        db, sport=sport, area=area, limit=limit, offset=offset
-    )
+    return await honor_system_service.list_rankings(db, sport=sport, area=area, limit=limit, offset=offset)
 
 
 # ---------------------------------------------------------------------------
@@ -84,9 +80,7 @@ async def get_current_honor(
     Returns the current honor title for ``(sport, area)``, or ``null``
     if no title exists yet (no recorded match results in this area).
     """
-    return await honor_system_service.get_current_honor(
-        db, sport=sport, area=area
-    )
+    return await honor_system_service.get_current_honor(db, sport=sport, area=area)
 
 
 @honors_router.get("/me", response_model=list[HonorTitleRead])

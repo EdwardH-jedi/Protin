@@ -40,17 +40,13 @@ from app.db.base import Base
 #                rank/honor was applied exactly once; terminal
 #   disputed   — both participants submitted conflicting results;
 #                rank/honor stays untouched; terminal
-CHALLENGE_STATUSES: frozenset[str] = frozenset(
-    {"pending", "accepted", "declined", "cancelled", "verified", "disputed"}
-)
+CHALLENGE_STATUSES: frozenset[str] = frozenset({"pending", "accepted", "declined", "cancelled", "verified", "disputed"})
 
 # Statuses where the challenge is open to action by either side.
 CHALLENGE_ACTIVE_STATUSES: frozenset[str] = frozenset({"pending", "accepted"})
 
 # Terminal statuses — no further mutation allowed by the service layer.
-CHALLENGE_TERMINAL_STATUSES: frozenset[str] = frozenset(
-    {"declined", "cancelled", "verified", "disputed"}
-)
+CHALLENGE_TERMINAL_STATUSES: frozenset[str] = frozenset({"declined", "cancelled", "verified", "disputed"})
 
 
 class SportsChallenge(Base):
@@ -75,31 +71,19 @@ class SportsChallenge(Base):
     )
     sport: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
     area: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="pending", index=True
-    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
     note: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
     )
-    accepted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    verified_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -135,15 +119,9 @@ class ChallengeResultSubmission(Base):
     submitted_by_user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    winner_user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
-    loser_user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    winner_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    loser_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
         UniqueConstraint(

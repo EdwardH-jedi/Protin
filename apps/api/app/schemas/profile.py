@@ -20,9 +20,7 @@ def _validate_birth_year(value: Optional[int]) -> Optional[int]:
     min_year = current_year - MAX_PROFILE_AGE
     max_year = current_year - MIN_PROFILE_AGE
     if value < min_year or value > max_year:
-        raise ValueError(
-            f"birth_year must be between {min_year} and {max_year}"
-        )
+        raise ValueError(f"birth_year must be between {min_year} and {max_year}")
     return value
 
 

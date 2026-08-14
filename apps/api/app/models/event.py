@@ -20,9 +20,7 @@ from app.db.base import Base
 # Status vocabulary kept as plain strings (no DB enum) so adding new
 # values like "started" later does not require a migration. Service
 # layer validates allowed transitions.
-EVENT_STATUSES: frozenset[str] = frozenset(
-    {"open", "full", "cancelled", "completed"}
-)
+EVENT_STATUSES: frozenset[str] = frozenset({"open", "full", "cancelled", "completed"})
 EVENT_MODES: frozenset[str] = frozenset({"casual", "ranked"})
 EVENT_VISIBILITIES: frozenset[str] = frozenset({"public", "private"})
 EVENT_PARTICIPANT_STATUSES: frozenset[str] = frozenset({"joined", "left"})
@@ -35,16 +33,12 @@ EVENT_PARTICIPANT_STATUSES: frozenset[str] = frozenset({"joined", "left"})
 #   no_show     — expected but did not attend; host-only mark
 #   excused     — could not attend with valid reason (illness, conflict);
 #                 self-report or host mark
-EVENT_ATTENDANCE_STATUSES: frozenset[str] = frozenset(
-    {"pending", "attended", "no_show", "excused"}
-)
+EVENT_ATTENDANCE_STATUSES: frozenset[str] = frozenset({"pending", "attended", "no_show", "excused"})
 # Host can set any of these (including resetting back to pending).
 EVENT_ATTENDANCE_HOST_STATUSES: frozenset[str] = EVENT_ATTENDANCE_STATUSES
 # Participants self-report only positive / excused outcomes — they cannot
 # brand themselves as no_show, and resetting back to pending is host-only.
-EVENT_ATTENDANCE_SELF_STATUSES: frozenset[str] = frozenset(
-    {"attended", "excused"}
-)
+EVENT_ATTENDANCE_SELF_STATUSES: frozenset[str] = frozenset({"attended", "excused"})
 
 
 class Event(Base):
@@ -57,28 +51,20 @@ class Event(Base):
     __tablename__ = "events"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    host_user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    host_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     sport: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
     mode: Mapped[str] = mapped_column(String(20), nullable=False, default="casual")
-    starts_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
-    )
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     location_text: Mapped[str] = mapped_column(String(200), nullable=False)
     capacity: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="public")
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now(), nullable=False
-    )
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    __table_args__ = (
-        CheckConstraint("capacity >= 1", name="ck_events_capacity_min"),
-    )
+    __table_args__ = (CheckConstraint("capacity >= 1", name="ck_events_capacity_min"),)
 
 
 class EventParticipant(Base):
@@ -90,17 +76,11 @@ class EventParticipant(Base):
     __tablename__ = "event_participants"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    event_id: Mapped[UUID] = mapped_column(
-        ForeignKey("events.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    event_id: Mapped[UUID] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="joined")
     joined_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
-    left_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    left_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # Attendance lifecycle is independent of participant lifecycle.
     # status='left' means the user departed before attendance was
     # finalized; attendance_status='no_show' means they were expected
@@ -108,12 +88,8 @@ class EventParticipant(Base):
     attendance_status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="pending", server_default="pending"
     )
-    attendance_confirmed_by_host_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    attendance_self_reported_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    attendance_confirmed_by_host_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    attendance_self_reported_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     attendance_note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     __table_args__ = (

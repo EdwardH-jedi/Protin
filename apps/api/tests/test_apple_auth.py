@@ -40,10 +40,14 @@ def _ec_private_key_pem() -> str:
 
 def _public_pem_from_private(private_pem: str) -> str:
     private_key = serialization.load_pem_private_key(private_pem.encode(), password=None)
-    return private_key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    ).decode()
+    return (
+        private_key.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode()
+    )
 
 
 def _settings(private_pem: str) -> SimpleNamespace:
@@ -161,9 +165,7 @@ async def test_exchange_authorization_code_returns_refresh_token_form_encoded() 
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as http_client:
-        refresh = await exchange_authorization_code(
-            "auth-code-1", settings=_settings(pem), http_client=http_client
-        )
+        refresh = await exchange_authorization_code("auth-code-1", settings=_settings(pem), http_client=http_client)
 
     assert refresh == "rt-fresh"
     assert captured["url"] == APPLE_TOKEN_URL

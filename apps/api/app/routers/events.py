@@ -111,9 +111,7 @@ async def host_update_attendance(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> AttendanceEntry:
-    return await events_service.host_update_attendance(
-        db, event_id, current_user.id, body
-    )
+    return await events_service.host_update_attendance(db, event_id, current_user.id, body)
 
 
 @router.post("/{event_id}/attendance/self", response_model=AttendanceEntry)
@@ -123,6 +121,4 @@ async def self_report_attendance(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> AttendanceEntry:
-    return await events_service.self_report_attendance(
-        db, event_id, current_user.id, body
-    )
+    return await events_service.self_report_attendance(db, event_id, current_user.id, body)

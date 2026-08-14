@@ -163,19 +163,14 @@ async def test_upsert_bot_is_idempotent_across_two_runs(db_session) -> None:
     assert await _count(session, User, email=bot["email"]) == 1
     assert await _count(session, UserProfile, user_id=user_id_first) == 1
 
-    profile = (
-        await session.execute(
-            select(UserProfile).where(UserProfile.user_id == user_id_first)
-        )
-    ).scalar_one()
+    profile = (await session.execute(select(UserProfile).where(UserProfile.user_id == user_id_first))).scalar_one()
 
-    assert (
-        await _count(session, ProfilePhoto, profile_id=profile.id) == bot["photo_count"]
-    ), "photo count must not inflate across re-runs"
-    assert (
-        await _count(session, SportProfile, user_id=user_id_first)
-        == len(bot["sport_profiles"])
-    ), "sport profile count must not inflate across re-runs"
+    assert await _count(session, ProfilePhoto, profile_id=profile.id) == bot["photo_count"], (
+        "photo count must not inflate across re-runs"
+    )
+    assert await _count(session, SportProfile, user_id=user_id_first) == len(bot["sport_profiles"]), (
+        "sport profile count must not inflate across re-runs"
+    )
 
 
 async def test_upsert_bot_seeds_all_five_bots_idempotently(db_session) -> None:
@@ -210,20 +205,12 @@ async def test_upsert_bot_drops_sports_removed_from_config(db_session) -> None:
     assert await _count(session, SportProfile, user_id=user_id) == 2
 
     # Drop "running" from the configured set.
-    bot["sport_profiles"] = [
-        sp for sp in bot["sport_profiles"] if sp["sport"] != "running"
-    ]
+    bot["sport_profiles"] = [sp for sp in bot["sport_profiles"] if sp["sport"] != "running"]
     await seed_bots._upsert_bot(session, bot, str(media_root), "/media")
     await session.commit()
 
-    rows = (
-        await session.execute(
-            select(SportProfile.sport).where(SportProfile.user_id == user_id)
-        )
-    ).scalars().all()
-    assert list(rows) == ["tennis"], (
-        f"expected only the configured sport to remain, got {rows}"
-    )
+    rows = (await session.execute(select(SportProfile.sport).where(SportProfile.user_id == user_id))).scalars().all()
+    assert list(rows) == ["tennis"], f"expected only the configured sport to remain, got {rows}"
 
 
 async def test_upsert_bot_reactivates_a_deactivated_user(db_session) -> None:
@@ -235,9 +222,7 @@ async def test_upsert_bot_reactivates_a_deactivated_user(db_session) -> None:
     user_id = await seed_bots._upsert_bot(session, bot, str(media_root), "/media")
     await session.commit()
 
-    user = (
-        await session.execute(select(User).where(User.id == user_id))
-    ).scalar_one()
+    user = (await session.execute(select(User).where(User.id == user_id))).scalar_one()
     user.is_active = False
     await session.commit()
     assert user.is_active is False
@@ -245,7 +230,5 @@ async def test_upsert_bot_reactivates_a_deactivated_user(db_session) -> None:
     await seed_bots._upsert_bot(session, bot, str(media_root), "/media")
     await session.commit()
 
-    refreshed = (
-        await session.execute(select(User).where(User.id == user_id))
-    ).scalar_one()
+    refreshed = (await session.execute(select(User).where(User.id == user_id))).scalar_one()
     assert refreshed.is_active is True, "re-seeding must reactivate the bot user"

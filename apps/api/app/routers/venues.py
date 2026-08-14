@@ -42,10 +42,7 @@ async def get_nearby_venues(
     request: Request,
     sport: str = Query(
         ...,
-        description=(
-            "Sport filter, e.g. tennis|basketball|badminton|soccer|football|"
-            "running|gym|golf"
-        ),
+        description=("Sport filter, e.g. tennis|basketball|badminton|soccer|football|running|gym|golf"),
     ),
     lat: float | None = Query(None, ge=-90.0, le=90.0),
     lng: float | None = Query(None, ge=-180.0, le=180.0),

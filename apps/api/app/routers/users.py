@@ -30,9 +30,7 @@ async def get_profile(
     db: AsyncSession = Depends(get_db),
 ) -> UserProfile:
     result = await db.execute(
-        select(UserProfile)
-        .options(selectinload(UserProfile.photos))
-        .where(UserProfile.user_id == current_user.id)
+        select(UserProfile).options(selectinload(UserProfile.photos)).where(UserProfile.user_id == current_user.id)
     )
     profile = result.scalar_one_or_none()
     if profile is None:
@@ -47,9 +45,7 @@ async def upsert_profile(
     db: AsyncSession = Depends(get_db),
 ) -> UserProfile:
     result = await db.execute(
-        select(UserProfile)
-        .options(selectinload(UserProfile.photos))
-        .where(UserProfile.user_id == current_user.id)
+        select(UserProfile).options(selectinload(UserProfile.photos)).where(UserProfile.user_id == current_user.id)
     )
     profile = result.scalar_one_or_none()
 
@@ -64,9 +60,7 @@ async def upsert_profile(
     # Re-fetch with the photos relationship eagerly loaded so the response
     # serialization does not trigger a lazy load on the async session.
     refreshed = await db.execute(
-        select(UserProfile)
-        .options(selectinload(UserProfile.photos))
-        .where(UserProfile.user_id == current_user.id)
+        select(UserProfile).options(selectinload(UserProfile.photos)).where(UserProfile.user_id == current_user.id)
     )
     return refreshed.scalar_one()
 
@@ -172,10 +166,7 @@ async def replace_profile_photos(
     media_storage.clear_user_photos(current_user.id)
     urls = media_storage.save_user_photos(current_user.id, files)
 
-    new_photos = [
-        ProfilePhoto(profile_id=profile.id, photo_url=url, position=index)
-        for index, url in enumerate(urls)
-    ]
+    new_photos = [ProfilePhoto(profile_id=profile.id, photo_url=url, position=index) for index, url in enumerate(urls)]
     db.add_all(new_photos)
 
     profile.avatar_url = urls[0]

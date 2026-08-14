@@ -21,9 +21,7 @@ async def list_bookings(
     db: AsyncSession = Depends(get_db),
 ) -> BookingListResponse:
     statuses = [s.strip() for s in status.split(",") if s.strip()] if status else None
-    return await bookings_service.list_bookings(
-        db, current_user.id, limit, offset, statuses, match_id
-    )
+    return await bookings_service.list_bookings(db, current_user.id, limit, offset, statuses, match_id)
 
 
 @router.post("", response_model=BookingResponse, status_code=201)

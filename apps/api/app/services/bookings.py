@@ -78,9 +78,7 @@ async def _to_response(db: AsyncSession, booking: Booking, current_user_id: UUID
     partner = await _build_partner_card(db, other_id, booking.sport)
     venue_payload = None
     if booking.venue_id is not None:
-        venue = (
-            await db.execute(select(Venue).where(Venue.id == booking.venue_id))
-        ).scalar_one_or_none()
+        venue = (await db.execute(select(Venue).where(Venue.id == booking.venue_id))).scalar_one_or_none()
         if venue is not None:
             venue_payload = _venue_to_response(venue, distance_km=None)
     return BookingResponse(
@@ -137,13 +135,9 @@ async def create_booking(
 
     venue_id_to_persist = None
     if req.venue_id is not None:
-        venue = (
-            await db.execute(select(Venue).where(Venue.id == req.venue_id))
-        ).scalar_one_or_none()
+        venue = (await db.execute(select(Venue).where(Venue.id == req.venue_id))).scalar_one_or_none()
         if venue is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Venue not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venue not found")
         if req.sport not in (venue.sport_tags or []):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -233,9 +227,7 @@ async def transition_booking(
     # Sports Reputation hook: emit rank/honor events. Same DB session, no
     # commit here — the booking commit at the bottom of the function flushes
     # both the booking mutation and the new ledger rows atomically.
-    await rank_service.record_booking_transition(
-        db, b, previous_status, new_status, current_user_id
-    )
+    await rank_service.record_booking_transition(db, b, previous_status, new_status, current_user_id)
 
     # Determine who to notify and what type of notification to send
     other_id = b.partner_id if b.proposer_id == current_user_id else b.proposer_id

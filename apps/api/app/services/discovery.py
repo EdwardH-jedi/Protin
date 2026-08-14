@@ -34,9 +34,7 @@ def _score_compatibility(
     Weights: 60% skill-level proximity, 40% preferred-time overlap.
     'flexible' in either party's times counts as a full time match.
     """
-    level_score = 1.0 - abs(
-        _LEVEL_ORDER.get(actor_level, 1) - _LEVEL_ORDER.get(target_sp.level, 1)
-    ) / 2.0
+    level_score = 1.0 - abs(_LEVEL_ORDER.get(actor_level, 1) - _LEVEL_ORDER.get(target_sp.level, 1)) / 2.0
 
     actor_set = set(actor_times or [])
     target_set = set(target_sp.preferred_times or [])

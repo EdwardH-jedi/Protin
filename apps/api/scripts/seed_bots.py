@@ -159,12 +159,7 @@ def _make_solid_png(width: int, height: int, rgb: tuple[int, int, int]) -> bytes
     """Return PNG bytes for a solid-color rectangle. Pure stdlib."""
 
     def _chunk(typ: bytes, data: bytes) -> bytes:
-        return (
-            struct.pack(">I", len(data))
-            + typ
-            + data
-            + struct.pack(">I", zlib.crc32(typ + data) & 0xFFFFFFFF)
-        )
+        return struct.pack(">I", len(data)) + typ + data + struct.pack(">I", zlib.crc32(typ + data) & 0xFFFFFFFF)
 
     sig = b"\x89PNG\r\n\x1a\n"
     # 8-bit RGB, no palette, no interlace
@@ -258,16 +253,10 @@ async def _upsert_bot(
         profile.bio = bot["bio"]
 
     # 3. Photos (replace-all: delete rows + files, regenerate).
-    await session.execute(
-        delete(ProfilePhoto).where(ProfilePhoto.profile_id == profile.id)
-    )
-    urls = _write_bot_photos(
-        user.id, bot["color"], bot["photo_count"], media_root, media_url_prefix
-    )
+    await session.execute(delete(ProfilePhoto).where(ProfilePhoto.profile_id == profile.id))
+    urls = _write_bot_photos(user.id, bot["color"], bot["photo_count"], media_root, media_url_prefix)
     for idx, url in enumerate(urls):
-        session.add(
-            ProfilePhoto(profile_id=profile.id, photo_url=url, position=idx)
-        )
+        session.add(ProfilePhoto(profile_id=profile.id, photo_url=url, position=idx))
     profile.avatar_url = urls[0] if urls else None
 
     # 4. Sport profiles.
@@ -307,8 +296,7 @@ async def seed() -> int:
     settings = get_settings()
     if settings.app_env != "local":
         print(
-            f"[seed_bots] Refusing to run in app_env={settings.app_env!r}. "
-            "This script is local/dev only.",
+            f"[seed_bots] Refusing to run in app_env={settings.app_env!r}. This script is local/dev only.",
             file=sys.stderr,
         )
         return 1
@@ -319,9 +307,7 @@ async def seed() -> int:
     try:
         async with Session() as session:
             for bot in _BOTS:
-                user_id = await _upsert_bot(
-                    session, bot, settings.media_root, settings.media_url_prefix
-                )
+                user_id = await _upsert_bot(session, bot, settings.media_root, settings.media_url_prefix)
                 print(f"[seed_bots] upserted {bot['email']:<28} -> user_id={user_id}")
             await session.commit()
     finally:

@@ -112,10 +112,7 @@ class Settings(BaseSettings):
         # If a developer set TOURNAMENTS_ENABLED in their env (true OR
         # false), respect it. Otherwise auto-flip to True in local dev so
         # the V2 Tournaments surface is reachable without extra setup.
-        if (
-            self.app_env == "local"
-            and "tournaments_enabled" not in self.model_fields_set
-        ):
+        if self.app_env == "local" and "tournaments_enabled" not in self.model_fields_set:
             self.tournaments_enabled = True
 
     @property

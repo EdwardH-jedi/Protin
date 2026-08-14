@@ -100,9 +100,7 @@ def test_seed_rows_cover_supported_sports(seed_payload: list[dict]) -> None:
     all_tags: set[str] = set()
     for entry in seed_payload:
         tags = entry["sport_tags"]
-        assert isinstance(tags, list) and tags, (
-            f"{entry.get('name')!r} is missing sport_tags"
-        )
+        assert isinstance(tags, list) and tags, f"{entry.get('name')!r} is missing sport_tags"
         all_tags.update(tags)
     covered = all_tags & supported
     assert covered, (

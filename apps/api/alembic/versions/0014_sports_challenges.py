@@ -59,12 +59,8 @@ def upgrade() -> None:
         sa.Column("verified_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
-        sa.ForeignKeyConstraint(
-            ["challenger_user_id"], ["users.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["opponent_user_id"], ["users.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["challenger_user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["opponent_user_id"], ["users.id"], ondelete="CASCADE"),
         sa.CheckConstraint(
             "challenger_user_id <> opponent_user_id",
             name="ck_sports_challenges_distinct_users",
@@ -82,9 +78,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_sports_challenges_sport", "sports_challenges", ["sport"])
     op.create_index("ix_sports_challenges_area", "sports_challenges", ["area"])
-    op.create_index(
-        "ix_sports_challenges_status", "sports_challenges", ["status"]
-    )
+    op.create_index("ix_sports_challenges_status", "sports_challenges", ["status"])
 
     op.create_table(
         "challenge_result_submissions",
@@ -100,18 +94,10 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.ForeignKeyConstraint(
-            ["challenge_id"], ["sports_challenges.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["submitted_by_user_id"], ["users.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["winner_user_id"], ["users.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["loser_user_id"], ["users.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["challenge_id"], ["sports_challenges.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["submitted_by_user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["winner_user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["loser_user_id"], ["users.id"], ondelete="CASCADE"),
         sa.UniqueConstraint(
             "challenge_id",
             "submitted_by_user_id",
@@ -148,9 +134,7 @@ def downgrade() -> None:
     op.drop_index("ix_sports_challenges_status", table_name="sports_challenges")
     op.drop_index("ix_sports_challenges_area", table_name="sports_challenges")
     op.drop_index("ix_sports_challenges_sport", table_name="sports_challenges")
-    op.drop_index(
-        "ix_sports_challenges_opponent_user_id", table_name="sports_challenges"
-    )
+    op.drop_index("ix_sports_challenges_opponent_user_id", table_name="sports_challenges")
     op.drop_index(
         "ix_sports_challenges_challenger_user_id",
         table_name="sports_challenges",

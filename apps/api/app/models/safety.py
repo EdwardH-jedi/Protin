@@ -12,9 +12,7 @@ from app.db.base import Base
 # Moderation lifecycle for a report. Only "actioned" feeds Honor; the
 # others are inert. Service-layer validates the vocabulary; the DB
 # column is a free-form String so new states do not require migrations.
-REPORT_STATUSES: frozenset[str] = frozenset(
-    {"submitted", "reviewed", "dismissed", "actioned"}
-)
+REPORT_STATUSES: frozenset[str] = frozenset({"submitted", "reviewed", "dismissed", "actioned"})
 REPORT_TARGET_TYPES: frozenset[str] = frozenset({"user", "event"})
 
 
@@ -39,9 +37,7 @@ class Report(Base):
         nullable=False,
         index=True,
     )
-    target_type: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="user", server_default="user"
-    )
+    target_type: Mapped[str] = mapped_column(String(20), nullable=False, default="user", server_default="user")
     # Relaxed to nullable in V1.1 so target_type='event' reports may
     # omit a user target. Legacy user reports keep populating it.
     reported_id: Mapped[UUID | None] = mapped_column(
@@ -59,9 +55,7 @@ class Report(Base):
     # | unsafe_behavior (V1.1)
     reason: Mapped[str] = mapped_column(String(50), nullable=False)
     context: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="submitted", server_default="submitted"
-    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="submitted", server_default="submitted")
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

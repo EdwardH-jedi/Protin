@@ -28,15 +28,11 @@ def upgrade() -> None:
         sa.Column("user_id", sa.UUID(), nullable=False),
         sa.Column("sport", sa.String(30), nullable=False),
         sa.Column("area", sa.String(80), nullable=False),
-        sa.Column(
-            "rating", sa.Integer(), nullable=False, server_default="1000"
-        ),
+        sa.Column("rating", sa.Integer(), nullable=False, server_default="1000"),
         sa.Column("wins", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("losses", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("streak", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column(
-            "last_played_at", sa.DateTime(timezone=True), nullable=True
-        ),
+        sa.Column("last_played_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -51,9 +47,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.UniqueConstraint(
-            "user_id", "sport", "area", name="uq_rank_profiles_user_sport_area"
-        ),
+        sa.UniqueConstraint("user_id", "sport", "area", name="uq_rank_profiles_user_sport_area"),
         sa.CheckConstraint("rating >= 0", name="ck_rank_profiles_rating_min"),
         sa.CheckConstraint("wins >= 0", name="ck_rank_profiles_wins_min"),
         sa.CheckConstraint("losses >= 0", name="ck_rank_profiles_losses_min"),
@@ -89,12 +83,8 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.ForeignKeyConstraint(
-            ["current_holder_user_id"], ["users.id"], ondelete="SET NULL"
-        ),
-        sa.UniqueConstraint(
-            "sport", "area", "title_name", name="uq_honor_titles_sport_area_name"
-        ),
+        sa.ForeignKeyConstraint(["current_holder_user_id"], ["users.id"], ondelete="SET NULL"),
+        sa.UniqueConstraint("sport", "area", "title_name", name="uq_honor_titles_sport_area_name"),
     )
     op.create_index("ix_honor_titles_sport", "honor_titles", ["sport"])
     op.create_index("ix_honor_titles_area", "honor_titles", ["area"])
@@ -118,18 +108,11 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.ForeignKeyConstraint(
-            ["honor_title_id"], ["honor_titles.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["previous_holder_user_id"], ["users.id"], ondelete="SET NULL"
-        ),
-        sa.ForeignKeyConstraint(
-            ["new_holder_user_id"], ["users.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["honor_title_id"], ["honor_titles.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["previous_holder_user_id"], ["users.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["new_holder_user_id"], ["users.id"], ondelete="CASCADE"),
         sa.CheckConstraint(
-            "previous_holder_user_id IS NULL "
-            "OR previous_holder_user_id <> new_holder_user_id",
+            "previous_holder_user_id IS NULL OR previous_holder_user_id <> new_holder_user_id",
             name="ck_honor_history_distinct_users",
         ),
     )
@@ -151,20 +134,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_honor_history_new_holder_user_id", table_name="honor_history"
-    )
-    op.drop_index(
-        "ix_honor_history_previous_holder_user_id", table_name="honor_history"
-    )
-    op.drop_index(
-        "ix_honor_history_honor_title_id", table_name="honor_history"
-    )
+    op.drop_index("ix_honor_history_new_holder_user_id", table_name="honor_history")
+    op.drop_index("ix_honor_history_previous_holder_user_id", table_name="honor_history")
+    op.drop_index("ix_honor_history_honor_title_id", table_name="honor_history")
     op.drop_table("honor_history")
 
-    op.drop_index(
-        "ix_honor_titles_current_holder_user_id", table_name="honor_titles"
-    )
+    op.drop_index("ix_honor_titles_current_holder_user_id", table_name="honor_titles")
     op.drop_index("ix_honor_titles_area", table_name="honor_titles")
     op.drop_index("ix_honor_titles_sport", table_name="honor_titles")
     op.drop_table("honor_titles")

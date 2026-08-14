@@ -29,9 +29,7 @@ from app.models import (  # noqa: F401  — populate Base.metadata
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-_engine = create_async_engine(
-    TEST_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+_engine = create_async_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
 _TestSession = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
 
 
@@ -60,9 +58,7 @@ async def _override_get_redis() -> AsyncGenerator:
 async def client() -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_redis] = _override_get_redis
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
 
@@ -73,9 +69,7 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
 
 
 async def _register(client: AsyncClient, email: str) -> tuple[str, str]:
-    r = await client.post(
-        "/auth/register", json={"email": email, "password": "password123"}
-    )
+    r = await client.post("/auth/register", json={"email": email, "password": "password123"})
     token = r.json()["access_token"]
     me = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     return token, me.json()["id"]
@@ -89,9 +83,7 @@ def _payload(**overrides) -> dict:
     # Default to a `starts_at` slightly in the past so existing
     # attendance-flow tests pass the new time-eligibility gate. Tests
     # that need a future event explicitly pass `starts_at` themselves.
-    starts_at = (
-        datetime.now(tz=timezone.utc) - timedelta(hours=1)
-    ).isoformat()
+    starts_at = (datetime.now(tz=timezone.utc) - timedelta(hours=1)).isoformat()
     body = {
         "title": "Bondi pickup hoops",
         "sport": "basketball",
@@ -119,11 +111,7 @@ async def _set_event_starts_at(event_id: str, when: datetime) -> None:
     from app.models.event import Event
 
     async with _TestSession() as db:
-        await db.execute(
-            update(Event)
-            .where(Event.id == UUID(event_id))
-            .values(starts_at=when)
-        )
+        await db.execute(update(Event).where(Event.id == UUID(event_id)).values(starts_at=when))
         await db.commit()
 
 
@@ -245,9 +233,7 @@ async def test_create_event_allows_normal_venue_name_in_location_text(
 
     r = await client.post(
         "/events",
-        json=_payload(
-            location_text="Anytime Fitness Surry Hills, 428 Crown St"
-        ),
+        json=_payload(location_text="Anytime Fitness Surry Hills, 428 Crown St"),
         headers=_auth(token),
     )
     assert r.status_code == 201, r.text
@@ -257,9 +243,7 @@ async def test_create_event_capacity_must_be_positive(client: AsyncClient) -> No
     await _wipe_events()
     token, _ = await _register(client, "evt_cap0@example.com")
 
-    r = await client.post(
-        "/events", json=_payload(capacity=0), headers=_auth(token)
-    )
+    r = await client.post("/events", json=_payload(capacity=0), headers=_auth(token))
     assert r.status_code == 422
 
 
@@ -267,9 +251,7 @@ async def test_create_event_rejects_private_for_now(client: AsyncClient) -> None
     await _wipe_events()
     token, _ = await _register(client, "evt_private@example.com")
 
-    r = await client.post(
-        "/events", json=_payload(visibility="private"), headers=_auth(token)
-    )
+    r = await client.post("/events", json=_payload(visibility="private"), headers=_auth(token))
     assert r.status_code == 422
 
 
@@ -297,9 +279,7 @@ async def test_list_returns_empty_for_fresh_user_with_no_events(
 async def test_list_returns_open_events(client: AsyncClient) -> None:
     await _wipe_events()
     token, _ = await _register(client, "evt_list@example.com")
-    create = await client.post(
-        "/events", json=_payload(title="Soccer kickabout", sport="soccer"), headers=_auth(token)
-    )
+    create = await client.post("/events", json=_payload(title="Soccer kickabout", sport="soccer"), headers=_auth(token))
     assert create.status_code == 201
 
     r = await client.get("/events", headers=_auth(token))
@@ -361,9 +341,7 @@ async def test_detail_returns_participants(client: AsyncClient) -> None:
 
 async def test_detail_unknown_event_returns_404(client: AsyncClient) -> None:
     token, _ = await _register(client, "evt_404@example.com")
-    r = await client.get(
-        "/events/00000000-0000-0000-0000-000000000999", headers=_auth(token)
-    )
+    r = await client.get("/events/00000000-0000-0000-0000-000000000999", headers=_auth(token))
     assert r.status_code == 404
 
 
@@ -417,9 +395,7 @@ async def test_capacity_enforced_and_status_flips_to_full(client: AsyncClient) -
     b_tok, _ = await _register(client, "evt_cap_b@example.com")
     c_tok, _ = await _register(client, "evt_cap_c@example.com")
 
-    created = await client.post(
-        "/events", json=_payload(capacity=2), headers=_auth(a_tok)
-    )
+    created = await client.post("/events", json=_payload(capacity=2), headers=_auth(a_tok))
     event_id = created.json()["id"]
     # Host already filled slot 1; B fills slot 2 — flips to full.
     fill = await client.post(f"/events/{event_id}/join", headers=_auth(b_tok))
@@ -456,9 +432,7 @@ async def test_full_to_open_round_trip(client: AsyncClient) -> None:
     a_tok, _ = await _register(client, "evt_cycle_a@example.com")
     b_tok, _ = await _register(client, "evt_cycle_b@example.com")
 
-    created = await client.post(
-        "/events", json=_payload(capacity=2), headers=_auth(a_tok)
-    )
+    created = await client.post("/events", json=_payload(capacity=2), headers=_auth(a_tok))
     event_id = created.json()["id"]
 
     fill = await client.post(f"/events/{event_id}/join", headers=_auth(b_tok))
@@ -530,9 +504,7 @@ async def test_host_cannot_leave_own_event(client: AsyncClient) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def _seed_private_event(
-    *, host_user_id: str, title: str = "Friends only"
-) -> str:
+async def _seed_private_event(*, host_user_id: str, title: str = "Friends only") -> str:
     """
     Seed a private event directly via the ORM — the public POST /events
     rejects visibility='private' for now, so we go around it to verify
@@ -599,9 +571,7 @@ async def test_private_event_visible_to_active_participant(
 
     await _wipe_events()
     host_tok, host_uid = await _register(client, "evt_priv_host_p@example.com")
-    member_tok, member_uid = await _register(
-        client, "evt_priv_member@example.com"
-    )
+    member_tok, member_uid = await _register(client, "evt_priv_member@example.com")
     event_id = await _seed_private_event(host_user_id=host_uid)
 
     # Inject the member as a joined participant. POST /events/{id}/join
@@ -972,9 +942,7 @@ async def test_non_participant_cannot_read_attendance(client: AsyncClient) -> No
     created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
     event_id = created.json()["id"]
 
-    r = await client.get(
-        f"/events/{event_id}/attendance", headers=_auth(outsider_tok)
-    )
+    r = await client.get(f"/events/{event_id}/attendance", headers=_auth(outsider_tok))
     assert r.status_code == 404
 
 
@@ -989,9 +957,7 @@ async def _set_event_status(event_id: str, new_status: str) -> None:
     from app.models.event import Event
 
     async with _TestSession() as db:
-        await db.execute(
-            update(Event).where(Event.id == UUID(event_id)).values(status=new_status)
-        )
+        await db.execute(update(Event).where(Event.id == UUID(event_id)).values(status=new_status))
         await db.commit()
 
 
@@ -1093,9 +1059,7 @@ async def test_private_event_outsider_cannot_get_attendance(
     outsider_tok, _ = await _register(client, "evt_pga_out@example.com")
     event_id = await _seed_private_event(host_user_id=host_uid)
 
-    r = await client.get(
-        f"/events/{event_id}/attendance", headers=_auth(outsider_tok)
-    )
+    r = await client.get(f"/events/{event_id}/attendance", headers=_auth(outsider_tok))
     assert r.status_code == 404
 
 
@@ -1184,9 +1148,7 @@ async def test_completed_event_cannot_be_cancelled(client: AsyncClient) -> None:
     host_tok, _ = await _register(client, "evt_cxl_complete@example.com")
     created = await client.post("/events", json=_payload(), headers=_auth(host_tok))
     event_id = created.json()["id"]
-    complete = await client.post(
-        f"/events/{event_id}/complete", headers=_auth(host_tok)
-    )
+    complete = await client.post(f"/events/{event_id}/complete", headers=_auth(host_tok))
     assert complete.status_code == 200
     assert complete.json()["status"] == "completed"
 
@@ -1387,9 +1349,7 @@ async def test_self_attendance_on_completed_event_allowed(
 # --- Hide-as-404 preserved on cancel/complete ------------------------------
 
 
-async def _seed_private_event_lifecycle(
-    *, host_user_id: str, status_value: str = "open"
-) -> str:
+async def _seed_private_event_lifecycle(*, host_user_id: str, status_value: str = "open") -> str:
     from uuid import UUID, uuid4
 
     from app.models.event import Event, EventParticipant
@@ -1409,11 +1369,7 @@ async def _seed_private_event_lifecycle(
         )
         db.add(e)
         await db.flush()
-        db.add(
-            EventParticipant(
-                event_id=e.id, user_id=UUID(host_user_id), status="joined"
-            )
-        )
+        db.add(EventParticipant(event_id=e.id, user_id=UUID(host_user_id), status="joined"))
         await db.commit()
         return str(e.id)
 
@@ -1434,9 +1390,7 @@ async def test_private_outsider_cannot_complete(client: AsyncClient) -> None:
     outsider_tok, _ = await _register(client, "evt_priv_dn_out@example.com")
     event_id = await _seed_private_event_lifecycle(host_user_id=host_uid)
 
-    r = await client.post(
-        f"/events/{event_id}/complete", headers=_auth(outsider_tok)
-    )
+    r = await client.post(f"/events/{event_id}/complete", headers=_auth(outsider_tok))
     assert r.status_code == 404
 
 
@@ -1447,38 +1401,22 @@ async def test_private_outsider_cannot_complete(client: AsyncClient) -> None:
 
 
 @pytest.mark.parametrize("event_status", ["cancelled", "completed"])
-async def test_private_outsider_join_terminal_event_gets_404_not_422(
-    client: AsyncClient, event_status: str
-) -> None:
+async def test_private_outsider_join_terminal_event_gets_404_not_422(client: AsyncClient, event_status: str) -> None:
     await _wipe_events()
-    _, host_uid = await _register(
-        client, f"evt_priv_join_terminal_host_{event_status}@example.com"
-    )
-    outsider_tok, _ = await _register(
-        client, f"evt_priv_join_terminal_out_{event_status}@example.com"
-    )
-    event_id = await _seed_private_event_lifecycle(
-        host_user_id=host_uid, status_value=event_status
-    )
+    _, host_uid = await _register(client, f"evt_priv_join_terminal_host_{event_status}@example.com")
+    outsider_tok, _ = await _register(client, f"evt_priv_join_terminal_out_{event_status}@example.com")
+    event_id = await _seed_private_event_lifecycle(host_user_id=host_uid, status_value=event_status)
 
     r = await client.post(f"/events/{event_id}/join", headers=_auth(outsider_tok))
     assert r.status_code == 404, r.text
 
 
 @pytest.mark.parametrize("event_status", ["cancelled", "completed"])
-async def test_private_outsider_leave_terminal_event_gets_404_not_422(
-    client: AsyncClient, event_status: str
-) -> None:
+async def test_private_outsider_leave_terminal_event_gets_404_not_422(client: AsyncClient, event_status: str) -> None:
     await _wipe_events()
-    _, host_uid = await _register(
-        client, f"evt_priv_leave_terminal_host_{event_status}@example.com"
-    )
-    outsider_tok, _ = await _register(
-        client, f"evt_priv_leave_terminal_out_{event_status}@example.com"
-    )
-    event_id = await _seed_private_event_lifecycle(
-        host_user_id=host_uid, status_value=event_status
-    )
+    _, host_uid = await _register(client, f"evt_priv_leave_terminal_host_{event_status}@example.com")
+    outsider_tok, _ = await _register(client, f"evt_priv_leave_terminal_out_{event_status}@example.com")
+    event_id = await _seed_private_event_lifecycle(host_user_id=host_uid, status_value=event_status)
 
     r = await client.post(f"/events/{event_id}/leave", headers=_auth(outsider_tok))
     assert r.status_code == 404, r.text

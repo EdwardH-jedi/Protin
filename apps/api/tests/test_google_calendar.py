@@ -16,9 +16,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 
-def _future_booking_window(
-    *, days_from_now: int = 7, duration_hours: int = 1
-) -> tuple[str, str]:
+def _future_booking_window(*, days_from_now: int = 7, duration_hours: int = 1) -> tuple[str, str]:
     """
     Return (starts_at, ends_at) ISO strings safely in the future.
 
@@ -33,6 +31,7 @@ def _future_booking_window(
     starts_iso = starts.replace(microsecond=0).isoformat().replace("+00:00", "Z")
     ends_iso = ends.replace(microsecond=0).isoformat().replace("+00:00", "Z")
     return starts_iso, ends_iso
+
 
 from app.db.base import Base
 from app.db.redis import get_redis

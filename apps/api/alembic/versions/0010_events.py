@@ -78,12 +78,8 @@ def upgrade() -> None:
             name="uq_event_participants_event_user_status",
         ),
     )
-    op.create_index(
-        "ix_event_participants_event_id", "event_participants", ["event_id"]
-    )
-    op.create_index(
-        "ix_event_participants_user_id", "event_participants", ["user_id"]
-    )
+    op.create_index("ix_event_participants_event_id", "event_participants", ["event_id"])
+    op.create_index("ix_event_participants_user_id", "event_participants", ["user_id"])
 
 
 def downgrade() -> None:

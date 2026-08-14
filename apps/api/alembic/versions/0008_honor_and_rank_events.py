@@ -41,9 +41,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["booking_id"], ["bookings.id"], ondelete="SET NULL"
-        ),
+        sa.ForeignKeyConstraint(["booking_id"], ["bookings.id"], ondelete="SET NULL"),
     )
     op.create_index("ix_honor_events_user_id", "honor_events", ["user_id"])
     op.create_index("ix_honor_events_booking_id", "honor_events", ["booking_id"])
@@ -64,9 +62,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["booking_id"], ["bookings.id"], ondelete="SET NULL"
-        ),
+        sa.ForeignKeyConstraint(["booking_id"], ["bookings.id"], ondelete="SET NULL"),
     )
     op.create_index("ix_rank_events_user_id", "rank_events", ["user_id"])
     op.create_index("ix_rank_events_sport", "rank_events", ["sport"])

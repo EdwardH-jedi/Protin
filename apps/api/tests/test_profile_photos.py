@@ -87,10 +87,7 @@ async def photo_client(tmp_path, monkeypatch) -> AsyncGenerator[tuple[AsyncClien
 
 
 def _files(count: int) -> list[tuple[str, tuple[str, bytes, str]]]:
-    return [
-        ("files", (f"photo{i}.jpg", b"\xff\xd8\xff\xe0fake-jpeg-bytes", "image/jpeg"))
-        for i in range(count)
-    ]
+    return [("files", (f"photo{i}.jpg", b"\xff\xd8\xff\xe0fake-jpeg-bytes", "image/jpeg")) for i in range(count)]
 
 
 async def test_replace_profile_photos_two_files(photo_client) -> None:

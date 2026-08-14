@@ -310,9 +310,7 @@ async def sync_booking(
     if booking.venue_id is not None:
         from app.models.venue import Venue
 
-        venue = (
-            await db.execute(select(Venue).where(Venue.id == booking.venue_id))
-        ).scalar_one_or_none()
+        venue = (await db.execute(select(Venue).where(Venue.id == booking.venue_id))).scalar_one_or_none()
 
     event_body = _booking_to_event(booking, partner_name, venue=venue)
     headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}

@@ -26,18 +26,14 @@ from app.db.base import Base
 #   closed      — registration cut off but tournament has not run yet
 #   completed   — tournament happened
 #   cancelled   — organizer cancelled
-TOURNAMENT_STATUSES: frozenset[str] = frozenset(
-    {"draft", "open", "full", "closed", "completed", "cancelled"}
-)
+TOURNAMENT_STATUSES: frozenset[str] = frozenset({"draft", "open", "full", "closed", "completed", "cancelled"})
 
 
 class Tournament(Base):
     __tablename__ = "tournaments"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    organizer_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    organizer_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     sport: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     description: Mapped[Optional[str]] = mapped_column(String(1000))
@@ -49,13 +45,9 @@ class Tournament(Base):
     capacity: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now(), nullable=False
-    )
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    __table_args__ = (
-        CheckConstraint("capacity >= 2", name="ck_tournaments_capacity_min"),
-    )
+    __table_args__ = (CheckConstraint("capacity >= 2", name="ck_tournaments_capacity_min"),)
 
 
 class TournamentParticipant(Base):
@@ -68,10 +60,6 @@ class TournamentParticipant(Base):
 
     __tablename__ = "tournament_participants"
 
-    tournament_id: Mapped[UUID] = mapped_column(
-        ForeignKey("tournaments.id", ondelete="CASCADE"), primary_key=True
-    )
-    user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
+    tournament_id: Mapped[UUID] = mapped_column(ForeignKey("tournaments.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     joined_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)

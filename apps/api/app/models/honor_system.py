@@ -66,26 +66,18 @@ class RankProfile(Base):
     __tablename__ = "rank_profiles"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     sport: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
     area: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
-    rating: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=DEFAULT_RATING
-    )
+    rating: Mapped[int] = mapped_column(Integer, nullable=False, default=DEFAULT_RATING)
     wins: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     losses: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # Winning-streak counter. Increments on a win, resets to 0 on a
     # loss. Kept positive-only for MVP so the UI can show "5 in a row"
     # without an extra sign-handling rule.
     streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    last_played_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    last_played_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -94,9 +86,7 @@ class RankProfile(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint(
-            "user_id", "sport", "area", name="uq_rank_profiles_user_sport_area"
-        ),
+        UniqueConstraint("user_id", "sport", "area", name="uq_rank_profiles_user_sport_area"),
         CheckConstraint("rating >= 0", name="ck_rank_profiles_rating_min"),
         CheckConstraint("wins >= 0", name="ck_rank_profiles_wins_min"),
         CheckConstraint("losses >= 0", name="ck_rank_profiles_losses_min"),
@@ -135,12 +125,8 @@ class HonorTitle(Base):
     current_holder_user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, server_default="1"
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -148,11 +134,7 @@ class HonorTitle(Base):
         nullable=False,
     )
 
-    __table_args__ = (
-        UniqueConstraint(
-            "sport", "area", "title_name", name="uq_honor_titles_sport_area_name"
-        ),
-    )
+    __table_args__ = (UniqueConstraint("sport", "area", "title_name", name="uq_honor_titles_sport_area_name"),)
 
 
 class HonorHistory(Base):
@@ -186,14 +168,11 @@ class HonorHistory(Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     source_match_id: Mapped[UUID | None] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
         CheckConstraint(
-            "previous_holder_user_id IS NULL "
-            "OR previous_holder_user_id <> new_holder_user_id",
+            "previous_holder_user_id IS NULL OR previous_holder_user_id <> new_holder_user_id",
             name="ck_honor_history_distinct_users",
         ),
     )

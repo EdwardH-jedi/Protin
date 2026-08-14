@@ -53,9 +53,7 @@ from app.schemas.honor_system import (
 # ---------------------------------------------------------------------------
 
 
-async def get_or_create_rank_profile(
-    db: AsyncSession, user_id: UUID, sport: str, area: str
-) -> RankProfile:
+async def get_or_create_rank_profile(db: AsyncSession, user_id: UUID, sport: str, area: str) -> RankProfile:
     """
     Return the existing (user, sport, area) profile or create one at the
     baseline. The caller is responsible for committing; this function
@@ -85,9 +83,7 @@ async def get_or_create_rank_profile(
     return profile
 
 
-async def get_my_rank_profile(
-    db: AsyncSession, user_id: UUID, sport: str, area: str
-) -> RankProfileRead:
+async def get_my_rank_profile(db: AsyncSession, user_id: UUID, sport: str, area: str) -> RankProfileRead:
     """
     Read-only self lookup for ``GET /rankings/me``.
 
@@ -142,16 +138,8 @@ async def list_rankings(
             RankProfile.updated_at.asc(),
         )
     )
-    total = int(
-        (
-            await db.execute(
-                select(func.count()).select_from(base.subquery())
-            )
-        ).scalar_one()
-    )
-    rows = list(
-        (await db.execute(base.offset(offset).limit(limit))).scalars().all()
-    )
+    total = int((await db.execute(select(func.count()).select_from(base.subquery()))).scalar_one())
+    rows = list((await db.execute(base.offset(offset).limit(limit))).scalars().all())
     items = [
         RankingEntry(
             rank=offset + idx + 1,
@@ -177,9 +165,7 @@ def _default_title_name(sport: str, area: str) -> str:
     return f"{area.title()} {sport.title()} Champion"
 
 
-async def get_or_create_honor_title(
-    db: AsyncSession, sport: str, area: str, title_name: str
-) -> HonorTitle:
+async def get_or_create_honor_title(db: AsyncSession, sport: str, area: str, title_name: str) -> HonorTitle:
     stmt = select(HonorTitle).where(
         HonorTitle.sport == sport,
         HonorTitle.area == area,
@@ -188,18 +174,14 @@ async def get_or_create_honor_title(
     title = (await db.execute(stmt)).scalar_one_or_none()
     if title is not None:
         return title
-    title = HonorTitle(
-        sport=sport, area=area, title_name=title_name, active=True
-    )
+    title = HonorTitle(sport=sport, area=area, title_name=title_name, active=True)
     db.add(title)
     await db.flush()
     await db.refresh(title)
     return title
 
 
-async def get_current_honor(
-    db: AsyncSession, sport: str, area: str
-) -> HonorTitleRead | None:
+async def get_current_honor(db: AsyncSession, sport: str, area: str) -> HonorTitleRead | None:
     """
     Return the canonical title for the (sport, area) — auto-generated
     name "{Area} {Sport} Champion". Returns None if it has never been
@@ -219,9 +201,7 @@ async def get_current_honor(
     return HonorTitleRead.model_validate(title)
 
 
-async def list_titles_held_by(
-    db: AsyncSession, user_id: UUID
-) -> list[HonorTitleRead]:
+async def list_titles_held_by(db: AsyncSession, user_id: UUID) -> list[HonorTitleRead]:
     stmt = (
         select(HonorTitle)
         .where(
@@ -240,13 +220,9 @@ async def list_titles_held_by(
 
 
 async def _user_or_404(db: AsyncSession, user_id: UUID) -> User:
-    user = (
-        await db.execute(select(User).where(User.id == user_id))
-    ).scalar_one_or_none()
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if user is None or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return user
 
 
@@ -298,9 +274,7 @@ async def record_match_result_for_honor(
     now = datetime.now(tz=timezone.utc)
 
     # Rating + counter updates --------------------------------------------
-    winner = await get_or_create_rank_profile(
-        db, winner_user_id, sport, area
-    )
+    winner = await get_or_create_rank_profile(db, winner_user_id, sport, area)
     loser = await get_or_create_rank_profile(db, loser_user_id, sport, area)
 
     winner.rating = winner.rating + RATING_WIN_DELTA
@@ -369,9 +343,5 @@ async def record_match_result_for_honor(
         loser_profile=RankProfileRead.model_validate(loser),
         honor_title=HonorTitleRead.model_validate(title),
         transferred=transferred,
-        history_entry=(
-            HonorHistoryRead.model_validate(history_row)
-            if history_row is not None
-            else None
-        ),
+        history_entry=(HonorHistoryRead.model_validate(history_row) if history_row is not None else None),
     )

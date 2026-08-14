@@ -330,9 +330,7 @@ async def test_honor_floor_clamps_at_zero(client: AsyncClient) -> None:
             )
         await db.commit()
         # Sanity-check: rows landed.
-        count = (
-            await db.execute(_select(HonorEvent).where(HonorEvent.user_id == user_uuid))
-        ).scalars().all()
+        count = (await db.execute(_select(HonorEvent).where(HonorEvent.user_id == user_uuid))).scalars().all()
         assert len(count) == 50
 
     r = await client.get("/users/me/rank-summary", headers=_auth(token))
@@ -757,9 +755,7 @@ async def test_cancelled_event_does_not_grant_host_bonus(
     await _wipe_v11_state()
     host_tok, host_uid = await _register(client, "h_cxl_host@example.com")
     _, a_uid = await _register(client, "h_cxl_a@example.com")
-    event_id = await _create_event(
-        host_user_id=host_uid, status_value="cancelled"
-    )
+    event_id = await _create_event(host_user_id=host_uid, status_value="cancelled")
     await _add_participant(
         event_id=event_id,
         user_id=a_uid,
@@ -782,9 +778,7 @@ async def test_sport_xp_and_level_calculation(client: AsyncClient) -> None:
     _, host_uid = await _register(client, "h_xp_host@example.com")
     token, uid = await _register(client, "h_xp_self@example.com")
     for i in range(5):
-        event_id = await _create_event(
-            host_user_id=host_uid, sport="basketball"
-        )
+        event_id = await _create_event(host_user_id=host_uid, sport="basketball")
         await _add_participant(
             event_id=event_id,
             user_id=uid,
@@ -863,9 +857,7 @@ async def test_rank_users_public_summary(client: AsyncClient) -> None:
         host_confirmed=True,
     )
 
-    r = await client.get(
-        f"/rank/users/{target_uid}", headers=_auth(token_other)
-    )
+    r = await client.get(f"/rank/users/{target_uid}", headers=_auth(token_other))
     assert r.status_code == 200
     body = r.json()
     assert body["user_id"] == target_uid
@@ -896,9 +888,7 @@ async def test_host_marking_only_self_attended_gets_no_player_credit(
     bonus also stays off because no NON-host participant attended.
     """
     await _wipe_v11_state()
-    host_tok, host_uid = await _register(
-        client, "h_self_only_host@example.com"
-    )
+    host_tok, host_uid = await _register(client, "h_self_only_host@example.com")
     event_id = await _create_event(host_user_id=host_uid, sport="basketball")
     # Host auto-join row, marked attended + host-confirmed.
     await _add_participant(
@@ -926,9 +916,7 @@ async def test_host_self_attendance_plus_non_host_attended(
     own row.
     """
     await _wipe_v11_state()
-    host_tok, host_uid = await _register(
-        client, "h_self_plus_host@example.com"
-    )
+    host_tok, host_uid = await _register(client, "h_self_plus_host@example.com")
     p_tok, p_uid = await _register(client, "h_self_plus_player@example.com")
     event_id = await _create_event(host_user_id=host_uid, sport="soccer")
     # Host's own row attended + confirmed.
@@ -1005,9 +993,7 @@ async def test_left_attended_non_host_does_not_grant_hosted_bonus(
     NOT qualify the host for the +15 Gang Score / +5 hosted sport XP.
     """
     await _wipe_v11_state()
-    host_tok, host_uid = await _register(
-        client, "h_left_attended_host@example.com"
-    )
+    host_tok, host_uid = await _register(client, "h_left_attended_host@example.com")
     _, p_uid = await _register(client, "h_left_attended_player@example.com")
     event_id = await _create_event(host_user_id=host_uid, sport="soccer")
     # Soft-left participant row that still carries attended + host
@@ -1037,15 +1023,9 @@ async def test_cancelled_event_attended_row_does_not_count(
     Honor, Gang Score, or Sport XP — for the player or for the host.
     """
     await _wipe_v11_state()
-    host_tok, host_uid = await _register(
-        client, "h_cxl_attended_host@example.com"
-    )
-    p_tok, p_uid = await _register(
-        client, "h_cxl_attended_player@example.com"
-    )
-    event_id = await _create_event(
-        host_user_id=host_uid, status_value="cancelled"
-    )
+    host_tok, host_uid = await _register(client, "h_cxl_attended_host@example.com")
+    p_tok, p_uid = await _register(client, "h_cxl_attended_player@example.com")
+    event_id = await _create_event(host_user_id=host_uid, status_value="cancelled")
     await _add_participant(
         event_id=event_id,
         user_id=p_uid,

@@ -29,9 +29,7 @@ from app.services import challenges as challenges_service
 router = APIRouter(prefix="/challenges", tags=["challenges"])
 
 
-@router.post(
-    "", response_model=ChallengeRead, status_code=status.HTTP_201_CREATED
-)
+@router.post("", response_model=ChallengeRead, status_code=status.HTTP_201_CREATED)
 async def create_challenge(
     body: ChallengeCreateRequest,
     current_user: User = Depends(get_current_user),
@@ -75,9 +73,7 @@ async def get_challenge(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ChallengeRead:
-    return await challenges_service.get_challenge(
-        db, current_user_id=current_user.id, challenge_id=challenge_id
-    )
+    return await challenges_service.get_challenge(db, current_user_id=current_user.id, challenge_id=challenge_id)
 
 
 @router.post("/{challenge_id}/accept", response_model=ChallengeRead)
@@ -86,9 +82,7 @@ async def accept_challenge(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ChallengeRead:
-    return await challenges_service.accept_challenge(
-        db, current_user_id=current_user.id, challenge_id=challenge_id
-    )
+    return await challenges_service.accept_challenge(db, current_user_id=current_user.id, challenge_id=challenge_id)
 
 
 @router.post("/{challenge_id}/decline", response_model=ChallengeRead)
@@ -97,9 +91,7 @@ async def decline_challenge(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ChallengeRead:
-    return await challenges_service.decline_challenge(
-        db, current_user_id=current_user.id, challenge_id=challenge_id
-    )
+    return await challenges_service.decline_challenge(db, current_user_id=current_user.id, challenge_id=challenge_id)
 
 
 @router.post("/{challenge_id}/cancel", response_model=ChallengeRead)
@@ -108,9 +100,7 @@ async def cancel_challenge(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ChallengeRead:
-    return await challenges_service.cancel_challenge(
-        db, current_user_id=current_user.id, challenge_id=challenge_id
-    )
+    return await challenges_service.cancel_challenge(db, current_user_id=current_user.id, challenge_id=challenge_id)
 
 
 @router.post("/{challenge_id}/result", response_model=ChallengeRead)

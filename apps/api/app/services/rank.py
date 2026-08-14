@@ -96,11 +96,7 @@ async def _record_honor(
     booking_id: UUID | None,
 ) -> None:
     _validate_honor_reason(reason)
-    db.add(
-        HonorEvent(
-            user_id=user_id, delta=delta, reason=reason, booking_id=booking_id
-        )
-    )
+    db.add(HonorEvent(user_id=user_id, delta=delta, reason=reason, booking_id=booking_id))
 
 
 async def _record_rank(
@@ -151,9 +147,7 @@ async def record_booking_transition(
         (cancelling a confirmed booking is a reliability cost; cancelling
          a `proposed` booking is not, since no commitment was made.)
     """
-    other_id = (
-        booking.partner_id if booking.proposer_id == actor_user_id else booking.proposer_id
-    )
+    other_id = booking.partner_id if booking.proposer_id == actor_user_id else booking.proposer_id
 
     if previous_status == "confirmed" and new_status == "completed":
         for participant_id in (booking.proposer_id, booking.partner_id):
@@ -214,9 +208,7 @@ def _clamp(value: int, lo: int, hi: int) -> int:
 
 async def compute_summary(db: AsyncSession, user_id: UUID) -> RankSummary:
     # Honor: baseline + sum(deltas), clamped to [HONOR_FLOOR, HONOR_CEILING].
-    honor_sum_stmt = select(func.coalesce(func.sum(HonorEvent.delta), 0)).where(
-        HonorEvent.user_id == user_id
-    )
+    honor_sum_stmt = select(func.coalesce(func.sum(HonorEvent.delta), 0)).where(HonorEvent.user_id == user_id)
     honor_total = (await db.execute(honor_sum_stmt)).scalar_one()
     honor_score = _clamp(HONOR_BASELINE + int(honor_total), HONOR_FLOOR, HONOR_CEILING)
 
@@ -309,9 +301,7 @@ def sport_level_for(xp: int) -> int:
     return min(99, 1 + xp // 50)
 
 
-async def compute_honor_summary(
-    db: AsyncSession, user_id: UUID
-) -> HonorSummary:
+async def compute_honor_summary(db: AsyncSession, user_id: UUID) -> HonorSummary:
     """
     Compute Honor / Gang Score / Sport Levels for a single user.
 
@@ -355,8 +345,7 @@ async def compute_honor_summary(
         .group_by(Event.sport)
     )
     attended_by_sport: dict[str, int] = {
-        sport: int(count)
-        for sport, count in (await db.execute(attended_rows_stmt)).all()
+        sport: int(count) for sport, count in (await db.execute(attended_rows_stmt)).all()
     }
     completed_games_count = sum(attended_by_sport.values())
 
@@ -370,34 +359,14 @@ async def compute_honor_summary(
             )
         )
         if require_confirmation:
-            stmt = stmt.where(
-                EventParticipant.attendance_confirmed_by_host_at.is_not(None)
-            )
+            stmt = stmt.where(EventParticipant.attendance_confirmed_by_host_at.is_not(None))
         return stmt
 
-    no_show_count = int(
-        (
-            await db.execute(
-                _count_by_attendance("no_show", require_confirmation=True)
-            )
-        ).scalar_one()
-    )
-    excused_count = int(
-        (
-            await db.execute(
-                _count_by_attendance("excused", require_confirmation=True)
-            )
-        ).scalar_one()
-    )
+    no_show_count = int((await db.execute(_count_by_attendance("no_show", require_confirmation=True))).scalar_one())
+    excused_count = int((await db.execute(_count_by_attendance("excused", require_confirmation=True))).scalar_one())
     # Pending stays inert for score — the gate is here only so the UI
     # counter reflects active, non-cancelled, non-host rows.
-    pending_count = int(
-        (
-            await db.execute(
-                _count_by_attendance("pending", require_confirmation=False)
-            )
-        ).scalar_one()
-    )
+    pending_count = int((await db.execute(_count_by_attendance("pending", require_confirmation=False))).scalar_one())
 
     # --- Hosted events (once-per-event bonus) ---------------------------
     #
@@ -420,13 +389,10 @@ async def compute_honor_summary(
         )
         .exists()
     )
-    hosted_events_stmt = (
-        select(Event.id, Event.sport)
-        .where(
-            Event.host_user_id == user_id,
-            Event.status != "cancelled",
-            other_participant_attended,
-        )
+    hosted_events_stmt = select(Event.id, Event.sport).where(
+        Event.host_user_id == user_id,
+        Event.status != "cancelled",
+        other_participant_attended,
     )
     hosted_rows = list((await db.execute(hosted_events_stmt)).all())
     hosted_games_count = len(hosted_rows)
@@ -460,10 +426,7 @@ async def compute_honor_summary(
     honor += actioned_reports_count * _HONOR_DELTA_REPORT_ACTIONED
     honor_score = _clamp(honor, HONOR_FLOOR_V11, HONOR_CEILING_V11)
 
-    gang_score = (
-        completed_games_count * _GANG_DELTA_ATTENDED
-        + hosted_games_count * _GANG_DELTA_HOSTED_EVENT
-    )
+    gang_score = completed_games_count * _GANG_DELTA_ATTENDED + hosted_games_count * _GANG_DELTA_HOSTED_EVENT
 
     # --- Per-sport XP + level -------------------------------------------
     sport_keys = set(attended_by_sport.keys()) | set(hosted_by_sport.keys())

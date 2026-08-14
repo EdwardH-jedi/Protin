@@ -46,9 +46,7 @@ def upgrade() -> None:
                 nullable=True,
             )
         )
-        batch.add_column(
-            sa.Column("attendance_note", sa.String(500), nullable=True)
-        )
+        batch.add_column(sa.Column("attendance_note", sa.String(500), nullable=True))
 
 
 def downgrade() -> None:

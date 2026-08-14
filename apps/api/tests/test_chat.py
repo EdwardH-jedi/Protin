@@ -180,9 +180,7 @@ async def test_send_message_blocked_by_moderation_returns_422_and_does_not_persi
     """
     token_a, uid_a = await _register(client, "chat_mod_a@example.com")
     token_b, uid_b = await _register(client, "chat_mod_b@example.com")
-    match_id = await _mutual_like_and_get_match_id(
-        client, token_a, uid_a, token_b, uid_b
-    )
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
 
     r = await client.post(
         f"/matches/{match_id}/messages",
@@ -195,9 +193,7 @@ async def test_send_message_blocked_by_moderation_returns_422_and_does_not_persi
     assert "BANNED" not in r.json()["detail"]
 
     # No message persisted — listing should return empty.
-    list_r = await client.get(
-        f"/matches/{match_id}/messages", headers=_auth(token_a)
-    )
+    list_r = await client.get(f"/matches/{match_id}/messages", headers=_auth(token_a))
     assert list_r.status_code == 200
     assert list_r.json()["items"] == []
 
@@ -312,9 +308,7 @@ async def test_connection_manager_tolerates_send_failure() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_send_message_triggers_ws_broadcast(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_send_message_triggers_ws_broadcast(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
     token_a, uid_a = await _register(client, "ws_bcast_a@example.com")
     token_b, uid_b = await _register(client, "ws_bcast_b@example.com")
     match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
@@ -325,6 +319,7 @@ async def test_send_message_triggers_ws_broadcast(
         broadcast_calls.append((room, data))
 
     import app.routers.chat as chat_router
+
     monkeypatch.setattr(chat_router._manager, "broadcast", _capture_broadcast)
 
     r = await client.post(

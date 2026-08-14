@@ -59,9 +59,7 @@ async def _joined_count(db: AsyncSession, event_id: UUID) -> int:
     return int((await db.execute(stmt)).scalar_one())
 
 
-async def _active_participant(
-    db: AsyncSession, event_id: UUID, user_id: UUID
-) -> EventParticipant | None:
+async def _active_participant(db: AsyncSession, event_id: UUID, user_id: UUID) -> EventParticipant | None:
     stmt = select(EventParticipant).where(
         EventParticipant.event_id == event_id,
         EventParticipant.user_id == user_id,
@@ -70,28 +68,20 @@ async def _active_participant(
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
-async def _resolve_host(
-    db: AsyncSession, host_user_id: UUID
-) -> EventHost:
+async def _resolve_host(db: AsyncSession, host_user_id: UUID) -> EventHost:
     stmt = select(UserProfile.display_name).where(UserProfile.user_id == host_user_id)
     name = (await db.execute(stmt)).scalar_one_or_none()
     return EventHost(id=host_user_id, display_name=name or "Host")
 
 
 async def _get_event_or_404(db: AsyncSession, event_id: UUID) -> Event:
-    e = (
-        await db.execute(select(Event).where(Event.id == event_id))
-    ).scalar_one_or_none()
+    e = (await db.execute(select(Event).where(Event.id == event_id))).scalar_one_or_none()
     if e is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
     return e
 
 
-async def _to_summary(
-    db: AsyncSession, e: Event, current_user_id: UUID
-) -> EventSummary:
+async def _to_summary(db: AsyncSession, e: Event, current_user_id: UUID) -> EventSummary:
     count = await _joined_count(db, e.id)
     joined = (await _active_participant(db, e.id, current_user_id)) is not None
     host = await _resolve_host(db, e.host_user_id)
@@ -121,9 +111,7 @@ async def _to_summary(
 # ---------------------------------------------------------------------------
 
 
-async def create_event(
-    db: AsyncSession, host_user_id: UUID, body: CreateEventRequest
-) -> EventDetail:
+async def create_event(db: AsyncSession, host_user_id: UUID, body: CreateEventRequest) -> EventDetail:
     if body.mode not in EVENT_MODES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -212,10 +200,7 @@ async def list_events(
             )
             .where(
                 (Event.host_user_id == current_user_id)
-                | (
-                    (EventParticipant.user_id == current_user_id)
-                    & (EventParticipant.status == "joined")
-                )
+                | ((EventParticipant.user_id == current_user_id) & (EventParticipant.status == "joined"))
             )
             .distinct()
         )
@@ -239,11 +224,7 @@ async def list_events(
     base = base.order_by(Event.starts_at.asc())
 
     rows = list((await db.execute(base.offset(offset).limit(limit))).scalars().all())
-    total = int(
-        (
-            await db.execute(select(func.count()).select_from(base.subquery()))
-        ).scalar_one()
-    )
+    total = int((await db.execute(select(func.count()).select_from(base.subquery()))).scalar_one())
 
     items: list[EventSummary] = []
     for e in rows:
@@ -251,9 +232,7 @@ async def list_events(
     return EventListResponse(items=items, total=total)
 
 
-async def get_event(
-    db: AsyncSession, event_id: UUID, current_user_id: UUID
-) -> EventDetail:
+async def get_event(db: AsyncSession, event_id: UUID, current_user_id: UUID) -> EventDetail:
     e = await _get_event_or_404(db, event_id)
 
     # Defensive private-visibility guard. POST /events rejects
@@ -265,9 +244,7 @@ async def get_event(
     if e.visibility == "private" and current_user_id != e.host_user_id:
         joined = await _active_participant(db, e.id, current_user_id)
         if joined is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
     summary = await _to_summary(db, e, current_user_id)
 
@@ -292,15 +269,11 @@ async def get_event(
     return EventDetail(**summary.model_dump(), participants=participants)
 
 
-async def join_event(
-    db: AsyncSession, event_id: UUID, current_user_id: UUID
-) -> EventDetail:
+async def join_event(db: AsyncSession, event_id: UUID, current_user_id: UUID) -> EventDetail:
     locked_stmt = select(Event).where(Event.id == event_id).with_for_update()
     e = (await db.execute(locked_stmt)).scalar_one_or_none()
     if e is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
     # Hide-as-404 MUST run before any terminal-status 422 so that a
     # private outsider cannot distinguish "no event with this id" from
@@ -358,15 +331,11 @@ async def join_event(
     return await get_event(db, e.id, current_user_id)
 
 
-async def leave_event(
-    db: AsyncSession, event_id: UUID, current_user_id: UUID
-) -> EventDetail:
+async def leave_event(db: AsyncSession, event_id: UUID, current_user_id: UUID) -> EventDetail:
     locked_stmt = select(Event).where(Event.id == event_id).with_for_update()
     e = (await db.execute(locked_stmt)).scalar_one_or_none()
     if e is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
     # Hide-as-404 MUST run before any terminal-status 422 so that a
     # private outsider cannot distinguish "no event with this id" from
@@ -412,7 +381,6 @@ async def leave_event(
     return await get_event(db, e.id, current_user_id)
 
 
-
 # ---------------------------------------------------------------------------
 # Attendance
 # ---------------------------------------------------------------------------
@@ -423,14 +391,10 @@ async def leave_event(
 # - completed   → still mutable (host may correct a wrong mark)
 # - cancelled   → frozen; no attendance updates make sense for a
 #                 cancelled event
-_ATTENDANCE_MUTABLE_EVENT_STATUSES: frozenset[str] = frozenset(
-    {"open", "full", "completed"}
-)
+_ATTENDANCE_MUTABLE_EVENT_STATUSES: frozenset[str] = frozenset({"open", "full", "completed"})
 
 
-async def _enforce_private_visibility(
-    db: AsyncSession, e: Event, current_user_id: UUID
-) -> None:
+async def _enforce_private_visibility(db: AsyncSession, e: Event, current_user_id: UUID) -> None:
     """
     Hide-as-404 guard for private events. Must run before any
     endpoint-specific permission check (403 for non-host, 422 for
@@ -445,14 +409,10 @@ async def _enforce_private_visibility(
         return
     joined = await _active_participant(db, e.id, current_user_id)
     if joined is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
 
-def _entry_for(
-    event_id: UUID, p: EventParticipant, display_name: str | None
-) -> AttendanceEntry:
+def _entry_for(event_id: UUID, p: EventParticipant, display_name: str | None) -> AttendanceEntry:
     return AttendanceEntry(
         event_id=event_id,
         participant_user_id=p.user_id,
@@ -467,9 +427,7 @@ def _entry_for(
     )
 
 
-async def get_event_attendance(
-    db: AsyncSession, event_id: UUID, current_user_id: UUID
-) -> AttendanceListResponse:
+async def get_event_attendance(db: AsyncSession, event_id: UUID, current_user_id: UUID) -> AttendanceListResponse:
     """
     Return attendance rows for an event.
 
@@ -509,9 +467,7 @@ async def get_event_attendance(
     )
     row = (await db.execute(me_stmt)).first()
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
     p, name = row
     return AttendanceListResponse(
         event_id=e.id,
@@ -608,9 +564,7 @@ async def host_update_attendance(
             detail=f"Invalid attendance status: {body.attendance_status}",
         )
 
-    loaded = await _load_participant_with_name(
-        db, e.id, body.participant_user_id
-    )
+    loaded = await _load_participant_with_name(db, e.id, body.participant_user_id)
     if loaded is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -675,9 +629,7 @@ async def self_report_attendance(
     await db.refresh(participant)
 
     # Resolve display name for the response payload.
-    name_stmt = select(UserProfile.display_name).where(
-        UserProfile.user_id == current_user_id
-    )
+    name_stmt = select(UserProfile.display_name).where(UserProfile.user_id == current_user_id)
     name = (await db.execute(name_stmt)).scalar_one_or_none()
     return _entry_for(e.id, participant, name)
 
@@ -693,15 +645,11 @@ async def self_report_attendance(
 # ---------------------------------------------------------------------------
 
 
-async def cancel_event(
-    db: AsyncSession, event_id: UUID, current_user_id: UUID
-) -> EventDetail:
+async def cancel_event(db: AsyncSession, event_id: UUID, current_user_id: UUID) -> EventDetail:
     locked_stmt = select(Event).where(Event.id == event_id).with_for_update()
     e = (await db.execute(locked_stmt)).scalar_one_or_none()
     if e is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
     # Hide-as-404 for outsiders on private events — same pattern as
     # join_event so the cancel endpoint can't be used to probe.
@@ -729,15 +677,11 @@ async def cancel_event(
     return await get_event(db, e.id, current_user_id)
 
 
-async def complete_event(
-    db: AsyncSession, event_id: UUID, current_user_id: UUID
-) -> EventDetail:
+async def complete_event(db: AsyncSession, event_id: UUID, current_user_id: UUID) -> EventDetail:
     locked_stmt = select(Event).where(Event.id == event_id).with_for_update()
     e = (await db.execute(locked_stmt)).scalar_one_or_none()
     if e is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
     await _enforce_private_visibility(db, e, current_user_id)
 

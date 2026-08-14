@@ -129,9 +129,7 @@ async def test_process_notifications_endpoint(client: AsyncClient) -> None:
     assert "failed" in body
 
 
-async def test_notification_scheduled_on_booking_proposal(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_notification_scheduled_on_booking_proposal(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
     """Creating a booking enqueues a proposal_received notification for the partner."""
     # Stub the Expo delivery so processing never makes a real outbound POST to
     # exp.host — keeps the test hermetic and deterministic in a network-
@@ -251,6 +249,7 @@ async def test_process_pending_notifications_handles_naive_scheduled_at() -> Non
             class _S:
                 def all(inner_self):
                     return [event]
+
             return _S()
 
         def scalar_one_or_none(self):
@@ -409,6 +408,7 @@ async def _setup_match_and_booking(client: AsyncClient) -> tuple[str, str, str, 
     Returns (token_a, uid_a, token_b, uid_b, booking_id).
     """
     import uuid
+
     suffix = uuid.uuid4().hex[:8]
     token_a, uid_a = await _register(client, f"notif_trans_a_{suffix}@example.com")
     token_b, uid_b = await _register(client, f"notif_trans_b_{suffix}@example.com")
@@ -453,6 +453,7 @@ async def test_confirm_transition_schedules_booking_confirmed_notification(
         scheduled.append((notif_type, str(recipient_id)))
 
     import app.services.bookings as bookings_svc
+
     monkeypatch.setattr(bookings_svc.notif_service, "schedule_booking_notification", _capture)
 
     r = await client.post(
@@ -478,6 +479,7 @@ async def test_decline_transition_schedules_booking_declined_notification(
         scheduled.append((notif_type, str(recipient_id)))
 
     import app.services.bookings as bookings_svc
+
     monkeypatch.setattr(bookings_svc.notif_service, "schedule_booking_notification", _capture)
 
     r = await client.post(
@@ -499,6 +501,7 @@ async def test_cancel_transition_schedules_booking_cancelled_notification(
         scheduled.append((notif_type, str(recipient_id)))
 
     import app.services.bookings as bookings_svc
+
     monkeypatch.setattr(bookings_svc.notif_service, "schedule_booking_notification", _capture)
 
     r = await client.post(
@@ -514,9 +517,7 @@ async def test_cancel_transition_schedules_booking_cancelled_notification(
 # ---------------------------------------------------------------------------
 
 
-async def test_process_marks_sent_on_success(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_process_marks_sent_on_success(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
     """Successful Expo delivery increments processed count and marks sent_at."""
     import app.services.notifications as notif_svc
 
@@ -565,9 +566,7 @@ async def test_process_marks_sent_on_success(
     assert body["failed"] == 0
 
 
-async def test_process_marks_failed_on_delivery_error(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_process_marks_failed_on_delivery_error(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
     """Failed Expo delivery increments failed count."""
     import app.services.notifications as notif_svc
 
@@ -615,9 +614,7 @@ async def test_process_marks_failed_on_delivery_error(
     assert body["failed"] >= 1
 
 
-async def test_process_skips_already_sent_events(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_process_skips_already_sent_events(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
     """Running process-notifications twice must not re-send already-sent events."""
     import app.services.notifications as notif_svc
 
@@ -678,6 +675,7 @@ async def test_process_skips_already_sent_events(
 
 def _fake_settings(*, app_env: str, internal_api_token: str):
     from types import SimpleNamespace
+
     return SimpleNamespace(app_env=app_env, internal_api_token=internal_api_token)
 
 
