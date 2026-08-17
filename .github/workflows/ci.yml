@@ -114,4 +114,4 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build API Docker image
-        run: docker build -f apps/api/Dockerfile apps/api
+        run: docker build -f apps/api/Dockerfile .
