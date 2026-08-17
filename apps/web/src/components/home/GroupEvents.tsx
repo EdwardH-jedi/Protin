@@ -143,7 +143,7 @@ export function GroupEvents() {
           </h3>
           <p className="mt-3 text-base leading-relaxed text-slate-300 sm:text-lg">
             Whether you need one more for doubles or want to organize a
-            weekend tournament, Protin makes group coordination effortless.
+            weekend tournament, SportsGang makes group coordination effortless.
           </p>
         </div>
       </div>

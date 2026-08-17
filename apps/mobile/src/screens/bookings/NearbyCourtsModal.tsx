@@ -17,7 +17,7 @@ import { useNearbyVenues } from '../../hooks/useNearbyVenues';
 import type { VenueLocationStatus } from '../../hooks/useVenueLocation';
 import { formatVenueLocation } from '../../lib/venueLocation';
 import { colors, radii, spacing, typography } from '../../theme';
-import type { Venue, VenueProviderStatus } from '@protin/shared-types';
+import type { Venue, VenueProviderStatus } from '@sportsgang/shared-types';
 
 type PickerMode = 'list' | 'map';
 

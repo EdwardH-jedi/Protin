@@ -1,9 +1,9 @@
 {
-  "name": "@protin/web",
+  "name": "@sportsgang/web",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Protin official marketing site (Vite + React + Tailwind + anime.js).",
+  "description": "SportsGang official marketing site (Vite + React + Tailwind + anime.js).",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

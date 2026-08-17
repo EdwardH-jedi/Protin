@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { sportLabel } from '../stores/profile';
 import { colors, radii, spacing, typography } from '../theme';
-import type { TournamentSummary } from '@protin/shared-types';
+import type { TournamentSummary } from '@sportsgang/shared-types';
 
 interface TournamentCardProps {
   tournament: TournamentSummary;

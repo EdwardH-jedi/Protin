@@ -16,14 +16,14 @@ import type {
   HonorTitleRead,
   RankProfileRead,
   RankingListResponse,
-} from '@protin/shared-types';
+} from '@sportsgang/shared-types';
 
 export type {
   HonorTitleRead,
   RankProfileRead,
   RankingEntry,
   RankingListResponse,
-} from '@protin/shared-types';
+} from '@sportsgang/shared-types';
 
 function buildQuery(params: Record<string, string>): string {
   const usp = new URLSearchParams();

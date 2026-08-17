@@ -1,8 +1,8 @@
-# @protin/web
+# @sportsgang/web
 
-Protin's official marketing site. Vite + React + Tailwind v4 + anime.js.
+SportsGang's official marketing site. Vite + React + Tailwind v4 + anime.js.
 
-This app is the public homepage at the Protin marketing domain. The
+This app is the public homepage at the SportsGang marketing domain. The
 mobile app and FastAPI backend live elsewhere in the monorepo
 (`apps/mobile`, `apps/api`) and are not used by the marketing site.
 
@@ -23,21 +23,18 @@ the root `package.json` today — run commands from `apps/web/`.
 
 ## Brand alignment
 
-The homepage uses **Protin** as the marketing brand. That matches the
-project name in the root `package.json`, the iOS bundle id
-(`com.edh1223.protin`), the API workspace, env var prefixes, and infra
-naming. The mobile app currently displays the wordmark "MoveMate" inside
-several screens — that appears to be an in-app visual trial, not an
-official brand change. Confirm with the brand owner before public launch
-that "Protin" remains the official name across mobile, web, and the App
-Store / Play Store listing. Until then, this site stays on "Protin".
+The homepage, npm workspaces, repository documentation, and local development
+identifiers use **SportsGang** / `sportsgang`. Registered mobile identities
+such as `com.edh1223.protin` remain unchanged so this repository-only rename
+does not create a different App Store or Play application. The deployed
+domain and mailbox names also remain external migration work.
 
 ## Waitlist (prototype, no backend)
 
 `WaitlistForm` uses client-only validation and persists submissions to
-`localStorage` (`protin.waitlist.v1`) so the same browser cannot submit
+`localStorage` (`sportsgang.waitlist.v1`) so the same browser cannot submit
 twice and so a returning visitor sees the "you're on the list" state on
-reload.
+reload. The reader migrates the legacy storage key on first access.
 
 This is **temporary**. Before public launch, swap
 `src/lib/waitlist.ts::submitWaitlistEmail` for a real backend or hosted
@@ -84,7 +81,7 @@ also snapped visible so JS errors can never leave the page blank.
 
 ## Reference: Figma Make draft
 
-The folder `apps/web/Protin Landing Page Design/` is the original Figma
+The folder `apps/web/SportsGang Landing Page Design/` is the original Figma
 Make export. It is left in place as a visual reference and is **excluded
 from this project's build, type-check, and Tailwind class scan** — see
 `vite.config.ts`, `tsconfig.json`, and the `source(none)` directive in
@@ -100,7 +97,7 @@ Recommended path (any static host works):
 | ---------------- | --------------------------- |
 | Source repo      | this repository             |
 | Project root     | `apps/web/`                 |
-| Install command  | `npm install` (root) *or* `npm install --workspace=@protin/web` |
+| Install command  | `npm install` (root) *or* `npm install --workspace=@sportsgang/web` |
 | Build command    | `npm run build` (from `apps/web/`) |
 | Output directory | `apps/web/dist`             |
 | Node version     | 18.x or 20.x LTS            |
@@ -119,7 +116,7 @@ Two known-good targets:
 - [ ] Wire `WaitlistForm` to a real waitlist backend or service.
 - [ ] Set `og:url` + `og:image` + `twitter:image` in `index.html` once
       the production domain and 1200×630 share image are finalised.
-- [ ] Confirm "Protin" vs "MoveMate" branding decision is final.
+- [ ] Remove any remaining experimental "MoveMate" copy before public launch.
 - [ ] Decide whether to add a router (`/privacy`, `/terms`,
       `/contact`) — only worth it once policies stabilise.
 - [ ] Verify the placeholder `hello@`, `support@`, `partnerships@`

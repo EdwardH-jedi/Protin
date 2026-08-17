@@ -1,4 +1,4 @@
-# Protin Staging — Known Issues
+# SportsGang Staging — Known Issues
 
 Updated: 2026-03-18
 Environment: RX6600 staging

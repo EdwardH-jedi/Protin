@@ -1,4 +1,4 @@
-# Protin on Fly.io
+# SportsGang on Fly.io
 
 Production deployment target. The existing `docker-compose.yml` and
 `docker-compose.staging.yml` remain the local and staging path — they are

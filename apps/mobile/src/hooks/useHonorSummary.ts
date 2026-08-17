@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { getMyHonorSummary, getUserHonorSummary } from '../lib/rank';
-import type { HonorSummary } from '@protin/shared-types';
+import type { HonorSummary } from '@sportsgang/shared-types';
 
 interface UseHonorSummaryArgs {
   /** Omit / null = self (/rank/me). Otherwise fetch public summary. */

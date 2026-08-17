@@ -1,4 +1,4 @@
-# Protin Claude guidance
+# SportsGang Claude guidance
 
 ## Product direction
 

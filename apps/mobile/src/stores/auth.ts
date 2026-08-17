@@ -1,11 +1,21 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
-import type { AppleSignInRequest, MeResponse, TokenResponse } from '@protin/shared-types';
+import type { AppleSignInRequest, MeResponse, TokenResponse } from '@sportsgang/shared-types';
 
 import { api, setToken } from '../lib/api';
 import { useProfileStore } from './profile';
 
-const TOKEN_KEY = 'protin.auth.token';
+const TOKEN_KEY = 'sportsgang.auth.token';
+// Installed builds may still hold the pre-migration key. Read it once during
+// initialization, move the value, then keep all future writes canonical.
+const LEGACY_TOKEN_KEY = 'protin.auth.token';
+
+async function deleteStoredTokens(): Promise<void> {
+  await Promise.all([
+    SecureStore.deleteItemAsync(TOKEN_KEY),
+    SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY),
+  ]);
+}
 
 interface AuthState {
   token: string | null;
@@ -88,7 +98,7 @@ async function hydrateUserAfterToken(
         ? err
         : new Error('Signed in, but could not load your account. Please try again.');
     }
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await deleteStoredTokens();
     setToken(null);
     set({ token: null, user: null });
     throw err instanceof Error
@@ -150,7 +160,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     // flight must observe a stale op the moment it next checks, so it
     // cannot re-pin the api token or repopulate user after we clear here.
     nextAuthOp();
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await deleteStoredTokens();
     setToken(null);
     set({ token: null, user: null });
     // Drop every session-bound row out of the profile store too.
@@ -163,7 +173,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   initialize: async () => {
     const op = nextAuthOp();
     try {
-      const stored = await SecureStore.getItemAsync(TOKEN_KEY);
+      let stored = await SecureStore.getItemAsync(TOKEN_KEY);
+      if (!stored) {
+        const legacyStored = await SecureStore.getItemAsync(LEGACY_TOKEN_KEY);
+        if (!isCurrent(op)) return;
+        if (legacyStored) {
+          await SecureStore.setItemAsync(TOKEN_KEY, legacyStored);
+          await SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY);
+          stored = legacyStored;
+        }
+      }
       if (!stored) return;
       if (!isCurrent(op)) return;
       setToken(stored);
@@ -173,7 +192,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch {
       if (!isCurrent(op)) return;
       // Token may be invalid — clear it silently
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
+      await deleteStoredTokens();
       setToken(null);
     }
   },

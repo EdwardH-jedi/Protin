@@ -167,6 +167,9 @@ module.exports = () => {
   return {
     expo: {
       name: "SportsGang",
+      // The slug is bound to the existing EAS projectId below. Renaming it
+      // requires an EAS identity migration and is intentionally not part of
+      // the repository-only SportsGang naming change.
       slug: "protin",
       version: "1.0.0",
       orientation: "portrait",

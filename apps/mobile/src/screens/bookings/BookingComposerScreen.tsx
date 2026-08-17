@@ -32,7 +32,7 @@ import {
 import { formatVenueLocation } from '../../lib/venueLocation';
 import { colors, radii, spacing, typography } from '../../theme';
 import type { BookingComposerScreenProps } from '../../navigation/types';
-import type { Venue } from '@protin/shared-types';
+import type { Venue } from '@sportsgang/shared-types';
 import { NearbyCourtsModal } from './NearbyCourtsModal';
 
 // ─── Screen ──────────────────────────────────────────────────────────────────

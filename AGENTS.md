@@ -1,8 +1,8 @@
-# Protin Codex guidance
+# SportsGang Codex guidance
 
 ## Role
 
-Codex is primarily the design challenger, independent reviewer, adversarial verifier, integration reviewer, and engineering-workflow reviewer. It does not normally act as Protin's primary feature implementation agent.
+Codex is primarily the design challenger, independent reviewer, adversarial verifier, integration reviewer, and engineering-workflow reviewer. It does not normally act as SportsGang's primary feature implementation agent.
 
 ## Before implementation
 

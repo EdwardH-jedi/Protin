@@ -6,7 +6,7 @@ import type {
   Venue,
   VenueProviderStatus,
   VenueSourceMode,
-} from '@protin/shared-types';
+} from '@sportsgang/shared-types';
 
 interface UseNearbyVenuesArgs {
   /**

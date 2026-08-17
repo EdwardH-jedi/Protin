@@ -42,7 +42,7 @@ class GoogleCalendarToken(Base):
 
 class CalendarBookingSync(Base):
     """
-    Tracks the sync state between a Protin booking and a Google Calendar event.
+    Tracks the sync state between a SportsGang booking and a Google Calendar event.
     One row per (booking, user) pair — each participant syncs independently.
     """
 

@@ -6,7 +6,7 @@ import type {
   TournamentDetail,
   TournamentListResponse,
   TournamentSummary,
-} from '@protin/shared-types';
+} from '@sportsgang/shared-types';
 
 // ---------------------------------------------------------------------------
 // Module-level cache: feature-availability is fetched once per session and

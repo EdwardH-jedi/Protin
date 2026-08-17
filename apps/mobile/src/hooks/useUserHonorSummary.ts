@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { getUserHonorSummaryCached } from '../lib/rank';
-import type { HonorSummary } from '@protin/shared-types';
+import type { HonorSummary } from '@sportsgang/shared-types';
 
 interface UseUserHonorSummaryArgs {
   userId: string | null | undefined;

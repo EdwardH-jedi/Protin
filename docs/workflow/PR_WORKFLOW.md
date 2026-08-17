@@ -1,4 +1,4 @@
-# Protin engineering lifecycle and pull-request workflow
+# SportsGang engineering lifecycle and pull-request workflow
 
 The repository owner remains accountable for product direction, Issue scope, acceptance criteria, significant architecture choices, conflicting AI recommendations, merge decisions, and release decisions. AI tools provide engineering leverage; they do not own product decisions.
 

@@ -10,7 +10,7 @@ import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 
 import { TournamentsScreen } from '../screens/tournaments/TournamentsScreen';
-import type { TournamentSummary } from '@protin/shared-types';
+import type { TournamentSummary } from '@sportsgang/shared-types';
 
 let mockHookState: {
   items: TournamentSummary[];

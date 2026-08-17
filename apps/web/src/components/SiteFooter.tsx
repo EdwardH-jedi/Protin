@@ -11,7 +11,7 @@ type LegalKey = 'privacy' | 'terms' | 'contact';
 const LEGAL_TITLES: Record<LegalKey, string> = {
   privacy: 'Privacy Policy (draft)',
   terms: 'Terms of Service (draft)',
-  contact: 'Contact Protin',
+  contact: 'Contact SportsGang',
 };
 
 /**
@@ -39,7 +39,7 @@ export function SiteFooter() {
     <footer className="relative z-10 mt-24 border-t border-white/10 py-8">
       <div className="container mx-auto px-4 text-center text-sm text-slate-400 sm:px-6 lg:px-8">
         <p>
-          © {new Date().getFullYear()} Protin. Building the future of fitness
+          © {new Date().getFullYear()} SportsGang. Building the future of fitness
           connections.
         </p>
         <nav

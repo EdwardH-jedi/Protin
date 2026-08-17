@@ -9,7 +9,7 @@ import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 
 import { BattlesScreen } from '../screens/battles/BattlesScreen';
-import type { EventSummary } from '@protin/shared-types';
+import type { EventSummary } from '@sportsgang/shared-types';
 
 let mockHookState: {
   items: EventSummary[];

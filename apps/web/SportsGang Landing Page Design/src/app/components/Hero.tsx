@@ -40,7 +40,7 @@ export function Hero({ onJoinWaitlist }: HeroProps) {
 
           <div className="animate-fade-in opacity-0" style={{ animationDelay: '0.3s', animationFillMode: 'forwards' }}>
             <p className="text-xl sm:text-2xl text-slate-300 mb-12 max-w-3xl mx-auto leading-relaxed">
-              Protin connects people through fitness, sports, and real-life activity — from gym sessions to golf rounds, running crews, and local events.
+              SportsGang connects people through fitness, sports, and real-life activity — from gym sessions to golf rounds, running crews, and local events.
             </p>
           </div>
 

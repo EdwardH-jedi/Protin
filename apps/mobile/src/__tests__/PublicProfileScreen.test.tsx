@@ -9,7 +9,7 @@ import React from 'react';
 import { act, fireEvent, render } from '@testing-library/react-native';
 
 import { PublicProfileScreen } from '../screens/profile/PublicProfileScreen';
-import type { HonorSummary } from '@protin/shared-types';
+import type { HonorSummary } from '@sportsgang/shared-types';
 
 let mockSummary: HonorSummary | null = {
   userId: 'other-1',

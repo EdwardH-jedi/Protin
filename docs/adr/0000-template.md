@@ -18,7 +18,7 @@ What credible alternatives were considered?
 
 ## Rationale
 
-Why is this option appropriate for Protin now?
+Why is this option appropriate for SportsGang now?
 
 ## Consequences
 

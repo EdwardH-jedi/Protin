@@ -9,7 +9,7 @@ import React from 'react';
 import { act, fireEvent, render } from '@testing-library/react-native';
 
 import { BattleDetailScreen } from '../screens/battles/BattleDetailScreen';
-import type { EventDetail } from '@protin/shared-types';
+import type { EventDetail } from '@sportsgang/shared-types';
 
 let mockState: {
   detail: EventDetail | null;

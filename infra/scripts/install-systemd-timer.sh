@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install-systemd-timer.sh — install the protin-healthcheck systemd timer.
+# install-systemd-timer.sh — install the sportsgang-healthcheck systemd timer.
 #
 # Alternative to infra/scripts/install-cron.sh for hosts running systemd.
 # Both paths invoke the same cron-health-check.sh wrapper, so pick ONE —
@@ -8,7 +8,7 @@
 # Usage (as root on the staging/production host):
 #   sudo bash infra/scripts/install-systemd-timer.sh
 #
-# Assumes the repository is checked out at /opt/protin. If it lives
+# Assumes the repository is checked out at /opt/sportsgang. If it lives
 # elsewhere, edit WorkingDirectory / ExecStart in the .service unit (or
 # add a systemd drop-in) before enabling the timer.
 
@@ -23,8 +23,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UNIT_DIR="${SCRIPT_DIR}/../systemd"
 TARGET_DIR="/etc/systemd/system"
 
-SERVICE="protin-healthcheck.service"
-TIMER="protin-healthcheck.timer"
+SERVICE="sportsgang-healthcheck.service"
+TIMER="sportsgang-healthcheck.timer"
 
 echo "Installing ${SERVICE} and ${TIMER} into ${TARGET_DIR}..."
 install -m 0644 "${UNIT_DIR}/${SERVICE}" "${TARGET_DIR}/${SERVICE}"

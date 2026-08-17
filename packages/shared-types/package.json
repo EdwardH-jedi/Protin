@@ -1,8 +1,8 @@
 {
-  "name": "@protin/shared-types",
+  "name": "@sportsgang/shared-types",
   "version": "0.1.0",
   "private": true,
-  "description": "Shared TypeScript type contracts for the Protin platform",
+  "description": "Shared TypeScript type contracts for the SportsGang platform",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {

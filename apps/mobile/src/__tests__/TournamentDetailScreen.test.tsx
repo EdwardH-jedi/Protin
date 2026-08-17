@@ -10,7 +10,7 @@ import { Alert } from 'react-native';
 import { render, fireEvent, act, waitFor } from '@testing-library/react-native';
 
 import { TournamentDetailScreen } from '../screens/tournaments/TournamentDetailScreen';
-import type { TournamentDetail } from '@protin/shared-types';
+import type { TournamentDetail } from '@sportsgang/shared-types';
 
 const mockJoin = jest.fn();
 const mockLeave = jest.fn();

@@ -1,8 +1,8 @@
-# Protin Staging - Operational Runbook
+# SportsGang Staging - Operational Runbook
 
 Day-to-day operations on the RX6600 staging server.
 
-All commands assume you are in `/opt/protin` (the repo root) on the server.
+All commands assume you are in `/opt/sportsgang` (the repo root) on the server.
 
 Shorthand used throughout:
 ```bash
@@ -127,11 +127,11 @@ A healthy response:
 bash infra/scripts/backup.sh
 ```
 
-Backup files are saved to `infra/backups/protin_YYYYMMDDTHHMMSSZ.dump`.
+Backup files are saved to `infra/backups/sportsgang_YYYYMMDDTHHMMSSZ.dump`.
 
 **Recommended:** Schedule a daily backup via cron on the server:
 ```
-0 2 * * * cd /opt/protin && bash infra/scripts/backup.sh >> /var/log/protin-backup.log 2>&1
+0 2 * * * cd /opt/sportsgang && bash infra/scripts/backup.sh >> /var/log/sportsgang-backup.log 2>&1
 ```
 
 List existing backups:
@@ -152,7 +152,7 @@ Old backups must be deleted manually - there is no automatic retention policy.
 $COMPOSE stop api worker
 
 # Restore
-bash infra/scripts/restore.sh infra/backups/protin_20260318T020000Z.dump
+bash infra/scripts/restore.sh infra/backups/sportsgang_20260318T020000Z.dump
 
 # Run migrations to ensure schema is current
 $COMPOSE run --rm migrate
@@ -209,7 +209,7 @@ If notifications are not being delivered:
 3. Verify the Expo push token was registered (`POST /notifications/token` on login)
 4. Check the `notification_events` table in postgres:
    ```bash
-   $COMPOSE exec postgres psql -U protin -d protin \
+   $COMPOSE exec postgres psql -U sportsgang -d sportsgang \
      -c "SELECT id, notification_type, scheduled_at, sent_at, failed_reason FROM notification_events ORDER BY scheduled_at DESC LIMIT 20;"
    ```
 
@@ -218,7 +218,7 @@ If notifications are not being delivered:
 ## Accessing the database directly
 
 ```bash
-$COMPOSE exec postgres psql -U protin -d protin
+$COMPOSE exec postgres psql -U sportsgang -d sportsgang
 ```
 
 ---
@@ -299,8 +299,8 @@ bash infra/scripts/setup-server.sh
 # Log out and back in after this step
 
 # 2. Clone the repo
-git clone <repo-url> /opt/protin
-cd /opt/protin
+git clone <repo-url> /opt/sportsgang
+cd /opt/sportsgang
 
 # 3. Configure staging environment
 cp .env.staging.example .env.staging

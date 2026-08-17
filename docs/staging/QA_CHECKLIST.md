@@ -1,4 +1,4 @@
-# Protin Staging QA Checklist
+# SportsGang Staging QA Checklist
 
 Date: ___________
 Tester: ___________

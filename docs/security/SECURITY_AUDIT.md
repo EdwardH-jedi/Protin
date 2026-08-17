@@ -104,7 +104,7 @@ Severity ladder: **critical** → exploit available now in staging/prod posture 
 
 ### L5. JWT `sub` accepts any UUID-shaped string without verifying user existed at issue time
 - **Where:** `apps/api/app/core/security.py:41-49`
-- **Issue:** Cosmetic — the existence check happens in `get_current_user`. Minor robustness gain by signing `iss`/`aud` so cross-service token reuse is impossible if Protin later adds a second JWT issuer.
+- **Issue:** Cosmetic — the existence check happens in `get_current_user`. Minor robustness gain by signing `iss`/`aud` so cross-service token reuse is impossible if SportsGang later adds a second JWT issuer.
 
 ---
 

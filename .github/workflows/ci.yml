@@ -46,8 +46,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck -w @protin/mobile
+      - name: Typecheck shared contracts
+        run: npm run typecheck -w @sportsgang/shared-types
+
+      - name: Typecheck mobile
+        run: npm run typecheck -w @sportsgang/mobile
 
   lint-mobile:
     runs-on: ubuntu-latest
@@ -64,7 +67,7 @@ jobs:
         run: npm ci
 
       - name: Lint
-        run: npm run lint -w @protin/mobile
+        run: npm run lint -w @sportsgang/mobile
 
   test-mobile:
     runs-on: ubuntu-latest
@@ -82,7 +85,7 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npm run test:ci -w @protin/mobile
+        run: npm run test:ci -w @sportsgang/mobile
 
   test:
     # API tests use SQLite in-memory — no external services required.

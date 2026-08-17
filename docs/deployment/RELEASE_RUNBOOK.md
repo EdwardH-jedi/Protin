@@ -1,4 +1,4 @@
-# Protin — Release Runbook
+# SportsGang — Release Runbook
 
 Command-by-command path from a green `main` to a TestFlight build, and
 from TestFlight to the App Store.

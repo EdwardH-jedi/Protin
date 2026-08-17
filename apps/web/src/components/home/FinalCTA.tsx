@@ -37,7 +37,7 @@ export function FinalCTA() {
             data-reveal
             className="mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-slate-300 sm:text-xl"
           >
-            Join the waitlist. Be first to connect when Protin launches in
+            Join the waitlist. Be first to connect when SportsGang launches in
             your city.
           </p>
 

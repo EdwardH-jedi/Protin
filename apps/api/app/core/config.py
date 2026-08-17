@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     app_env: str = "local"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
-    postgres_url: str = "postgresql://protin:protin@localhost:5432/protin"
+    postgres_url: str = "postgresql://sportsgang:sportsgang@localhost:5432/sportsgang"
     redis_url: str = "redis://localhost:6379/0"
 
     # Google Calendar OAuth 2.0

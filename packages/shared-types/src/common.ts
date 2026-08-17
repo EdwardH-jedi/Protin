@@ -1,5 +1,5 @@
 /**
- * Common primitives shared across all Protin domains.
+ * Common primitives shared across all SportsGang domains.
  *
  * Keep this file minimal — only add a type here if at least two
  * domain files need it. Domain-specific primitives live in their

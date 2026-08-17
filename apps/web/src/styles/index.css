@@ -1,5 +1,5 @@
 /* Tailwind v4. `source(none)` disables auto-discovery so the draft folder
-   (`apps/web/Protin Landing Page Design/`) is never scanned for class names.
+   (`apps/web/SportsGang Landing Page Design/`) is never scanned for class names.
    We add only this app's source tree. */
 @import 'tailwindcss' source(none);
 @source '../**/*.{ts,tsx,html}';

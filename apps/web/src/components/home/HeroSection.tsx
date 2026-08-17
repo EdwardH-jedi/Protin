@@ -193,7 +193,7 @@ export function HeroSection() {
             data-reveal
             className="inline-block rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-200 backdrop-blur-sm"
           >
-            Protin · Fitness-first
+            SportsGang · Fitness-first
           </span>
 
           <h1
@@ -223,7 +223,7 @@ export function HeroSection() {
             data-reveal
             className="mx-auto mt-8 max-w-3xl text-lg leading-relaxed text-slate-300 sm:text-xl md:text-2xl"
           >
-            Protin connects people through fitness, sports, and real-life
+            SportsGang connects people through fitness, sports, and real-life
             activity — from gym sessions to golf rounds, running crews, and
             local events.
           </p>

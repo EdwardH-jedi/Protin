@@ -1,6 +1,6 @@
-# Protin
+# SportsGang
 
-Protin is the technical repository for SportsGang, a Sydney-first mobile product that helps people discover workout partners, coordinate activity, and book shared sessions. The product is partner-oriented rather than a trainer marketplace: users remain peers, and matching, safety, booking, and compatibility rules are explicit domain concerns.
+SportsGang is a Sydney-first mobile product that helps people discover workout partners, coordinate activity, and book shared sessions. The product is partner-oriented rather than a trainer marketplace: users remain peers, and matching, safety, booking, and compatibility rules are explicit domain concerns.
 
 | Layer | Stack |
 |---|---|
@@ -104,9 +104,14 @@ Expected output — both `Status` columns should read `Up (healthy)`:
 
 ```
 NAME               IMAGE                COMMAND                  STATUS
-protin-postgres-1  postgres:16-alpine   "docker-entrypoint.s…"  Up (healthy)
-protin-redis-1     redis:7-alpine       "docker-entrypoint.s…"  Up (healthy)
+sportsgang-postgres-1  postgres:16-alpine   "docker-entrypoint.s…"  Up (healthy)
+sportsgang-redis-1     redis:7-alpine       "docker-entrypoint.s…"  Up (healthy)
 ```
+
+The Compose project and default database credentials were renamed to
+`sportsgang`. Existing legacy Compose volumes are not renamed automatically;
+back up any local data that matters, then recreate or migrate the local stack
+under the new project name before relying on it.
 
 If services show `starting` rather than `healthy`, wait 10–15 seconds and run `npm run infra:ps` again.
 
@@ -224,10 +229,10 @@ uv run alembic downgrade -1                                         # roll back 
 
 ```bash
 cd apps/api && uv run ruff check . && uv run ruff format --check . && uv run pytest
-npm run typecheck -w @protin/shared-types
-npm run typecheck -w @protin/mobile
-npm run lint -w @protin/mobile
-npm run test:ci -w @protin/mobile
+npm run typecheck -w @sportsgang/shared-types
+npm run typecheck -w @sportsgang/mobile
+npm run lint -w @sportsgang/mobile
+npm run test:ci -w @sportsgang/mobile
 ```
 
 Run the checks relevant to the change locally; CI remains the pull-request gate.
@@ -245,7 +250,7 @@ npm run infra:ps
 # Both STATUS values should be "Up (healthy)"
 
 # Check PostgreSQL directly
-docker compose exec postgres pg_isready -U protin
+docker compose exec postgres pg_isready -U sportsgang
 # → /var/run/postgresql:5432 - accepting connections
 
 # Check Redis directly
@@ -271,15 +276,15 @@ is running but cannot reach that dependency — see [Troubleshooting](#troublesh
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `POSTGRES_DB` | `protin` | database name |
-| `POSTGRES_USER` | `protin` | database user |
-| `POSTGRES_PASSWORD` | `protin` | database password |
+| `POSTGRES_DB` | `sportsgang` | database name |
+| `POSTGRES_USER` | `sportsgang` | database user |
+| `POSTGRES_PASSWORD` | `sportsgang` | database password |
 | `POSTGRES_PORT` | `5432` | host port for PostgreSQL |
 | `REDIS_PORT` | `6379` | host port for Redis |
 | `APP_ENV` | `local` | reported in `/health` response |
 | `API_HOST` | `0.0.0.0` | uvicorn bind address |
 | `API_PORT` | `8000` | uvicorn bind port |
-| `POSTGRES_URL` | `postgresql://protin:protin@localhost:5432/protin` | used by API and Alembic |
+| `POSTGRES_URL` | `postgresql://sportsgang:sportsgang@localhost:5432/sportsgang` | used by API and Alembic |
 | `REDIS_URL` | `redis://localhost:6379/0` | used by API |
 | `EXPO_PUBLIC_API_URL` | `http://localhost:8000` | API base URL baked into mobile JS bundle |
 
@@ -312,7 +317,7 @@ and re-run migrations.
 
 1. Confirm PostgreSQL is healthy: `npm run infra:ps`
 2. Confirm `POSTGRES_URL` in `apps/api/.env` matches the credentials in `.env`
-   (default for both: `protin` / `protin` / `protin`)
+   (default for both: `sportsgang` / `sportsgang` / `sportsgang`)
 3. If you reset volumes with `npm run infra:reset`, re-run migrations:
    ```bash
    cd apps/api && uv run alembic upgrade head

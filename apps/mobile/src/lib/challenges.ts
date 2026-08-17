@@ -2,7 +2,7 @@
  * Sports Challenge API client.
  *
  * Thin wrapper around the typed ``/challenges`` surface. All payload
- * shapes live in ``@protin/shared-types``; the api helper auto-transforms
+ * shapes live in ``@sportsgang/shared-types``; the api helper auto-transforms
  * camelCase request bodies to snake_case on the wire and snake_case
  * responses back to camelCase. Mobile must never call any honor/rank
  * endpoint directly — result submission lives behind
@@ -16,7 +16,7 @@ import type {
   ChallengeStatus,
   CreateChallengeRequest,
   SubmitChallengeResultRequest,
-} from '@protin/shared-types';
+} from '@sportsgang/shared-types';
 
 export type {
   ChallengeListResponse,
@@ -24,7 +24,7 @@ export type {
   ChallengeStatus,
   CreateChallengeRequest,
   SubmitChallengeResultRequest,
-} from '@protin/shared-types';
+} from '@sportsgang/shared-types';
 
 export interface ListChallengesParams {
   status?: ChallengeStatus;

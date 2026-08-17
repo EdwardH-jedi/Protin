@@ -1,4 +1,4 @@
-# Protin — Privacy Policy
+# SportsGang — Privacy Policy
 
 **Last updated:** 2026-04-16
 **Effective:** [INSERT LAUNCH DATE]
@@ -10,13 +10,13 @@
 
 ## 1. Who we are
 
-Protin ("**we**", "**us**", "**our**") is an app that helps people find
+SportsGang ("**we**", "**us**", "**our**") is an app that helps people find
 workout partners for gym and golf sessions (with tennis and running
 supported). This Privacy Policy explains what personal information we
 collect, how we use it, and the choices you have.
 
 Data controller: [INSERT LEGAL ENTITY NAME AND ADDRESS]
-Contact: [privacy@protin.app]
+Contact: [privacy@sportsgang.app]
 
 ## 2. Information we collect
 
@@ -98,14 +98,14 @@ We do not share personal data with anyone else. We never sell it.
 You can, at any time:
 - **Access** — view and edit your profile, preferences, sport profiles, and bookings from within the app.
 - **Delete** — delete your entire account from Settings → Delete Account. This cascades deletion of your profile, sport profiles, discovery actions, matches, chat messages, bookings, push tokens, calendar tokens, and reports you submitted. Backups are purged on a rolling 30-day cycle.
-- **Export** — email us at [privacy@protin.app] and we will provide a machine-readable export within 30 days.
+- **Export** — email us at [privacy@sportsgang.app] and we will provide a machine-readable export within 30 days.
 - **Correct** — edit your profile in-app.
 - **Withdraw consent** — disconnect Google Calendar or disable push notifications from your device settings.
 - **Complain** — contact your local data protection authority. In Australia, this is the OAIC (oaic.gov.au).
 
 ## 7. Children
 
-Protin is for users aged **18 and over**. You confirm you are 18+ when you register. If we learn an account belongs to someone under 18, we will delete it.
+SportsGang is for users aged **18 and over**. You confirm you are 18+ when you register. If we learn an account belongs to someone under 18, we will delete it.
 
 ## 8. Security
 
@@ -127,5 +127,5 @@ If we materially change how we handle your data, we will notify you in the app a
 
 ## 11. Contact
 
-- **Email:** [privacy@protin.app]
+- **Email:** [privacy@sportsgang.app]
 - **Postal:** [INSERT BUSINESS ADDRESS]

@@ -324,7 +324,7 @@ fly deploy -a protin-api
 
 ### Manual API smoke (run from a logged-in shell with a bearer token)
 
-Both calls hit the Protin backend, which then talks to Google. The
+Both calls hit the SportsGang backend, which then talks to Google. The
 mobile client is intentionally not involved.
 
 ```bash
@@ -412,7 +412,7 @@ flagged the gaps; sign-off belongs to operator + legal.
 | Check | Command | Result |
 |---|---|---|
 | API tests (places + venues) | `python -m pytest apps/api/tests/test_places.py apps/api/tests/test_venues.py -q` | **PASS — 72 / 72** (5.65s) |
-| Mobile typecheck | `npm run typecheck --workspace @protin/mobile` | **PASS** (`tsc --noEmit`, no diagnostics) |
+| Mobile typecheck | `npm run typecheck --workspace @sportsgang/mobile` | **PASS** (`tsc --noEmit`, no diagnostics) |
 | Working-tree scope | `git status --short --untracked-files=all` | `M apps/api/tests/test_venues.py` (new safety test for wire-side raw-Google-field denylist) and `?? docs/release/GOOGLE_PLACES_RELEASE_QA.md` (this doc). No generated/cache files. |
 
 No shared-types typecheck was run, so no `tsconfig.tsbuildinfo` was

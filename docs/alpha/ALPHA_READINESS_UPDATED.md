@@ -1,4 +1,4 @@
-# Protin — Alpha Readiness (Updated)
+# SportsGang — Alpha Readiness (Updated)
 
 > **Historical snapshot — not current project documentation.** This audit is
 > preserved as evidence of the repository state on the date and branch below.

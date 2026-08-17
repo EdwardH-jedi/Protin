@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii, spacing, typography } from '../theme';
-import type { RankSummary } from '@protin/shared-types';
+import type { RankSummary } from '@sportsgang/shared-types';
 
 interface RankBadgeProps {
   summary: RankSummary | null;

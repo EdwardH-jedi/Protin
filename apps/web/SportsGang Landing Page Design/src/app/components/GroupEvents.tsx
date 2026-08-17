@@ -129,7 +129,7 @@ export function GroupEvents() {
             Never play alone again
           </h3>
           <p className="text-slate-300 text-lg leading-relaxed">
-            Whether you need one more for doubles or want to organize a weekend tournament, Protin makes group coordination effortless.
+            Whether you need one more for doubles or want to organize a weekend tournament, SportsGang makes group coordination effortless.
           </p>
         </div>
       </div>

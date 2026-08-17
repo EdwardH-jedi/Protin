@@ -1,4 +1,4 @@
-# Protin review responsibilities
+# SportsGang review responsibilities
 
 Reviews are evidence-based checks against the linked Issue, not ceremonial approvals. The pull-request thread is the record for findings, decisions, and intentionally deferred work.
 
@@ -18,7 +18,7 @@ Blocking findings must be fixed or explicitly rejected by the repository owner w
 
 ## Codex independent review
 
-Codex is the design challenger, adversarial verifier, integration reviewer, and workflow reviewer. It does not normally implement Protin features.
+Codex is the design challenger, adversarial verifier, integration reviewer, and workflow reviewer. It does not normally implement SportsGang features.
 
 Before implementation, Codex may challenge missing acceptance criteria, authorization boundaries, data or migration impact, API compatibility, edge cases, failure modes, rollback risk, and unnecessary architecture. It should prefer simplifying the proposal over expanding it.
 

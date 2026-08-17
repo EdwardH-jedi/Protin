@@ -9,7 +9,8 @@
  * localStorage becomes a UX cache, not the source of truth.
  */
 
-const STORAGE_KEY = 'protin.waitlist.v1';
+const STORAGE_KEY = 'sportsgang.waitlist.v1';
+const LEGACY_STORAGE_KEY = 'protin.waitlist.v1';
 
 // Practical RFC-5322-ish check. Backend must still validate.
 const EMAIL_RE =
@@ -37,7 +38,7 @@ export function hasJoinedWaitlist(): boolean {
   const ls = safeLocalStorage();
   if (!ls) return false;
   try {
-    return Boolean(ls.getItem(STORAGE_KEY));
+    return Boolean(readStoredRecord(ls));
   } catch {
     return false;
   }
@@ -47,13 +48,31 @@ export function getJoinedEmail(): string | null {
   const ls = safeLocalStorage();
   if (!ls) return null;
   try {
-    const raw = ls.getItem(STORAGE_KEY);
+    const raw = readStoredRecord(ls);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { email?: unknown };
     return typeof parsed.email === 'string' ? parsed.email : null;
   } catch {
     return null;
   }
+}
+
+function readStoredRecord(ls: Storage): string | null {
+  const current = ls.getItem(STORAGE_KEY);
+  if (current) return current;
+
+  const legacy = ls.getItem(LEGACY_STORAGE_KEY);
+  if (!legacy) return null;
+
+  // Preserve the prototype's existing browser state while making every
+  // subsequent read and write use the canonical SportsGang key.
+  try {
+    ls.setItem(STORAGE_KEY, legacy);
+    ls.removeItem(LEGACY_STORAGE_KEY);
+  } catch {
+    // If storage is read-only, the legacy record remains readable.
+  }
+  return legacy;
 }
 
 /**

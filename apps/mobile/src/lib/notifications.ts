@@ -2,7 +2,7 @@
  * Push notification registration using Expo Notifications.
  *
  * Call registerForPushNotifications() once on app startup (after auth).
- * On success it registers the Expo push token with the Protin API.
+ * On success it registers the Expo push token with the SportsGang API.
  *
  * The function is safe to call multiple times — the API upserts tokens.
  */

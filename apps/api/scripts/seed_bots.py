@@ -55,7 +55,7 @@ class BotSeed(dict):
 
 _BOTS: list[BotSeed] = [
     {
-        "email": "bot.alex@protin.local",
+        "email": "bot.alex@sportsgang.local",
         "display_name": "Alex Park",
         "birth_year": 1992,
         "suburb": "Surry Hills",
@@ -72,7 +72,7 @@ _BOTS: list[BotSeed] = [
         ],
     },
     {
-        "email": "bot.sam@protin.local",
+        "email": "bot.sam@sportsgang.local",
         "display_name": "Sam Chen",
         "birth_year": 1995,
         "suburb": "Bondi",
@@ -93,7 +93,7 @@ _BOTS: list[BotSeed] = [
         ],
     },
     {
-        "email": "bot.jordan@protin.local",
+        "email": "bot.jordan@sportsgang.local",
         "display_name": "Jordan Reyes",
         "birth_year": 1988,
         "suburb": "Newtown",
@@ -109,7 +109,7 @@ _BOTS: list[BotSeed] = [
         ],
     },
     {
-        "email": "bot.priya@protin.local",
+        "email": "bot.priya@sportsgang.local",
         "display_name": "Priya Singh",
         "birth_year": 1990,
         "suburb": "Manly",
@@ -131,7 +131,7 @@ _BOTS: list[BotSeed] = [
         ],
     },
     {
-        "email": "bot.taylor@protin.local",
+        "email": "bot.taylor@sportsgang.local",
         "display_name": "Taylor Kim",
         "birth_year": 1997,
         "suburb": "Paddington",

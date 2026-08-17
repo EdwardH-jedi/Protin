@@ -11,7 +11,7 @@ import React from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import { ChallengeDetailScreen } from '../screens/challenges/ChallengeDetailScreen';
-import type { ChallengeRead, ChallengeStatus } from '@protin/shared-types';
+import type { ChallengeRead, ChallengeStatus } from '@sportsgang/shared-types';
 
 let mockDetail: ChallengeRead | null;
 let mockIsLoading: boolean;

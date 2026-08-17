@@ -10,7 +10,7 @@ import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 
 import { ChallengeListScreen } from '../screens/challenges/ChallengeListScreen';
-import type { ChallengeRead, ChallengeStatus } from '@protin/shared-types';
+import type { ChallengeRead, ChallengeStatus } from '@sportsgang/shared-types';
 
 let mockHookState: {
   items: ChallengeRead[];

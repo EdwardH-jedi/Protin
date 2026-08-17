@@ -1,7 +1,7 @@
-# Protin - Release Gate Checklist
+# SportsGang - Release Gate Checklist
 
-Canonical go/no-go artifact for moving Protin between release stages. Use this
-document to decide one question: **is Protin ready to move to the next release
+Canonical go/no-go artifact for moving SportsGang between release stages. Use this
+document to decide one question: **is SportsGang ready to move to the next release
 stage yet?**
 
 It does not teach release mechanics (see the runbook), it does not define App
@@ -150,7 +150,7 @@ Subsections 4.1 through 4.5 rest on this summary.
   section 6.1; they are unrelated to the five priority areas.
 - **Mobile typecheck is clean** (`tsc --noEmit`) after the shared-types
   alignment that consolidates auth/onboarding/profile types with
-  `@protin/shared-types`.
+  `@sportsgang/shared-types`.
 - **No real-iPhone verification has been performed for sections 4.1
   through 4.5.** Every row in those subsections that requires a device
   run is `[ ]`.
@@ -473,7 +473,7 @@ known-absent repo artifacts, and Apple-side unknowns live.
 | Push end-to-end on real iPhone not yet proven | Code-and-config readiness is not APNs delivery; claiming push as ready is the single highest rejection risk | Gate 2 push claim, Gate 3 | mobile and api | Section 4.3 rows checked with dated evidence |
 | Google Calendar flow not yet proven on real iPhone | Surface is exposed in booking UI; if unverified at Gate 3, hide or mark as optional | Gate 3 (risk) | mobile | Section 4.4 rows checked or feature hidden behind a flag |
 | Legal URLs in `apps/mobile/src/lib/legal.ts` still point at unpublished paths | App Store requires reachable Privacy Policy URL; mismatch risks a 5.1.2 rejection | Gate 3 | release owner | RESOLVED 2026-05-05 — URLs hosted on Netlify (`https://sportgang.netlify.app/{privacy,terms,support}/`), pinned on EAS preview + production via `EXPO_PUBLIC_*_URL`, and tap-tested on real iPhone (section 4.6). Hardcoded fallback constants in `apps/mobile/src/lib/legal.ts` may still be swapped in a separate slice once the env-driven flow is the only path. |
-| Public-facing brand spelling normalization to `SportsGang` / `sportsgang` | Operator decided 2026-05-05 to standardize on `SportsGang` (the inner `s` better implies multiple sports and future multi-sport expansion). On `release/v1` this commit normalized: visible mobile copy (`apps/mobile/src/screens/safety/ReportScreen.tsx` + matching test assertion), all release/deployment/legal docs, and the env-example comments. `apps/mobile/app.config.js` `expo.name` was already `SportsGang` and remains unchanged. Technical identifiers (slug `protin`, bundle ID `com.edh1223.protin`, npm workspaces `@protin/*`, EAS project `@edwardh1234/protin`) are intentionally preserved for v1. The Netlify deployment URL `https://sportgang.netlify.app/` is intentionally preserved (the public brand is `SportsGang` but the hostname stays). The website pages and README at `apps/web/site/` live on `feature/sportgang-official-website` (not on `release/v1`) and still need the same normalization on that branch | Gate 3 | release owner | RESOLVED on `release/v1` 2026-05-05 for the artifacts on this branch. Open: same normalization on `feature/sportgang-official-website` for the live website HTML/CSS, and an optional later swap of the Netlify hostname to a `sportsgang.*` custom domain |
+| Public-facing brand spelling normalization to `SportsGang` / `sportsgang` | Operator decided 2026-05-05 to standardize on `SportsGang`. Current product copy, active website content, repository documentation, npm workspaces, and local development identifiers are normalized. Externally registered identifiers remain stable for v1: slug `protin`, bundle ID `com.edh1223.protin`, EAS project `@edwardh1234/protin`, deployed Fly name `protin-api`, and the Netlify hostname `sportgang.netlify.app`. | Gate 3 | release owner | RESOLVED in repository content. A later owner-managed external identity migration is optional and must coordinate Apple, Google, EAS, hosting, and DNS. |
 | Delete-account not verified on real device | Core Apple 5.1.1(v) requirement; code-only is not proof | Gate 2 and Gate 3 | mobile and api | Section 4.2 rows checked |
 | Reviewer-usable staging environment not confirmed live | Confirmed CONFIRMED-DOWN as of 2026-05-07: `curl https://protin-api.fly.dev/health` returns `Could not resolve host`. The Fly app `protin-api` has not been created yet (no `fly launch` run). All wiring is in place — `fly.toml` at the repo root, Dockerfile at `apps/api/Dockerfile`, deploy guide at `infra/fly/README.md` (corrected 2026-05-07 to fix the broken `FIELD_ENCRYPTION_KEY` generator command and add the `APP_ENV`, `INTERNAL_API_TOKEN`, `APPLE_CLIENT_ID`, and `POSTGRES_URL`-mirror secrets that were absent from the prior list) — but `eas.json` `EXPO_PUBLIC_API_URL=https://protin-api.fly.dev` will only resolve once the user runs the README's `fly launch` -> `fly postgres / redis create` -> `fly secrets set` -> `fly deploy` -> `fly ssh ... alembic upgrade head` flow. | Gate 1, Gate 2, Gate 3 | infra / release owner | Run `infra/fly/README.md` end-to-end, then capture `curl https://protin-api.fly.dev/health` → `200 ok` with `db: ok` and `redis: ok`, plus a reviewer account login probe |
 | Real-device verification not performed | Sections 4.1 through 4.5 rows that require a real-iPhone run cannot be checked without one. The Current verification state summary in section 4 records what backend-only evidence exists today | Gate 2, Gate 3 | mobile + release owner | A dated device run per section 4 row, captured by owner |
@@ -503,7 +503,7 @@ are checked and **none** of the no-go conditions are present.
 
 ### Gate 1 - Internal Beta
 
-**Entry intent:** Protin team members can install or run the app (simulator
+**Entry intent:** SportsGang team members can install or run the app (simulator
 or TestFlight-internal) against a usable backend to exercise core auth,
 profile, and discovery flows.
 

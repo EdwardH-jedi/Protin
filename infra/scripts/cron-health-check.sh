@@ -2,13 +2,13 @@
 # cron-health-check.sh — wrapper around health-check.sh for cron execution.
 #
 # Runs the health check and, on failure, appends a timestamped entry to
-# /var/log/protin/health-failures.log. Always exits 0 so cron does not
+# /var/log/sportsgang/health-failures.log. Always exits 0 so cron does not
 # send root mail on transient failures.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_DIR="/var/log/protin"
+LOG_DIR="/var/log/sportsgang"
 LOG_FILE="${LOG_DIR}/health-failures.log"
 
 mkdir -p "${LOG_DIR}"

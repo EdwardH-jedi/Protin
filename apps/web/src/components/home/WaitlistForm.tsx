@@ -24,8 +24,8 @@ type Status =
 const MESSAGES = {
   empty: 'Enter your email to join the waitlist.',
   invalid: 'Please enter a valid email address.',
-  already: "You're already on the Protin waitlist on this device.",
-  success: "You're on the list — we'll let you know when Protin opens.",
+  already: "You're already on the SportsGang waitlist on this device.",
+  success: "You're on the list — we'll let you know when SportsGang opens.",
 } as const;
 
 const VARIANT_STYLES: Record<
@@ -147,7 +147,7 @@ export function WaitlistForm({ variant = 'hero', onSuccess }: WaitlistFormProps)
     <form
       onSubmit={handleSubmit}
       noValidate
-      aria-label="Join the Protin waitlist"
+      aria-label="Join the SportsGang waitlist"
       className="mx-auto w-full"
     >
       <div

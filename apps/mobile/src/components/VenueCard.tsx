@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii, spacing, typography } from '../theme';
-import type { Venue } from '@protin/shared-types';
+import type { Venue } from '@sportsgang/shared-types';
 
 interface VenueCardProps {
   venue: Venue;

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Protin — PostgreSQL restore script
+# SportsGang — PostgreSQL restore script
 #
 # Restores a pg_dump backup file into the running staging database.
 #
 # Usage:
-#   bash infra/scripts/restore.sh infra/backups/protin_20260318T020000Z.dump
+#   bash infra/scripts/restore.sh infra/backups/sportsgang_20260318T020000Z.dump
 #
 # WARNING: This will DROP and recreate the database. All current data
 # will be lost. Stop the API and worker before restoring.

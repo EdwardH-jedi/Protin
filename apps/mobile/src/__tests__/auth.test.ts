@@ -70,7 +70,7 @@ describe('useAuthStore — login hydrates user via /auth/me', () => {
     await useAuthStore.getState().login('chris@example.com', 'password123');
 
     // Token was persisted to SecureStore and to the api module.
-    expect(SecureStore.setItemAsync).toHaveBeenCalledWith('protin.auth.token', FAKE_TOKEN);
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith('sportsgang.auth.token', FAKE_TOKEN);
     expect(mockSetToken).toHaveBeenCalledWith(FAKE_TOKEN);
 
     // /auth/me was fetched after the token landed.
@@ -92,7 +92,7 @@ describe('useAuthStore — login hydrates user via /auth/me', () => {
 
     // SecureStore was wiped, the api module's token was reset, and the
     // store ends up with no token + no user (clean logged-out state).
-    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('protin.auth.token');
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('sportsgang.auth.token');
     expect(mockSetToken).toHaveBeenLastCalledWith(null);
     const state = useAuthStore.getState();
     expect(state.token).toBeNull();
@@ -265,5 +265,25 @@ describe('useAuthStore — stale auth-op results cannot overwrite a later identi
 
     expect(useAuthStore.getState().user?.id).toBe('sarah-id');
     expect(useAuthStore.getState().token).toBe('sarah-token');
+  });
+});
+
+describe('useAuthStore — legacy token-key migration', () => {
+  it('moves an existing legacy token to the SportsGang key during initialization', async () => {
+    (SecureStore.getItemAsync as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce('legacy-token');
+    mockApiGet.mockResolvedValue({ ...FAKE_ME, id: 'legacy-user' });
+
+    await useAuthStore.getState().initialize();
+
+    expect(SecureStore.getItemAsync).toHaveBeenNthCalledWith(1, 'sportsgang.auth.token');
+    expect(SecureStore.getItemAsync).toHaveBeenNthCalledWith(2, 'protin.auth.token');
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+      'sportsgang.auth.token',
+      'legacy-token'
+    );
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('protin.auth.token');
+    expect(useAuthStore.getState().user?.id).toBe('legacy-user');
   });
 });

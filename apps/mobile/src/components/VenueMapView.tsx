@@ -9,7 +9,7 @@ import MapView, {
 } from 'react-native-maps';
 
 import { colors, radii, spacing, typography } from '../theme';
-import type { Venue } from '@protin/shared-types';
+import type { Venue } from '@sportsgang/shared-types';
 
 /**
  * Whether the Google Maps SDK key is configured for the CURRENT

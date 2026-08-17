@@ -294,10 +294,10 @@ async def test_apple_sign_in_creates_user_on_first_call(client: AsyncClient, mon
 
     # Force a non-empty apple_client_id for this test
     settings = config_module.get_settings()
-    monkeypatch.setattr(settings, "apple_client_id", "com.protin.app")
+    monkeypatch.setattr(settings, "apple_client_id", "com.sportsgang.app")
 
     async def fake_verify(identity_token, *, audience, nonce=None, http_client=None):
-        assert audience == "com.protin.app"
+        assert audience == "com.sportsgang.app"
         return {
             "sub": "001234.apple-user-id",
             "email": "apple-user@example.com",
@@ -339,7 +339,7 @@ async def test_apple_sign_in_rejects_invalid_token(client: AsyncClient, monkeypa
     from app.services.apple_auth import AppleIdentityTokenError
 
     settings = config_module.get_settings()
-    monkeypatch.setattr(settings, "apple_client_id", "com.protin.app")
+    monkeypatch.setattr(settings, "apple_client_id", "com.sportsgang.app")
 
     async def fake_verify(identity_token, *, audience, nonce=None, http_client=None):
         raise AppleIdentityTokenError("Identity token verification failed: bad signature")
@@ -377,7 +377,7 @@ async def test_apple_sign_in_links_existing_user_by_verified_email(
     from app.routers import auth as auth_router
 
     settings = config_module.get_settings()
-    monkeypatch.setattr(settings, "apple_client_id", "com.protin.app")
+    monkeypatch.setattr(settings, "apple_client_id", "com.sportsgang.app")
 
     # Seed an email/password user directly (no /register dependency on bcrypt).
     async with _TestSession() as session:
@@ -422,7 +422,7 @@ async def test_apple_sign_in_does_not_link_via_client_supplied_email(
     from app.routers import auth as auth_router
 
     settings = config_module.get_settings()
-    monkeypatch.setattr(settings, "apple_client_id", "com.protin.app")
+    monkeypatch.setattr(settings, "apple_client_id", "com.sportsgang.app")
 
     async with _TestSession() as session:
         victim = User(email="victim@example.com", hashed_password="x" * 60)
@@ -466,7 +466,7 @@ async def test_apple_sign_in_propagates_nonce_mismatch_as_401(
     from app.services.apple_auth import AppleIdentityTokenError
 
     settings = config_module.get_settings()
-    monkeypatch.setattr(settings, "apple_client_id", "com.protin.app")
+    monkeypatch.setattr(settings, "apple_client_id", "com.sportsgang.app")
 
     async def fake_verify(identity_token, *, audience, nonce=None, http_client=None):
         raise AppleIdentityTokenError("Nonce mismatch")
@@ -495,7 +495,7 @@ async def test_apple_sign_in_first_time_without_verified_email_is_rejected(
     from app.routers import auth as auth_router
 
     settings = config_module.get_settings()
-    monkeypatch.setattr(settings, "apple_client_id", "com.protin.app")
+    monkeypatch.setattr(settings, "apple_client_id", "com.sportsgang.app")
 
     apple_sub = "001111.no-verified-email-user"
 
@@ -608,7 +608,7 @@ def _configure_apple_revocation(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.core import config as config_module
 
     settings = config_module.get_settings()
-    monkeypatch.setattr(settings, "apple_client_id", "com.protin.app")
+    monkeypatch.setattr(settings, "apple_client_id", "com.sportsgang.app")
     monkeypatch.setattr(settings, "apple_team_id", "TEAM123456")
     monkeypatch.setattr(settings, "apple_key_id", "KEY1234567")
     monkeypatch.setattr(settings, "apple_private_key", "dummy-pem")

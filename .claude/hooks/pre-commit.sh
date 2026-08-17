@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# pre-commit.sh — Protin harness pre-commit hook
+# pre-commit.sh — SportsGang harness pre-commit hook
 # Registered as: PreToolUse + Bash matcher on "git commit"
 # Exits 0 immediately for any non-commit command.
 

@@ -11,7 +11,7 @@ import { AgeRangeSelector } from '../../components/AgeRangeSelector';
 import { Screen } from '../../components/Screen';
 import { useProfileStore } from '../../stores/profile';
 import { colors, radii, spacing, typography } from '../../theme';
-import type { GenderPreference } from '@protin/shared-types';
+import type { GenderPreference } from '@sportsgang/shared-types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/types';
 

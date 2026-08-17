@@ -1,10 +1,10 @@
 /**
- * @protin/shared-types
+ * @sportsgang/shared-types
  *
- * Shared TypeScript type contracts for the Protin platform.
+ * Shared TypeScript type contracts for the SportsGang platform.
  *
  * Import from this barrel in all consumers:
- *   import type { User, PartnerCard, Match } from '@protin/shared-types';
+ *   import type { User, PartnerCard, Match } from '@sportsgang/shared-types';
  *
  * Domain map:
  *   common          — primitives: UUID, ISODateString, Paginated, ApiError

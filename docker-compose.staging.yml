@@ -1,5 +1,5 @@
 # =============================================================================
-# Protin — staging docker-compose override
+# SportsGang — staging docker-compose override
 #
 # Extends the base docker-compose.yml with the API, worker, and nginx
 # services needed for a complete staging deployment on the RX6600 server.
@@ -15,7 +15,7 @@
 #        -f docker-compose.staging.yml run --rm migrate
 # =============================================================================
 
-name: protin-staging
+name: sportsgang-staging
 
 services:
 

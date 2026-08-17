@@ -1,5 +1,5 @@
 {
-  "name": "protin",
+  "name": "sportsgang",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -11,10 +11,10 @@
     "infra:reset": "docker compose down -v && docker compose up -d",
     "infra:logs": "docker compose logs -f",
     "infra:ps": "docker compose ps",
-    "mobile:start": "npm run start --workspace @protin/mobile",
-    "mobile:android": "npm run android --workspace @protin/mobile",
-    "mobile:ios": "npm run ios --workspace @protin/mobile",
-    "mobile:web": "npm run web --workspace @protin/mobile"
+    "mobile:start": "npm run start --workspace @sportsgang/mobile",
+    "mobile:android": "npm run android --workspace @sportsgang/mobile",
+    "mobile:ios": "npm run ios --workspace @sportsgang/mobile",
+    "mobile:web": "npm run web --workspace @sportsgang/mobile"
   },
   "devDependencies": {
     "@expo/config-plugins": "~54.0.4"

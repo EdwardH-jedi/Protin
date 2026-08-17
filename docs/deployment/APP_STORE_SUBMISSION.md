@@ -3,12 +3,12 @@
 > **Public brand vs. technical identifier note.** The App Store
 > Connect *public* app record name is **SportsGang** (the inner `s`
 > is intentional). The technical identifiers used by the build path
-> — slug `protin`, iOS bundle identifier `com.edh1223.protin`,
-> Android package `com.edh1223.protin`, npm workspaces `@protin/*`,
-> EAS project `@edwardh1234/protin` — remain unchanged for v1 and
-> are intentionally distinct from the public brand. References to
-> "Protin" in this file appearing in technical contexts (bundle ID,
-> SKU prefix, internal/legacy naming) are correct as written.
+> — slug `protin`, iOS bundle identifier `com.edh1223.protin`, Android
+> package `com.edh1223.protin`, and EAS project `@edwardh1234/protin` — remain
+> unchanged for v1 because they are externally registered. Repository-owned
+> npm workspaces use `@sportsgang/*`. Legacy strings that remain in bundle,
+> SKU, domain, or deployed-service contexts are external identifiers, not the
+> public product name.
 
 > **Scope note.** This document is the **metadata / template reference**
 > for the App Store Connect submission forms (field values, reviewer-notes
@@ -231,7 +231,7 @@ review-notes block itself (see §6 Required test data).
 | Field | Character limit | Source of truth |
 |---|---|---|
 | Promotional Text | 170 | `APP_STORE_METADATA.md` §2 (editable without a new build). |
-| Description | 4000 | `APP_STORE_METADATA.md` §4. The canonical v1 description there reflects the shipped flows: discovery → connect → chat → propose a session with court/venue → Accept/Decline → Events tab → Privacy/Terms/Support. The earlier draft that lived here used "Protin" branding, swipe/like/pass/save framing, and Google Calendar copy that no longer match v1; do not use it. |
+| Description | 4000 | `APP_STORE_METADATA.md` §4. The canonical v1 description there reflects the shipped flows: discovery → connect → chat → propose a session with court/venue → Accept/Decline → Events tab → Privacy/Terms/Support. The earlier draft that lived here used "SportsGang" branding, swipe/like/pass/save framing, and Google Calendar copy that no longer match v1; do not use it. |
 | Keywords | 100 (comma-separated) | `APP_STORE_METADATA.md` §5. The earlier draft that lived here (`workout partner,gym buddy,…,matchmaking,…`) carried dating-app vocabulary (`matchmaking`) and is superseded. |
 | Support URL | - | `https://sportgang.netlify.app/support/` — live on Netlify (`apps/web/site/support/index.html`). Required field; same address must align with the App Review Contact email once a real `support@` mailbox exists. |
 | Marketing URL | - | `https://sportgang.netlify.app/` — optional in ASC; the Netlify-hosted home page is reachable today, so it can be supplied. Replace with a custom domain if/when one is pinned. |

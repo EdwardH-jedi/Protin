@@ -142,10 +142,10 @@ They do not block staging but must be resolved before production release.
 
 | File | Issue | Status |
 |---|---|---|
-| `apps/mobile/src/stores/profile.ts` | Defines local `UserProfile`, `IdentityPreferences`, `SportProfile` instead of importing from `@protin/shared-types` | Open |
-| `apps/mobile/src/screens/bookings/BookingDetailScreen.tsx` | Local `BookingDetail` interface defined inline instead of importing `BookingDetail` from `@protin/shared-types` | Open |
-| `apps/mobile/src/screens/matches/MatchesScreen.tsx` | Local `Match`, `PartnerSummary`, `MatchListResponse` defined inline instead of using `MatchWithPartner`, `MatchListResponse` from `@protin/shared-types` | Open |
-| `apps/mobile/src/screens/chat/ChatScreen.tsx` | Local `Message`, `MessageListResponse` defined inline instead of importing from `@protin/shared-types` | Open |
+| `apps/mobile/src/stores/profile.ts` | Defines local `UserProfile`, `IdentityPreferences`, `SportProfile` instead of importing from `@sportsgang/shared-types` | Open |
+| `apps/mobile/src/screens/bookings/BookingDetailScreen.tsx` | Local `BookingDetail` interface defined inline instead of importing `BookingDetail` from `@sportsgang/shared-types` | Open |
+| `apps/mobile/src/screens/matches/MatchesScreen.tsx` | Local `Match`, `PartnerSummary`, `MatchListResponse` defined inline instead of using `MatchWithPartner`, `MatchListResponse` from `@sportsgang/shared-types` | Open |
+| `apps/mobile/src/screens/chat/ChatScreen.tsx` | Local `Message`, `MessageListResponse` defined inline instead of importing from `@sportsgang/shared-types` | Open |
 | `apps/mobile/src/stores/auth.ts` | Local `AuthResponse` has `accessToken`/`tokenType` fields — matches shared-types `TokenResponse` shape but does not import from package | Open |
 
 ---

@@ -1,5 +1,5 @@
 # =============================================================================
-# Docker build-context excludes for the SportsGang / Protin monorepo.
+# Docker build-context excludes for the SportsGang / SportsGang monorepo.
 #
 # The Fly build context is the repo root (see fly.toml at the root +
 # apps/api/Dockerfile's `apps/api/...` COPY paths). Everything below is

@@ -1,4 +1,4 @@
-# Protin branch and commit strategy
+# SportsGang branch and commit strategy
 
 All development happens on focused branches. `main` is the integration branch and feeds staging; there is no separate `develop` branch.
 

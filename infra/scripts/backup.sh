@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Protin — PostgreSQL backup script
+# SportsGang — PostgreSQL backup script
 #
 # Creates a compressed pg_dump of the staging database and saves it to
 # infra/backups/ with a timestamp in the filename.
@@ -9,7 +9,7 @@
 #   bash infra/scripts/backup.sh
 #
 # Scheduling (cron example — daily at 2 AM):
-#   0 2 * * * cd /path/to/protin && bash infra/scripts/backup.sh >> /var/log/protin-backup.log 2>&1
+#   0 2 * * * cd /path/to/sportsgang && bash infra/scripts/backup.sh >> /var/log/sportsgang-backup.log 2>&1
 #
 # Retention: manually delete old backups from infra/backups/ as needed.
 # =============================================================================
@@ -33,7 +33,7 @@ POSTGRES_USER=$(grep '^POSTGRES_USER=' "$REPO_ROOT/.env.staging" | cut -d= -f2)
 POSTGRES_DB=$(grep '^POSTGRES_DB=' "$REPO_ROOT/.env.staging" | cut -d= -f2)
 
 TIMESTAMP=$(date -u '+%Y%m%dT%H%M%SZ')
-BACKUP_FILE="$BACKUP_DIR/protin_${TIMESTAMP}.dump"
+BACKUP_FILE="$BACKUP_DIR/sportsgang_${TIMESTAMP}.dump"
 
 echo "==> Backing up database '${POSTGRES_DB}' to ${BACKUP_FILE}…"
 

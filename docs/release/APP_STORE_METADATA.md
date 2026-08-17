@@ -17,7 +17,7 @@ without touching app code.
 
 | Field | Draft value | Notes |
 |---|---|---|
-| App Store display name | `SportsGang` | **Resolved 2026-05-05: public brand spelling is `SportsGang` / `sportsgang`** (the inner `s` better implies multiple sports and future multi-sport expansion). The mobile config (`app.config.js` `expo.name`) already uses `SportsGang` and is unchanged. Technical identifiers remain unchanged for v1: slug `protin`, iOS `bundleIdentifier` `com.edh1223.protin`, Android `package` `com.edh1223.protin`, npm workspace names `@protin/*`, EAS project `@edwardh1234/protin`. |
+| App Store display name | `SportsGang` | **Resolved 2026-05-05: public brand spelling is `SportsGang` / `sportsgang`** (the inner `s` better implies multiple sports and future multi-sport expansion). The mobile config (`app.config.js` `expo.name`) already uses `SportsGang`. Externally registered identifiers remain unchanged for v1: slug `protin`, iOS `bundleIdentifier` `com.edh1223.protin`, Android `package` `com.edh1223.protin`, and EAS project `@edwardh1234/protin`. Repository-owned npm workspaces use `@sportsgang/*`. |
 | App Store subtitle (≤30 chars) | `Find your next game` | 19 chars. v1 finalized wording — "next game" emphasises the session-and-play angle of the product instead of profile/match positioning. |
 | Bundle identifier | `com.edh1223.protin` | Already wired in `app.config.js`. Document only — do not change for v1. Technical IDs intentionally diverge from the public brand. |
 | SKU (App Store Connect, internal) | `protin-ios-1` | Suggestion. Must be unique within the developer account. Internal-only; never user-visible. |
@@ -363,7 +363,7 @@ For the device-class capture mechanics (iPhone 16 Pro Max 6.9", iPhone
 
 | # | Item | Resolution |
 |---|---|---|
-| R1 | Public brand spelling (`SportGang` vs `SportsGang`) | Resolved 2026-05-05: public brand is `SportsGang` / `sportsgang`. Technical identifiers (slug `protin`, bundle ID `com.edh1223.protin`, npm workspaces `@protin/*`, EAS project `@edwardh1234/protin`) intentionally unchanged for v1. |
+| R1 | Public brand spelling (`SportGang` vs `SportsGang`) | Resolved 2026-05-05: public brand is `SportsGang` / `sportsgang`. Externally registered identifiers (slug `protin`, bundle ID `com.edh1223.protin`, EAS project `@edwardh1234/protin`) remain unchanged for v1; repository-owned npm workspaces use `@sportsgang/*`. |
 | R2 | Privacy / Terms / Support pages reachable over HTTPS | Done on Netlify — see §8 URL table. All four routes return `200 OK` HTML over HTTPS today. |
 | R3 | Mobile EAS env values for legal/support URLs | `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_SUPPORT_URL` pinned on EAS `preview` and `production`. Verify with `eas env:list --environment {preview,production}`. |
 | R4 | Real-iPhone tap-test of in-app legal/support links | PASS, 2026-05-05 — recorded in `RELEASE_GATE_CHECKLIST.md` §4.6. All five links opened the expected Netlify pages, no "link unavailable" alert, no 404, no crash. |

@@ -1,6 +1,6 @@
 # Naming Conventions
 
-Canonical names for all entities, fields, and concepts in the Protin platform.
+Canonical names for all entities, fields, and concepts in the SportsGang platform.
 Follow these consistently across the API (Python/FastAPI), shared-types (TypeScript),
 and the mobile client (React Native/TypeScript).
 
@@ -190,7 +190,7 @@ GET /matches?limit=50&offset=0
 
 ## Terms aligned to product
 
-These terms keep mobile copy and codebase consistent with what Protin is:
+These terms keep mobile copy and codebase consistent with what SportsGang is:
 a booking-first workout partner app, not a trainer marketplace.
 
 | Context | Use | Do not use |

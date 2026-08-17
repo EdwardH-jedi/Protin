@@ -1,7 +1,7 @@
 /**
  * Events ("battles" in the UI) API client.
  *
- * Wraps the typed /events surface. The shared @protin/shared-types
+ * Wraps the typed /events surface. The shared @sportsgang/shared-types
  * package owns the response shapes — this file is intentionally thin
  * so the type contract stays in one place.
  */
@@ -17,7 +17,7 @@ import type {
   EventMode,
   HostAttendanceUpdateRequest,
   SelfAttendanceRequest,
-} from '@protin/shared-types';
+} from '@sportsgang/shared-types';
 
 export type {
   CreateEventRequest,
@@ -35,7 +35,7 @@ export type {
   AttendanceListResponse,
   HostAttendanceUpdateRequest,
   SelfAttendanceRequest,
-} from '@protin/shared-types';
+} from '@sportsgang/shared-types';
 
 export interface ListEventsParams {
   mine?: boolean;

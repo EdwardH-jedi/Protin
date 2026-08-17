@@ -9,7 +9,7 @@ backend-only contract test.
 
 Run staging first. Production is a separate explicit step.
 
-Bearer token comes from the PROTIN_SMOKE_TOKEN environment variable by
+Bearer token comes from the SPORTSGANG_SMOKE_TOKEN environment variable by
 default (preferred -- shell history / process listings don't leak the
 value). ``--token`` is supported as an override but discouraged.
 
@@ -690,9 +690,9 @@ def _argparser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--token",
-        default=os.environ.get("PROTIN_SMOKE_TOKEN", ""),
+        default=os.environ.get("SPORTSGANG_SMOKE_TOKEN", ""),
         help=(
-            "Bearer token (override). Prefer the PROTIN_SMOKE_TOKEN env var "
+            "Bearer token (override). Prefer the SPORTSGANG_SMOKE_TOKEN env var "
             "-- CLI args show up in shell history and process listings. "
             "Never printed by this script."
         ),
@@ -806,7 +806,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.token:
         print(
-            "smoke_venues_live: --token (or PROTIN_SMOKE_TOKEN env var) is required when --dry-run is not set.",
+            "smoke_venues_live: --token (or SPORTSGANG_SMOKE_TOKEN env var) is required when --dry-run is not set.",
             file=sys.stderr,
         )
         return 2

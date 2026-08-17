@@ -10,7 +10,7 @@ import React from 'react';
 import { act, fireEvent, render } from '@testing-library/react-native';
 
 import { AttendanceCheckScreen } from '../screens/battles/AttendanceCheckScreen';
-import type { AttendanceEntry, EventDetail } from '@protin/shared-types';
+import type { AttendanceEntry, EventDetail } from '@sportsgang/shared-types';
 
 let mockAttendanceState: {
   data: { eventId: string; hostUserId: string; items: AttendanceEntry[] } | null;

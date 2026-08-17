@@ -1,5 +1,5 @@
 """
-Protin notification worker.
+SportsGang notification worker.
 
 Polls notification_events for due push notifications and delivers them
 via the Expo push notification service.

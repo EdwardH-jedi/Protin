@@ -44,7 +44,7 @@ def test_bot_emails_are_unique_and_local_domain() -> None:
     emails = [b["email"] for b in seed_bots._BOTS]
     assert len(set(emails)) == len(emails), "duplicate email in _BOTS"
     for email in emails:
-        assert email.endswith("@protin.local"), f"non-local email: {email}"
+        assert email.endswith("@sportsgang.local"), f"non-local email: {email}"
 
 
 def test_bot_required_fields_present() -> None:

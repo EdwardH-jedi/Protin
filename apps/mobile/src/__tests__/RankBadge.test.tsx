@@ -10,7 +10,7 @@ import React from 'react';
 import { render } from '@testing-library/react-native';
 
 import { RankBadge } from '../components/RankBadge';
-import type { RankSummary } from '@protin/shared-types';
+import type { RankSummary } from '@sportsgang/shared-types';
 
 jest.mock('../theme', () => ({
   colors: {

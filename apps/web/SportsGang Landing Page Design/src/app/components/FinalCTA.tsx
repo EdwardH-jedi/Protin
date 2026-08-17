@@ -87,7 +87,7 @@ export function FinalCTA({ onJoinWaitlist }: FinalCTAProps) {
       <footer className="absolute bottom-0 left-0 right-0 py-8 border-t border-white/10">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center text-slate-400">
-            <p className="mb-2">© 2026 Protin. Building the future of fitness connections.</p>
+            <p className="mb-2">© 2026 SportsGang. Building the future of fitness connections.</p>
             <div className="flex items-center justify-center gap-6 text-sm">
               <a href="#" className="hover:text-white transition-colors">Privacy</a>
               <span>•</span>

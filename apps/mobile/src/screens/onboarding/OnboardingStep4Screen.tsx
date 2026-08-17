@@ -7,7 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { FitnessLevel, PreferredTime, Sport, UpsertSportProfileRequest } from '@protin/shared-types';
+import type { FitnessLevel, PreferredTime, Sport, UpsertSportProfileRequest } from '@sportsgang/shared-types';
 
 import { Screen } from '../../components/Screen';
 import { useProfileStore } from '../../stores/profile';

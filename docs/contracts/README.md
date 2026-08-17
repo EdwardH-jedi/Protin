@@ -1,6 +1,6 @@
-# Protin — Type Contracts
+# SportsGang — Type Contracts
 
-This directory documents the shared type contracts for the Protin platform.
+This directory documents the shared type contracts for the SportsGang platform.
 
 ---
 
@@ -211,7 +211,7 @@ The package is registered in the npm workspace root (`"packages/*"` in `workspac
 Import in mobile or other consumers:
 
 ```typescript
-import type { User, PartnerCard, Match, MatchWithPartner, BookingDetail } from '@protin/shared-types';
+import type { User, PartnerCard, Match, MatchWithPartner, BookingDetail } from '@sportsgang/shared-types';
 ```
 
 Always import the enriched type for entities where the API always returns a partner/enriched form:

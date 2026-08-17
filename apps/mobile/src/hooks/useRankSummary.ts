@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { api } from '../lib/api';
-import type { RankSummary } from '@protin/shared-types';
+import type { RankSummary } from '@sportsgang/shared-types';
 
 interface UseRankSummaryArgs {
   /** Omit / null = self (`/users/me/rank-summary`). Otherwise fetch the public summary. */

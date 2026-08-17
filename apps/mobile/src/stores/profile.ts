@@ -6,7 +6,7 @@ import type {
   SportProfile,
   UpsertSportProfileRequest,
   UserProfile,
-} from '@protin/shared-types';
+} from '@sportsgang/shared-types';
 
 import { api, BASE_URL } from '../lib/api';
 

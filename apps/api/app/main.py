@@ -30,7 +30,7 @@ _log = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    _log.info("Protin API v%s starting — env=%s", VERSION, settings.app_env)
+    _log.info("SportsGang API v%s starting — env=%s", VERSION, settings.app_env)
     from app.core.encryption import validate_encryption_config
     from app.routers.notifications import validate_internal_api_token_config
 
@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Protin API",
+    title="SportsGang API",
     version=VERSION,
     lifespan=lifespan,
 )

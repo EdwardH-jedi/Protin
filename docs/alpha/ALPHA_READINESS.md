@@ -1,4 +1,4 @@
-# Protin — Alpha Readiness
+# SportsGang — Alpha Readiness
 
 Date: 2026-03-18
 Wave: 7 (post-hardening)

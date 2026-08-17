@@ -1,6 +1,6 @@
-# Protin — Staging Setup
+# SportsGang — Staging Setup
 
-This guide covers first-time setup of the Protin staging environment on the RX6600 server.
+This guide covers first-time setup of the SportsGang staging environment on the RX6600 server.
 
 ## Prerequisites
 
@@ -20,8 +20,8 @@ docker compose version    # Docker Compose version v2+
 ## 1 — Clone the repository
 
 ```bash
-git clone <repo-url> /opt/protin
-cd /opt/protin
+git clone <repo-url> /opt/sportsgang
+cd /opt/sportsgang
 ```
 
 ---
@@ -66,7 +66,7 @@ mkdir -p infra/nginx/certs
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -keyout infra/nginx/certs/staging.key \
   -out    infra/nginx/certs/staging.crt \
-  -subj "/CN=protin-staging"
+  -subj "/CN=sportsgang-staging"
 ```
 
 Then uncomment the HTTPS server block in `infra/nginx/nginx.conf`.

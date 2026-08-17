@@ -22,7 +22,7 @@ import {
 import { formatVenueLocation } from '../../lib/venueLocation';
 import { NearbyCourtsModal } from '../bookings/NearbyCourtsModal';
 import { colors, radii, spacing, typography } from '../../theme';
-import type { Venue } from '@protin/shared-types';
+import type { Venue } from '@sportsgang/shared-types';
 import type { CreateBattleScreenProps } from '../../navigation/types';
 
 /**

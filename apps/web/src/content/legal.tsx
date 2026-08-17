@@ -17,7 +17,7 @@ function DraftBanner() {
         <strong>Draft policy — final legal review required before launch.</strong>{' '}
         This text is a placeholder so the site is not pointing to dead links.
         Real Privacy Policy and Terms of Service must be reviewed by qualified
-        counsel and replace this content before Protin is published.
+        counsel and replace this content before SportsGang is published.
       </span>
     </p>
   );
@@ -28,7 +28,7 @@ export function PrivacyContent() {
     <div className="space-y-4">
       <DraftBanner />
       <p>
-        Protin is a fitness-first social product. We expect to collect: account
+        SportsGang is a fitness-first social product. We expect to collect: account
         information you provide (email, name, profile fields), activity data
         you share with the app (sports, skill level, suburb, photos), and basic
         device telemetry needed to keep the service working safely.
@@ -37,7 +37,7 @@ export function PrivacyContent() {
         We do not sell personal data to advertisers. We use information to run
         matching, surface relevant events, moderate the community, and improve
         the product. Photos and profile content you create are visible to other
-        Protin users in line with the privacy settings you choose.
+        SportsGang users in line with the privacy settings you choose.
       </p>
       <p>
         You can request export or deletion of your account at any time from
@@ -58,8 +58,8 @@ export function TermsContent() {
     <div className="space-y-4">
       <DraftBanner />
       <p>
-        By creating a Protin account, you agree to use the service to find and
-        coordinate real-world fitness and sports activities. Protin is a
+        By creating a SportsGang account, you agree to use the service to find and
+        coordinate real-world fitness and sports activities. SportsGang is a
         fitness-first product — it is not a dating service. Misusing the
         platform for harassment, hate, sexualised content, scams, or unsafe
         meetups will result in account termination.
@@ -73,7 +73,7 @@ export function TermsContent() {
         you feel unsafe.
       </p>
       <p>
-        Protin moderates reports submitted through the in-app reporting flow
+        SportsGang moderates reports submitted through the in-app reporting flow
         and reserves the right to suspend or terminate accounts that violate
         our community standards or applicable law.
       </p>
@@ -121,17 +121,17 @@ export function ContactContent() {
       <div className="grid gap-3">
         <ContactRow
           label="General"
-          email="hello@protin.app"
+          email="hello@sportsgang.app"
           description="Press, partnerships, and anything that doesn't fit elsewhere."
         />
         <ContactRow
           label="Support"
-          email="support@protin.app"
+          email="support@sportsgang.app"
           description="App issues, account questions, billing — we aim to reply within two business days."
         />
         <ContactRow
           label="Partnerships"
-          email="partnerships@protin.app"
+          email="partnerships@sportsgang.app"
           description="Studios, clubs, brands, event organisers, and integrations."
         />
       </div>

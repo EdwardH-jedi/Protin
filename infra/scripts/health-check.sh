@@ -26,7 +26,7 @@ check() {
     fi
 }
 
-echo "==> Protin staging health check — $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+echo "==> SportsGang staging health check — $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 echo ""
 
 # ── Container status ──────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-# Protin — Environment Variables Reference
+# SportsGang — Environment Variables Reference
 
 All variables consumed by the API, worker, and docker-compose services.
 
@@ -12,11 +12,11 @@ These are loaded by Docker Compose and passed into the relevant containers.
 
 | Variable | Default (local) | Description |
 |---|---|---|
-| `POSTGRES_DB` | `protin` | Database name |
-| `POSTGRES_USER` | `protin` | Database user |
-| `POSTGRES_PASSWORD` | `protin` | Database password — **use a strong value in staging** |
+| `POSTGRES_DB` | `sportsgang` | Database name |
+| `POSTGRES_USER` | `sportsgang` | Database user |
+| `POSTGRES_PASSWORD` | `sportsgang` | Database password — **use a strong value in staging** |
 | `POSTGRES_PORT` | `5432` | Host port mapped to postgres container (local only; not exposed in staging) |
-| `POSTGRES_URL` | `postgresql://protin:protin@localhost:5432/protin` | Full connection URL for the API; must use `postgres` hostname in staging (Docker network) |
+| `POSTGRES_URL` | `postgresql://sportsgang:sportsgang@localhost:5432/sportsgang` | Full connection URL for the API; must use `postgres` hostname in staging (Docker network) |
 
 ### Redis (Compose + API)
 
@@ -58,7 +58,7 @@ Loaded by Expo at start time. Variables **must** have the `EXPO_PUBLIC_` prefix 
 
 | Variable | Local default | Staging value | Description |
 |---|---|---|---|
-| `EXPO_PUBLIC_API_URL` | `http://localhost:8000` | `http://RX6600_IP` | Base URL of the Protin API. No trailing slash. |
+| `EXPO_PUBLIC_API_URL` | `http://localhost:8000` | `http://RX6600_IP` | Base URL of the SportsGang API. No trailing slash. |
 | `EXPO_PUBLIC_GOOGLE_REDIRECT_URI` | `http://localhost:8000/users/me/google-calendar/callback` | `http://RX6600_IP/users/me/google-calendar/callback` | Must match `GOOGLE_REDIRECT_URI` in the API env and in Google Cloud Console. |
 
 ---

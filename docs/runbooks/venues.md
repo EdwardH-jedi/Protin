@@ -187,7 +187,7 @@ matrix and reports a pass / fail summary.
 > `--sports` / `--locations` / `--radii` / `--max-calls` to control
 > spend. Always run **staging first**.
 
-**Token handling.** The bearer comes from the `PROTIN_SMOKE_TOKEN`
+**Token handling.** The bearer comes from the `SPORTSGANG_SMOKE_TOKEN`
 environment variable by default -- preferred over `--token` because
 CLI arguments are visible in shell history and `ps` listings. The
 script NEVER prints token or `GOOGLE_PLACES_API_KEY` values.
@@ -210,7 +210,7 @@ catches typos in `--sports` / `--locations` here.
 #### Step 2 -- scoped staging probe
 
 ```bash
-export PROTIN_SMOKE_TOKEN="<staging-bearer>"
+export SPORTSGANG_SMOKE_TOKEN="<staging-bearer>"
 
 python -m scripts.smoke_venues_live \
   --base-url https://STAGING_API_HOST \
@@ -227,7 +227,7 @@ regression surfaces before the full matrix.
 #### Step 3 -- full staging run
 
 ```bash
-PROTIN_SMOKE_TOKEN="<staging-bearer>" \
+SPORTSGANG_SMOKE_TOKEN="<staging-bearer>" \
   python -m scripts.smoke_venues_live \
     --base-url https://STAGING_API_HOST \
     --output smoke-staging.json
@@ -240,7 +240,7 @@ PROTIN_SMOKE_TOKEN="<staging-bearer>" \
 > bearer token. Tear it down immediately afterwards.
 
 ```bash
-PROTIN_SMOKE_TOKEN="<short-lived-prod-bearer>" \
+SPORTSGANG_SMOKE_TOKEN="<short-lived-prod-bearer>" \
   python -m scripts.smoke_venues_live \
     --base-url https://protin-api.fly.dev \
     --output smoke-prod-$(date -u +%Y%m%dT%H%M%SZ).json
@@ -338,7 +338,7 @@ tuning `_SPORT_STRATEGIES` in `apps/api/app/services/places.py`:
 | Flag | Default | Purpose |
 |---|---|---|
 | `--base-url` | required | API root, no trailing slash. |
-| `--token` | env `PROTIN_SMOKE_TOKEN` | Bearer. Env var preferred. |
+| `--token` | env `SPORTSGANG_SMOKE_TOKEN` | Bearer. Env var preferred. |
 | `--output` | none | `.csv` or `.json` per-request results. |
 | `--dry-run` | off | Print plan, no HTTP, no token required. |
 | `--sports` | all 7 | Comma-separated subset. |

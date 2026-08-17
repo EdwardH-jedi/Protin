@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Protin staging deployment script
+# SportsGang staging deployment script
 #
 # Runs on the RX6600 server. Assumes:
 #   - Docker and docker compose v2 are installed
@@ -8,7 +8,7 @@
 #   - The repo is checked out at the path where this script lives
 #
 # Usage:
-#   cd /path/to/protin
+#   cd /path/to/sportsgang
 #   bash infra/scripts/deploy.sh
 #
 # To force rebuild of images (e.g. after code changes):
@@ -30,7 +30,7 @@ if [[ "${1:-}" == "--build" ]]; then
     DO_BUILD=true
 fi
 
-echo "==> Protin staging deploy - $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+echo "==> SportsGang staging deploy - $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 echo "    Repo root: $REPO_ROOT"
 cd "$REPO_ROOT"
 

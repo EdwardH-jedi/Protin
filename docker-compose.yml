@@ -1,4 +1,4 @@
-name: protin
+name: sportsgang
 
 services:
   postgres:

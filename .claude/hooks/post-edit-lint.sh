@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# post-edit-lint.sh — Protin harness post-edit lint hook
+# post-edit-lint.sh — SportsGang harness post-edit lint hook
 # Registered as: PostToolUse + Edit matcher
 # Receives the edited file path as $1
 

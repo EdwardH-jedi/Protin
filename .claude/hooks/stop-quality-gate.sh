@@ -54,8 +54,8 @@ ISSUES=()
 # 3. Python lint (apps/api) — only when Python files changed.
 if [ -n "$PY_CHANGED" ] && [ -d apps/api ]; then
   if have ruff; then
-    if ! (cd apps/api && ruff check . >/tmp/protin-ruff.out 2>&1); then
-      TAIL=$(tail -n 5 /tmp/protin-ruff.out | tr '\n' ' ')
+    if ! (cd apps/api && ruff check . >/tmp/sportsgang-ruff.out 2>&1); then
+      TAIL=$(tail -n 5 /tmp/sportsgang-ruff.out | tr '\n' ' ')
       ISSUES+=("ruff check failed in apps/api: ${TAIL}")
     fi
   else
@@ -66,8 +66,8 @@ fi
 # 4. TypeScript typecheck (apps/mobile) — only when TS files changed.
 if [ -n "$TS_CHANGED" ] && [ -d apps/mobile ] && [ -f apps/mobile/package.json ]; then
   if have npx; then
-    if ! (cd apps/mobile && npx --no-install tsc --noEmit >/tmp/protin-tsc.out 2>&1); then
-      TAIL=$(tail -n 5 /tmp/protin-tsc.out | tr '\n' ' ')
+    if ! (cd apps/mobile && npx --no-install tsc --noEmit >/tmp/sportsgang-tsc.out 2>&1); then
+      TAIL=$(tail -n 5 /tmp/sportsgang-tsc.out | tr '\n' ' ')
       ISSUES+=("mobile tsc --noEmit failed: ${TAIL}")
     fi
   else

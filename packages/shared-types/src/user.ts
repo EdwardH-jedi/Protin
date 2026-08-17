@@ -5,7 +5,7 @@
  * fields. Display and fitness data lives in UserProfile and SportProfile
  * (sport-profile.ts).
  *
- * Note: there is no UserRole — Protin has no trainer/client distinction.
+ * Note: there is no UserRole — SportsGang has no trainer/client distinction.
  * All users are workout seekers.
  */
 

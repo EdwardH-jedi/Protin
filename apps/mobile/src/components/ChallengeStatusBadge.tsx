@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import type { ChallengeStatus } from '@protin/shared-types';
+import type { ChallengeStatus } from '@sportsgang/shared-types';
 import { colors, radii, spacing, typography } from '../theme';
 
 interface ChallengeStatusBadgeProps {

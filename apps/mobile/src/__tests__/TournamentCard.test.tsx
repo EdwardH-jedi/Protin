@@ -6,7 +6,7 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 
 import { TournamentCard } from '../components/TournamentCard';
-import type { TournamentSummary } from '@protin/shared-types';
+import type { TournamentSummary } from '@sportsgang/shared-types';
 
 jest.mock('../theme', () => ({
   colors: {

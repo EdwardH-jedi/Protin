@@ -23,5 +23,5 @@
     }
   },
   "include": ["src"],
-  "exclude": ["Protin Landing Page Design", "dist", "node_modules"]
+  "exclude": ["SportsGang Landing Page Design", "dist", "node_modules"]
 }

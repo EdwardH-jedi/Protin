@@ -22,4 +22,4 @@ Do not create an ADR for routine features, small refactors, UI changes, trivial 
 4. Change the status to `Accepted` when the owner approves it.
 5. Never rewrite an accepted decision to hide history. Add a new ADR and mark the earlier record `Superseded` when the decision changes.
 
-Examples that could justify an ADR for Protin include HTTP polling versus WebSocket chat, database versus application-layer discovery ranking, or generated versus hand-maintained API contracts. These examples are not decisions and do not require ADRs now.
+Examples that could justify an ADR for SportsGang include HTTP polling versus WebSocket chat, database versus application-layer discovery ranking, or generated versus hand-maintained API contracts. These examples are not decisions and do not require ADRs now.

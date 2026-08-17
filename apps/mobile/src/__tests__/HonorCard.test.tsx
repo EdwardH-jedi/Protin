@@ -9,7 +9,7 @@ import React from 'react';
 import { render } from '@testing-library/react-native';
 
 import { HonorCard } from '../components/HonorCard';
-import type { HonorSummary } from '@protin/shared-types';
+import type { HonorSummary } from '@sportsgang/shared-types';
 
 jest.mock('../theme', () => ({
   colors: {
