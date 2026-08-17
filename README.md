@@ -1,10 +1,10 @@
 # Protin
 
-Protin connects clients with personal trainers for bookable sessions.
+Protin is the technical repository for SportsGang, a Sydney-first mobile product that helps people discover workout partners, coordinate activity, and book shared sessions. The product is partner-oriented rather than a trainer marketplace: users remain peers, and matching, safety, booking, and compatibility rules are explicit domain concerns.
 
 | Layer | Stack |
 |---|---|
-| Mobile | Expo 52, React Native 0.76, TypeScript, React Navigation |
+| Mobile | Expo 54, React Native 0.81, React 19, TypeScript, React Navigation |
 | API | FastAPI, SQLAlchemy (async), Alembic, Python 3.12 |
 | Data | PostgreSQL 16, Redis 7 |
 | Package manager (JS) | npm workspaces |
@@ -27,12 +27,27 @@ Protin connects clients with personal trainers for bookable sessions.
 │       └── src/
 │           ├── components/   shared UI primitives
 │           ├── navigation/   React Navigation setup
-│           ├── screens/      screen shells by domain
+│           ├── screens/      screens by product domain
 │           └── theme/        design tokens
+├── packages/shared-types/    API-to-mobile TypeScript contracts
+├── docs/                     contracts, runbooks, release, and workflow evidence
+├── infra/                    deployment configuration and operator scripts
+├── .github/                  CI and engineering templates
 ├── .env.example              root infrastructure variables (source of truth)
 ├── docker-compose.yml        PostgreSQL + Redis
 └── package.json              npm workspace root + infra scripts
 ```
+
+## Engineering approach
+
+- FastAPI routers delegate domain behaviour to services; SQLAlchemy models and Alembic migrations make persistence changes explicit.
+- `packages/shared-types/` records the mobile-facing contract. API schema changes must update shared types and mobile consumers together.
+- Booking transitions and discovery exclusions are treated as tested domain invariants, not UI-only rules.
+- Sensitive OAuth fields use application-level encryption, with protected environments refusing to start without the configured key.
+- CI runs API lint and tests, mobile lint, tests, and typecheck, followed by an API Docker build.
+- Product work starts from an Issue, stays on a focused branch, and records risk, verification, Claude review, Codex independent review, and the human merge decision in the pull request.
+
+See [`docs/workflow/PR_WORKFLOW.md`](docs/workflow/PR_WORKFLOW.md), [`docs/workflow/BRANCH_STRATEGY.md`](docs/workflow/BRANCH_STRATEGY.md), and [`docs/adr/README.md`](docs/adr/README.md) for the lightweight delivery policy.
 
 ---
 
@@ -204,6 +219,18 @@ uv run pytest                                                       # test suite
 uv run alembic upgrade head                                         # apply migrations
 uv run alembic downgrade -1                                         # roll back one migration
 ```
+
+### Quality checks
+
+```bash
+cd apps/api && uv run ruff check . && uv run ruff format --check . && uv run pytest
+npm run typecheck -w @protin/shared-types
+npm run typecheck -w @protin/mobile
+npm run lint -w @protin/mobile
+npm run test:ci -w @protin/mobile
+```
+
+Run the checks relevant to the change locally; CI remains the pull-request gate.
 
 ---
 

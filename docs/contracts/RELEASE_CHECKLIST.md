@@ -123,7 +123,7 @@ Any new list endpoint must use the standard envelope:
 
 - [ ] No new types added to shared-types without a corresponding API schema
 - [ ] `calendar.ts` types (`AvailabilityWindow`, `CalendarSlot`, `CalendarSyncRequest`, `CalendarSyncStatus`, `CalendarExportRequest`) are NOT used in any mobile screen — they remain future-scope only
-- [ ] No new sports added beyond `'gym' | 'golf'` without a product decision
+- [ ] No discovery sports added beyond `'gym' | 'golf' | 'tennis' | 'running'` without a product decision
 
 ---
 

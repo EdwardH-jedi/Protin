@@ -14,7 +14,7 @@ Sync:
   - update/cancel propagation via the same sync endpoint (idempotent by sync record)
 
 Production notes:
-  - Encrypt access_token + refresh_token at rest before shipping
+  - Keep access_token + refresh_token protected by EncryptedString at rest
   - Rotate the OAuth client secret regularly
   - Validate the state parameter with HMAC in production
 """

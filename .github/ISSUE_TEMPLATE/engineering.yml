@@ -1,0 +1,61 @@
+name: Engineering work
+description: Propose reliability, security, infrastructure, migration, performance, or developer-experience work.
+labels: []
+assignees: []
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What engineering limitation, operational risk, or technical debt exists?
+    validations:
+      required: true
+
+  - type: textarea
+    id: why-now
+    attributes:
+      label: Why now?
+      description: Why should this be addressed now instead of later?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-scope
+    attributes:
+      label: Proposed scope
+      description: What should change?
+    validations:
+      required: true
+
+  - type: textarea
+    id: non-goals
+    attributes:
+      label: Non-goals
+      description: What is deliberately excluded?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: List observable outcomes that establish completion.
+      placeholder: "- [ ] Migration rollback is exercised in a test environment"
+    validations:
+      required: true
+
+  - type: textarea
+    id: risk-recovery
+    attributes:
+      label: Risk and recovery
+      description: What could fail, and how would the change be rolled back or recovered when relevant?
+    validations:
+      required: false
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Completion evidence
+      description: What evidence should prove completion, such as a test, benchmark, CI result, or staging smoke test?
+    validations:
+      required: true

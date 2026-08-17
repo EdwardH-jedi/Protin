@@ -1,5 +1,9 @@
 # Protin — Alpha Readiness (Updated)
 
+> **Historical snapshot — not current project documentation.** This audit is
+> preserved as evidence of the repository state on the date and branch below.
+> Do not use its pass/fail results as current release evidence.
+
 Date: 2026-04-15
 Branch: `feature/wave-8-staging-readiness`
 Supersedes: `docs/alpha/ALPHA_READINESS.md` (2026-03-18)
@@ -84,8 +88,8 @@ distribution. **PASS** across the board.
 | NEW-001 | Medium | Sport scope drift: tennis/running shipped in onboarding/discovery but `ProfileScreen.tsx` only labels gym/golf and CLAUDE.md restricts scope to gym+golf. Either gate behind a flag or finish the UI before alpha. |
 | NEW-002 | Low | `KNOWN_ISSUES.md` NB-004 ("Chat does not auto-refresh") is now incorrect — WebSocket is wired. Update or delete. |
 | NEW-003 | Low | `ALPHA_READINESS.md` "Wave 7 improvements summary" is frozen at Wave 7; Waves 8–17 changes (WebSocket, matching algorithm, CI, ESLint, nginx HTTP-only) are unrecorded. |
-| NEW-004 | Low (pre-prod) | `models/google_calendar.py` stores tokens in plaintext (per `PROJECT_STATUS.md`); acceptable for alpha but must be encrypted before production. |
-| NEW-005 | Low | `apps/mobile/src/lib/api.ts` debug logs noted in `PROJECT_STATUS.md`; verify removed before broader alpha distribution. |
+| NEW-004 | Low (pre-prod) | The former root status snapshot (available in git history) reported plaintext Google Calendar tokens; this historical claim requires revalidation before production. |
+| NEW-005 | Low | The former root status snapshot noted debug logs in `apps/mobile/src/lib/api.ts`; verify their current state before broader alpha distribution. |
 
 ## 8. Go / no-go summary
 

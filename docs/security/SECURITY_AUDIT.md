@@ -1,5 +1,8 @@
 # Security Audit — Wave 8 Staging Readiness
 
+> **Historical snapshot — not current project documentation.** Findings record
+> the reviewed branch on the stated date and may have been resolved or changed.
+
 **Date:** 2026-04-15
 **Branch:** `feature/wave-8-staging-readiness`
 **Scope (read-only):**

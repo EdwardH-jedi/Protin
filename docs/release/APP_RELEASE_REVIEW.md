@@ -1,5 +1,9 @@
 # App Release Review
 
+> **Historical snapshot — not current project documentation.** Test counts and
+> readiness statements below describe the reviewed branch at that time; use the
+> current release gate documents and fresh verification for release decisions.
+
 ## Summary
 
 - **Automated QA is currently passing** across mobile and API.

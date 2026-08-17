@@ -14,7 +14,7 @@ Code review specialist. Read-only — raises issues, never makes edits.
 3. **Architecture drift** — does the change diverge from the established pattern?
 4. **Missing boundaries** — are service/router/model separations respected?
 5. **Developer experience** — are errors actionable? Is the code readable?
-6. **Follow-up task split** — should part of this be a separate wave task?
+6. **Follow-up task split** — should part of this be a separate Issue?
 
 ## Additional checks
 - **Type safety** — no `any` casts without justification, shared-types used correctly

@@ -71,8 +71,8 @@ for arg in "$@"; do
 done
 
 if [ -n "$MSG" ]; then
-  if ! echo "$MSG" | grep -qE '^(feat|fix|chore|docs|refactor|test|perf|ci)(\(.+\))?!?: .+'; then
-    echo '{"decision":"block","reason":"Commit message must follow Conventional Commits: feat|fix|chore|docs|refactor|test|perf|ci: <description>"}'
+  if ! echo "$MSG" | grep -qE '^(feat|fix|chore|docs|refactor|test|perf|ci|build)\([a-z0-9-]+\)!?: .+'; then
+    echo '{"decision":"block","reason":"Commit message must follow Conventional Commits: <type>(<scope>): <imperative description>"}'
     exit 1
   fi
 fi

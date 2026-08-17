@@ -1,0 +1,70 @@
+name: Feature
+description: Propose a user or product outcome with a bounded scope.
+labels: []
+assignees: []
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or product problem needs to be solved, and why does it matter?
+      placeholder: Describe the current limitation and who experiences it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: user-outcome
+    attributes:
+      label: User outcome
+      description: What should become observably better for the user?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-scope
+    attributes:
+      label: Proposed scope
+      description: What should change?
+    validations:
+      required: true
+
+  - type: textarea
+    id: non-goals
+    attributes:
+      label: Non-goals
+      description: What is deliberately excluded from this change?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: List observable outcomes. Avoid vague criteria such as "works correctly."
+      placeholder: "- [ ] Blocked users never appear in discovery"
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Product or technical constraints
+      description: Optional compatibility, policy, performance, or architecture constraints.
+    validations:
+      required: false
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and edge cases
+      description: Optional failure modes, edge cases, or dependencies worth considering.
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Optional links, screenshots, prior decisions, or supporting evidence.
+    validations:
+      required: false

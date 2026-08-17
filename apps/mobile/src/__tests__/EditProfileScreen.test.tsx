@@ -374,7 +374,7 @@ describe('EditProfileScreen', () => {
       // Latin replacement; the sanitizer must strip the CJK characters
       // before they reach React state, so the upsertProfile payload only
       // contains the Latin portion.
-      fireEvent.changeText(getDisplayNameInput(utils), '김민수Jordan');
+      fireEvent.changeText(getDisplayNameInput(utils), '\uAE40\uBBFC\uC218Jordan');
       fireEvent.press(utils.getByLabelText('Save profile'));
       await waitFor(() => {
         expect(mockUpsertProfile).toHaveBeenCalledWith(

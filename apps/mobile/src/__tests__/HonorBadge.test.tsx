@@ -38,10 +38,10 @@ describe('HonorBadge', () => {
     getByText('Trusted');
     getByText('- 126');
     // Regression guard: the previous middle-dot separator mojibaked to
-    // "쨌" in some encodings. Pin that nothing in the rendered tree
+    // U+CA4C in some encodings. Pin that nothing in the rendered tree
     // includes either the middle dot or the mojibake artifact.
     expect(queryByText(/·/)).toBeNull();
-    expect(queryByText(/쨌/)).toBeNull();
+    expect(queryByText(/\uCA4C/)).toBeNull();
   });
 
   it('hides the score in compact mode', () => {

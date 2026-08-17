@@ -128,7 +128,7 @@ String union values use `snake_case` (matching Python convention and JSON wire f
 
 | Type | TypeScript name | Values |
 |---|---|---|
-| Sport | `Sport` | `'gym'` `'golf'` |
+| Sport | `Sport` | `'gym'` `'golf'` `'tennis'` `'running'` |
 | Fitness level | `FitnessLevel` | `'beginner'` `'intermediate'` `'advanced'` |
 | Preferred time | `PreferredTime` | `'morning'` `'afternoon'` `'evening'` `'flexible'` |
 | Gender preference | `GenderPreference` | `'any'` `'male'` `'female'` `'non_binary'` |
@@ -199,7 +199,7 @@ a booking-first workout partner app, not a trainer marketplace.
 | Confirmed mutual interest | "match" | "connection", "appointment" |
 | Per-sport fitness data | "sport profile" | "trainer profile", "client profile" |
 | Swipe/like gesture | "like" / "pass" / "save" | "swipe", "approve" |
-| Sports in scope | `'gym'` or `'golf'` only | any other sport type in MVP |
+| Discovery sports in scope | `'gym'`, `'golf'`, `'tennis'`, or `'running'` | unapproved sport types |
 | Booked session | "booking" | "session" (as DB entity), "appointment" |
 
 ---
@@ -213,7 +213,7 @@ a booking-first workout partner app, not a trainer marketplace.
 | `TrainerProfile` | `UserProfile` + `SportProfile` | No trainer role exists |
 | `ClientProfile` | `UserProfile` + `SportProfile` | No client role exists |
 | `TrainerCard` | `PartnerCard` | Discovery shows partners, not trainers |
-| `SportType` (broad union) | `Sport` (`'gym'` \| `'golf'`) | Only gym and golf in current scope |
+| `SportType` (broad union) | `Sport` (`'gym'` \| `'golf'` \| `'tennis'` \| `'running'`) | Use the canonical discovery-sport contract |
 | `SessionFormat` | — | No virtual/in-person distinction |
 | `UserStatus` (string enum) | `isActive: boolean` | API uses a boolean, not a status string |
 | `user1Id` / `user2Id` in API responses | — | DB-internal fields; not exposed in API responses |

@@ -351,7 +351,7 @@ describe('OnboardingStep1Screen', () => {
       // the upsertProfile payload submits the same Latin-only string.
       fireEvent.changeText(
         utils.getByPlaceholderText("How you'll appear to others"),
-        '김민수Jordan'
+        '\uAE40\uBBFC\uC218Jordan'
       );
       fireEvent.press(utils.getByLabelText('Birth year'));
       fireEvent.press(utils.getAllByText('1990')[0]);

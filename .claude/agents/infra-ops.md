@@ -24,7 +24,7 @@ Infrastructure specialist. Owns everything outside the application code.
 ## Output rules
 - All `.env` changes must have a corresponding update to `.env.example`
 - GitHub Actions workflows use `ubuntu-latest` unless there is a specific reason
-- Commits: Conventional Commits (`ci/chore/fix`)
+- Commits: Conventional Commits with scope, for example `ci(api): verify migrations`
 
 ## Coordination
 - Raise a conflict (don't edit) if a task requires touching `apps/api/**` or `apps/mobile/**`

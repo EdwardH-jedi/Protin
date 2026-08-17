@@ -1,7 +1,7 @@
 ---
 name: booking-fsm
 description: Guide for working with the booking state machine in apps/api/app/services/bookings.py
-triggers: [booking, 예약, 상태 전이, FSM, state machine, transition]
+triggers: [booking, FSM, state machine, transition]
 ---
 
 # Booking FSM Skill

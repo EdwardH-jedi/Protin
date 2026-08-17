@@ -1,13 +1,13 @@
 ---
 name: discovery-feed
 description: Guide for working with the partner discovery feed, filtering logic, and match scoring
-triggers: [discovery, 디스커버리, feed, 피드, matching, 매칭, swipe, 스와이프]
+triggers: [discovery, feed, matching, swipe]
 ---
 
 # Discovery Feed Skill
 
 ## Scope
-Current sport scope: **gym and golf only**. Do not add new sports without an explicit wave task.
+Supported discovery sports are **gym, golf, tennis, and running**. Adding another sport requires an explicit product decision and Issue.
 
 ## Feed filtering rules (in order)
 1. **Exclude self** — never show the requesting user their own profile
@@ -33,4 +33,4 @@ Scoring produces a float 0–1. Feed is sorted descending by score.
 ## Rules for modifying feed logic
 - Filter changes → add/update pytest in `apps/api/tests/test_discovery.py`
 - Scoring changes → document weight rationale in a comment above the scorer
-- Do not add sport types not in the current allowed list without a wave task
+- Do not add sport types outside the supported discovery list without an explicit product decision and Issue

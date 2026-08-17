@@ -1,7 +1,7 @@
 ---
 name: api-contract
 description: Guide for keeping the API schema and shared-types in sync between backend and frontend
-triggers: [shared-types, API schema, type contract, 타입 변경, schema change, api-contract]
+triggers: [shared-types, API schema, type contract, schema change, api-contract]
 ---
 
 # API Contract Skill

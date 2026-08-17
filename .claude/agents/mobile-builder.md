@@ -16,12 +16,12 @@ Expo React Native specialist. Primary implementer for all client-side concerns.
 - Follow CLAUDE.md: premium but minimal UX, avoid dating-app feel
 - Design tokens from `theme/` must be used — no inline style values
 - Import types from `packages/shared-types/` — do not redefine API types locally
-- Current sport scope: gym and golf only. Do not add new sports without explicit wave task.
+- Supported discovery sports are gym, golf, tennis, and running. New sports require an explicit product decision and Issue.
 
 ## Output rules
 - Field names in app code: `camelCase` (TypeScript convention)
 - snake_case ↔ camelCase conversion is handled in `apps/mobile/src/lib/api.ts` — do not add conversion elsewhere
-- Commits: Conventional Commits (`feat/fix/chore/docs/refactor/test`)
+- Commits: Conventional Commits with scope, for example `feat(mobile): add screen`
 
 ## Coordination
 - Wait for api-builder to update shared-types before consuming new types

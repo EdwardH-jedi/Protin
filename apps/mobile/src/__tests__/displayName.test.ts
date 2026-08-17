@@ -11,8 +11,8 @@ describe('sanitizeDisplayName', () => {
   });
 
   it('strips Korean and other CJK characters', () => {
-    expect(sanitizeDisplayName('김민수Jordan')).toBe('Jordan');
-    expect(sanitizeDisplayName('山田Jordan太郎')).toBe('Jordan');
+    expect(sanitizeDisplayName('\uAE40\uBBFC\uC218Jordan')).toBe('Jordan');
+    expect(sanitizeDisplayName('\u5C71\u7530Jordan\u592A\u90CE')).toBe('Jordan');
   });
 
   it('strips emoji and punctuation outside the allowlist', () => {

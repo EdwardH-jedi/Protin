@@ -1,101 +1,68 @@
-# Protin — PR Workflow
+# Protin engineering lifecycle and pull-request workflow
 
----
+The repository owner remains accountable for product direction, Issue scope, acceptance criteria, significant architecture choices, conflicting AI recommendations, merge decisions, and release decisions. AI tools provide engineering leverage; they do not own product decisions.
 
-## When to open a PR
+## Lifecycle
 
-Open a PR when:
-- A feature or fix is complete and locally tested.
-- The branch is rebased on current `main` with no conflicts.
-- You are ready for a code review pass.
+```text
+Product or engineering problem
+  -> GitHub Issue with scope and acceptance criteria
+  -> design review or ADR when the decision warrants it
+  -> focused branch
+  -> implementation and local verification
+  -> pull request and CI
+  -> Claude review
+  -> blocking findings resolved
+  -> Codex independent review
+  -> human merge decision
+  -> staging verification when deployable
+  -> Issue closed
+```
 
-Do not open draft PRs just to back up work. Use your remote branch for that.
+## Before implementation
 
----
+- Confirm the Issue states the problem, scope, non-goals, and observable acceptance criteria.
+- Identify API, data, migration, mobile, security, and rollback implications.
+- Use an ADR only when the decision meets `docs/adr/README.md`.
+- Create one Issue-linked branch using `BRANCH_STRATEGY.md`.
 
-## PR checklist
+For cross-boundary work, establish the API and shared contract before parallel API and mobile implementation. Parallel work is appropriate only when ownership boundaries are clear.
 
-Before marking a PR ready for review, confirm:
+## Pull-request scope
 
-- [ ] Branch is rebased on current `main`
-- [ ] No `.env` or credential files staged
-- [ ] Code compiles / type-checks (`npm run typecheck` in `packages/shared-types` if types changed)
-- [ ] Manual smoke test done locally (or on staging) for the changed flows
-- [ ] PR description explains **what** changed and **why** (one short paragraph is enough)
-- [ ] Ownership boundaries respected — no edits outside your wave's scope
+A pull request should solve one Issue or one tightly related concern, remain reviewable, preserve compatibility unless the Issue changes it, and include tests for changed behaviour. Use the Non-goals section to make deliberately skipped work visible.
 
----
+If implementation reveals an unrelated systemic problem, open or recommend a follow-up Issue. Do not silently expand the current pull request.
 
 ## Review sequence
 
-Every PR follows this sequence before merge:
+1. Open the pull request using `.github/pull_request_template.md`.
+2. Let CI run and record any environment-limited or unrelated failures accurately.
+3. Claude reviews implementation correctness, repository conventions, Issue scope, tests, naming, maintainability, integration, and product-scope drift.
+4. Resolve blocking findings or record the owner's explicit justification for rejecting a finding.
+5. Codex independently derives expected behaviour from the linked Issue and attempts to falsify the implementation. See `CODE_REVIEW.md`.
+6. The owner decides whether the evidence is sufficient to merge.
+7. Verify deployable behaviour on staging and then close the Issue.
 
-```
-1. Claude Code Review   — automated review against the codebase
-2. Fix findings         — address blockers; note intentional skips
-3. Codex final review   — second-pass sign-off
-4. Merge to main
-5. Deploy to RX6600     — run deploy.sh on the server
-```
+Do not require repeated full reviews for trivial follow-up commits. Re-review when a follow-up materially changes reviewed behaviour, contracts, data, security, or risk.
 
-### 1. Claude Code Review
+## Definition of Done
 
-Run Claude Code Review on the open PR. See `CODE_REVIEW.md` for how to do this and what to look for.
+For normal product work, Done means that all applicable statements are true:
 
-### 2. Fix findings
+- the Issue has clear acceptance criteria;
+- implementation matches the agreed scope and non-goals;
+- tests cover changed behaviour;
+- lint, typecheck, and relevant local checks pass;
+- CI passes, or an unrelated failure is explicitly documented and owned;
+- API/mobile contract impact is handled;
+- migration and recovery impact is handled where applicable;
+- blocking review findings are resolved or explicitly decided by the owner;
+- the pull request explains risk, verification, and rollback; and
+- staging verification is complete when the behaviour is deployable.
 
-Resolve all findings rated **blocking**. For findings rated **advisory** or **style**:
-- Fix them if it takes less than a few minutes.
-- Document skipped findings in a PR comment explaining why.
+Not every item applies to every change. Mark non-applicable items with a short reason instead of manufacturing evidence.
 
-Push fixes to the same branch. Do not open a new PR.
+## Emergency exception
 
-### 3. Codex final review
-
-After Claude Code Review findings are addressed, request a Codex final review. Codex confirms:
-- The PR is coherent and safe to merge.
-- No new issues were introduced by the fix commits.
-
-Codex sign-off is required before merge. A simple "LGTM" or "approved" comment from Codex is sufficient.
-
-### 4. Merge
-
-Merge using the platform's merge button (squash or merge commit — team preference). Delete the branch after merge.
-
-### 5. Deploy
-
-On the RX6600:
-```bash
-git pull
-bash infra/scripts/deploy.sh --build
-curl http://localhost/health
-```
-
-If health check fails after deploy, see the Rollback section in `docs/staging/RUNBOOK.md`.
-
----
-
-## PR description template
-
-```
-## What
-One sentence describing the change.
-
-## Why
-One sentence or a short bullet list explaining the reason.
-
-## How to test
-Steps to manually verify the change on staging or locally.
-
-## Skipped review findings (if any)
-- [FINDING-ID] Reason for skipping
-```
-
----
-
-## Merge without full review (emergency only)
-
-If staging is actively broken and a hotfix must land immediately:
-- Claude Code Review is still required (it is fast).
-- Codex review may be skipped — note this in the PR.
-- The person merging takes responsibility for the change.
+When staging is actively broken, a focused `fix/` pull request may use an abbreviated review. Run the fastest relevant automated checks and a Claude review, record any skipped Codex or staging step, and make the owner accepting the risk explicit. The exception does not authorize a direct push to `main`.
