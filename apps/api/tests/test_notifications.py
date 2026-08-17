@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock
 
@@ -64,6 +65,13 @@ async def _register(client: AsyncClient, email: str) -> tuple[str, str]:
 
 def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def _future_booking_window() -> tuple[str, str]:
+    """Return a stable, timezone-aware booking window safely in the future."""
+    starts_at = (datetime.now(timezone.utc) + timedelta(days=2)).replace(microsecond=0)
+    ends_at = starts_at + timedelta(hours=1)
+    return starts_at.isoformat(), ends_at.isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -169,17 +177,14 @@ async def test_notification_scheduled_on_booking_proposal(client: AsyncClient, m
     # the past, so a hard-coded date turns into a 422 the moment the wall clock
     # passes it (a previously hard-coded 2026-06-01 did exactly that). now()+2d
     # keeps the proposal valid indefinitely.
-    from datetime import datetime, timedelta, timezone
-
-    starts_at = (datetime.now(timezone.utc) + timedelta(days=2)).replace(microsecond=0)
-    ends_at = starts_at + timedelta(hours=1)
+    starts_at, ends_at = _future_booking_window()
     book_r = await client.post(
         "/bookings",
         json={
             "match_id": match_id,
             "sport": "gym",
-            "starts_at": starts_at.isoformat(),
-            "ends_at": ends_at.isoformat(),
+            "starts_at": starts_at,
+            "ends_at": ends_at,
         },
         headers=_auth(token_a),
     )
@@ -428,13 +433,14 @@ async def _setup_match_and_booking(client: AsyncClient) -> tuple[str, str, str, 
     )
     match_id = r.json()["match_id"]
 
+    starts_at, ends_at = _future_booking_window()
     book_r = await client.post(
         "/bookings",
         json={
             "match_id": match_id,
             "sport": "gym",
-            "starts_at": "2026-08-01T09:00:00Z",
-            "ends_at": "2026-08-01T10:00:00Z",
+            "starts_at": starts_at,
+            "ends_at": ends_at,
         },
         headers=_auth(token_a),
     )
@@ -529,6 +535,7 @@ async def test_process_marks_sent_on_success(client: AsyncClient, monkeypatch: p
     token_a, uid_a = await _register(client, "notif_proc_ok_a@example.com")
     token_b, uid_b = await _register(client, "notif_proc_ok_b@example.com")
 
+    starts_at, ends_at = _future_booking_window()
     await client.post(
         "/notifications/token",
         json={"token": "ExponentPushToken[proc-ok-b]", "platform": "ios"},
@@ -553,8 +560,8 @@ async def test_process_marks_sent_on_success(client: AsyncClient, monkeypatch: p
         json={
             "match_id": match_id,
             "sport": "gym",
-            "starts_at": "2026-09-01T09:00:00Z",
-            "ends_at": "2026-09-01T10:00:00Z",
+            "starts_at": starts_at,
+            "ends_at": ends_at,
         },
         headers=_auth(token_a),
     )
@@ -578,6 +585,7 @@ async def test_process_marks_failed_on_delivery_error(client: AsyncClient, monke
     token_a, uid_a = await _register(client, "notif_proc_fail_a@example.com")
     token_b, uid_b = await _register(client, "notif_proc_fail_b@example.com")
 
+    starts_at, ends_at = _future_booking_window()
     await client.post(
         "/notifications/token",
         json={"token": "ExponentPushToken[proc-fail-b]", "platform": "ios"},
@@ -602,8 +610,8 @@ async def test_process_marks_failed_on_delivery_error(client: AsyncClient, monke
         json={
             "match_id": match_id,
             "sport": "gym",
-            "starts_at": "2026-09-10T09:00:00Z",
-            "ends_at": "2026-09-10T10:00:00Z",
+            "starts_at": starts_at,
+            "ends_at": ends_at,
         },
         headers=_auth(token_a),
     )
@@ -630,6 +638,7 @@ async def test_process_skips_already_sent_events(client: AsyncClient, monkeypatc
     token_a, uid_a = await _register(client, "notif_dedup_a@example.com")
     token_b, uid_b = await _register(client, "notif_dedup_b@example.com")
 
+    starts_at, ends_at = _future_booking_window()
     await client.post(
         "/notifications/token",
         json={"token": "ExponentPushToken[dedup-b]", "platform": "ios"},
@@ -654,8 +663,8 @@ async def test_process_skips_already_sent_events(client: AsyncClient, monkeypatc
         json={
             "match_id": match_id,
             "sport": "gym",
-            "starts_at": "2026-09-20T09:00:00Z",
-            "ends_at": "2026-09-20T10:00:00Z",
+            "starts_at": starts_at,
+            "ends_at": ends_at,
         },
         headers=_auth(token_a),
     )

@@ -333,28 +333,28 @@ export function DiscoveryScreen() {
     [navigation]
   );
 
-  function showMatchBanner() {
+  const showMatchBanner = useCallback(() => {
     setMatchVisible(true);
     setTimeout(() => setMatchVisible(false), 2000);
-  }
+  }, []);
 
-  async function handleAction(
-    targetUserId: string,
-    action: 'like' | 'pass' | 'save'
-  ) {
-    if (actingOn) return;
-    setActingOn(targetUserId);
-    try {
-      const result = await recordAction(targetUserId, action);
-      if (action === 'like' && result.matchCreated) {
-        showMatchBanner();
+  const handleAction = useCallback(
+    async (targetUserId: string, action: 'like' | 'pass' | 'save') => {
+      if (actingOn) return;
+      setActingOn(targetUserId);
+      try {
+        const result = await recordAction(targetUserId, action);
+        if (action === 'like' && result.matchCreated) {
+          showMatchBanner();
+        }
+      } catch {
+        // silently swallow action errors — card stays visible, user can retry
+      } finally {
+        setActingOn(null);
       }
-    } catch {
-      // silently swallow action errors — card stays visible, user can retry
-    } finally {
-      setActingOn(null);
-    }
-  }
+    },
+    [actingOn, recordAction, showMatchBanner]
+  );
 
   const renderItem = useCallback(
     ({ item }: { item: PartnerCard }) => (
