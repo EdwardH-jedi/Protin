@@ -1,8 +1,9 @@
 # Protin
 
 **A mobile social fitness platform for finding training partners and organising sports sessions.**
-Protin matches people by sport, skill level and location, then carries them all the way through
-messaging, session scheduling, group games and a reputation system that rewards actually showing up.
+Protin ranks potential partners by sport, skill level and training-time overlap, then carries them
+all the way through messaging, session scheduling, group games and a reputation system that
+rewards actually showing up.
 
 `React Native` · `Expo 54` · `TypeScript` · `FastAPI` · `PostgreSQL 16` · `Redis 7` · `Docker`
 
@@ -53,9 +54,12 @@ and the reputation system exists to make that session actually happen.
 
 ## Core capabilities
 
-**Discover & connect** — A sport-scoped partner feed filtered by fitness level, preferred
-training time, gender preference, age range and distance, with like / pass / save actions
-and mutual-match creation. Supported sports: gym, golf, tennis and running.
+**Discover & connect** — A sport-scoped partner feed with like / pass / save actions and
+mutual-match creation. The feed *filters* on sport, active accounts, cards you have already
+acted on, and blocks in both directions; it then *ranks* what remains by compatibility —
+60% skill-level proximity, 40% preferred-time overlap. Gender, age and distance preferences
+are captured on the profile but are not yet applied to the feed. Supported sports: gym, golf,
+tennis and running.
 
 **Plan & book** — 1:1 session proposals governed by an explicit booking state machine.
 Every transition is checked against both the current status and the acting party's role

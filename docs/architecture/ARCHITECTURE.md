@@ -52,8 +52,9 @@ Expo 54 / React Native 0.81 / React 19, TypeScript throughout.
 
 - **Navigation** — React Navigation, native-stack plus bottom tabs, with a root navigator
   that switches on authentication state.
-- **State** — Zustand stores for auth and profile. Screen-local state everywhere else;
-  there is no global cache layer.
+- **State** — Zustand stores for auth and profile, screen-local state elsewhere. There is no
+  general-purpose cache layer, though a few module-level session caches exist (for example
+  the tournament-availability probe in `useTournaments.ts`).
 - **Auth token** — the JWT is *persisted* in `expo-secure-store` (Keychain / Keystore)
   rather than AsyncStorage. For the life of a session it is also held in memory — in the
   Zustand auth store and in a module-level `_token` in `lib/api.ts` that the request
@@ -61,9 +62,11 @@ Expo 54 / React Native 0.81 / React 19, TypeScript throughout.
 - **Native capability** — Apple Sign-In, location, maps, calendar, image picker and push
   registration are all Expo modules, so the app builds through EAS without custom native
   code.
-- **Business rules** — none. The app renders what the API returns and enforces no domain
-  invariants of its own. Every rule that matters (who may transition a booking, what a
-  match is worth, whether a result counts) lives server-side.
+- **Business rules** — none that are authoritative. The app does mirror some server rules
+  for display purposes (`eventHasStarted`, challenge terminal-status checks) to grey out a
+  control before the user taps it, but every decision that matters — who may transition a
+  booking, what a match is worth, whether a result counts — is made and re-checked
+  server-side. A client that lied about any of them would simply get a 4xx.
 
 ### API — `apps/api`
 
@@ -215,7 +218,7 @@ database dumps are retained as backups and would otherwise leak tokens.
 | Integration | Used for | Absent key behaviour |
 |---|---|---|
 | Apple Sign-In | Identity-token verification at `/auth/apple`; token revocation on account deletion (App Store 5.1.1(v)) | Endpoint disabled; email/password unaffected |
-| Google Calendar | OAuth connect; outbound export of a confirmed booking to the user's calendar, and cancellation of that event | Export disabled |
+| Google Calendar | OAuth connect; outbound export of a confirmed booking to the user's calendar. (`cancel_calendar_event` exists in the service but has no caller — cancelling a booking does not currently remove the calendar event.) | Export disabled |
 | Google Places | Live venue density for the venue picker | Falls back to the seeded Sydney catalogue, no HTTP call |
 | Expo Push | Notification delivery from the worker | Defaults to the live Expo endpoint, so this one must be set *explicitly empty* to disable. Once empty: events are still scheduled and stored, and each delivery attempt returns failure and is recorded as such |
 | Sentry | Mobile crash and error reporting | Not initialised |
@@ -249,10 +252,10 @@ Two honest gaps, both worth stating plainly:
 - **The types are not generated from the FastAPI OpenAPI schema.** The API side of the
   contract is upheld by convention and review rather than by a compiler, so the package
   guarantees client-side consistency, not client/server agreement.
-- **Adoption is partial.** Several of the newer hooks — `useDiscovery`, `useEvents`,
-  `useChallenges`, `useTournaments` among them — still declare their wire shapes inline
-  rather than importing them, so those shapes can drift from the package without `tsc`
-  noticing.
+- **Adoption is not complete.** `useTournaments` imports from the package directly and
+  `useEvents` / `useChallenges` reach it through their `lib/` modules, but `useDiscovery`
+  still declares `PartnerCard` and its action response inline. Those shapes can drift from
+  the package without `tsc` noticing.
 
 Where it is used, the package does buy the thing it was built for: a contract change
 surfaces as a build failure rather than a runtime `undefined` on a user's phone.

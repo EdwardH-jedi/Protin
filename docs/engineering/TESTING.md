@@ -61,11 +61,17 @@ The remaining modules — `test_health`, `test_apple_auth`, `test_places`,
 **Redis** is mocked globally, and slowapi's limiter is disabled for the suite in
 `conftest.py` so rate limits do not make test ordering significant.
 
-**External services** are mocked at the outermost boundary — the HTTP client call, not
-the service function that wraps it. Expo Push, Google Calendar, Google Places and Apple
-identity-token verification are all stubbed this way, which means our own request
-construction, response parsing and error handling stay under test while no test ever
-touches the network.
+**External services** are mocked so no test touches the network, but not all at the same
+depth, and the difference matters:
+
+- **Expo Push, Google Calendar and Google Places** are stubbed at the HTTP boundary, so
+  our own request construction, response parsing and error handling stay under test.
+- **Apple identity-token verification** is stubbed one level higher — route tests
+  monkeypatch `verify_identity_token` outright. That covers the routes' handling of a
+  verified or rejected token, but it means the function's own JWKS fetch, key rotation,
+  signature check and nonce comparison are **not** exercised by the suite. This is the
+  most significant coverage gap in the API tests and is called out rather than implied
+  away.
 
 **What this does not cover.** SQLite is not PostgreSQL. Anything relying on
 PostgreSQL-specific behaviour is unverified by the suite — most notably the
@@ -120,7 +126,7 @@ typecheck (tsc --noEmit) ──────────────────�
 | `test-mobile` | `npm run test:ci -w @protin/mobile` |
 | `docker-build` | `docker build -f apps/api/Dockerfile .` |
 
-Two things worth noting about the gate design:
+Three things worth noting about the gate design:
 
 - **Lint failures block their test job.** Running a test suite over code that does not
   pass lint wastes a runner and buries the actionable signal under the noisier one.
