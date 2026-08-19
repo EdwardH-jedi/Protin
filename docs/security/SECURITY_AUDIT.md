@@ -10,7 +10,8 @@
 > | **H2** — permissive CORS default | **Partially addressed** | `main.py` sets `allow_credentials=bool(cors_origins)`, so the wildcard fallback can no longer serve credentialed cross-origin requests. The recommended startup validation requiring a non-empty origin list outside `local` is **not** implemented. |
 > | **H3** — no rate limiting on auth routes | **Closed** | slowapi is wired in `main.py`; `routers/auth.py` applies `3/minute` and `5/minute` limits to registration and login. |
 > | **M6** — encryption key enforced only in `production` | **Closed** | `core/encryption.py` uses `_PROTECTED_ENVS = {"staging", "production"}`, so staging fails startup without a key too. |
-> | **M1–M5, L1–L5** | **Open** | Not yet addressed. `M4` (decrypt failure returning the raw stored value) is the most significant of these. |
+> | **L2** — no password policy | **Partially addressed** | `schemas/auth.py` enforces `min_length=8` on registration. The audit's stronger recommendation (complexity or breach-list checks, and a policy on login) is not implemented. |
+> | **M1–M5, L1, L3–L5** | **Open** | Not yet addressed. `M4` (decrypt failure returning the raw stored value) is the most significant of these. |
 >
 > Retaining an audit alongside its remediation record is intentional — the finding, the
 > fix and what is still outstanding are all more useful than a document that only shows

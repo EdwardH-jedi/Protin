@@ -179,19 +179,27 @@ the standard fix; it is not implemented, and the single-instance limitation is r
 
 ### Rank and honor
 
-`services/rank.py` is the single entry point for reputation changes, and
-`record_booking_transition` is its only public emitter. Three constraints shaped it:
+There are two reputation subsystems with different trust models, and conflating them
+would misrepresent both.
 
-- **Tier is computed, never stored.** Deriving it from points on read avoids a third
-  source of truth that can drift out of sync with the ledger.
-- **Honor writes are not publicly reachable.** `services/honor_system.py` exposes reads
-  only. The write path is reachable exclusively through `services/challenges.py`, and
-  only once *both* participants submit matching results. A public endpoint that wrapped
-  the honor writer would let any authenticated user mutate two other users' records.
-- **No-show claims cost the claimant too.** The booking FSM lets either party mark a
-  no-show, so the caller takes a smaller penalty as well. This is a game-theoretic
-  deterrent, not a dispute system — a real dispute window is not implemented, and the
-  product copy says so.
+**Booking-derived rank and honor — `services/rank.py`.** `record_booking_transition` is
+its only public emitter; the booking FSM calls it, and it writes `RankEvent` and
+`HonorEvent` ledger rows in the same transaction as the status change. Two properties:
+
+- **Tier is computed, never stored.** Deriving it from the point sum on read avoids a
+  third source of truth that can drift out of sync with the ledger.
+- **No-show claims cost the claimant too.** Either party may mark a confirmed session
+  completed or no-show, so this input is effectively self-reported. The mitigation is
+  that the caller takes a smaller penalty as well — a game-theoretic deterrent, not a
+  dispute system. No dispute window is implemented, and the product copy says so.
+
+**Competitive Honor System — `services/honor_system.py`.** Local rankings, titles,
+win/loss streaks and `HonorHistory`. Its public API is **read-only**; the writer
+(`record_match_result_for_honor`) has exactly one caller, `services/challenges.py`, which
+fires it only once *both* participants have submitted matching results, and only on the
+`accepted → verified` transition so a result can never be applied twice. A public
+endpoint wrapping that writer would let any authenticated user mutate two other users'
+rankings, streaks and title holdings — which is precisely why there isn't one.
 
 ---
 

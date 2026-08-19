@@ -71,13 +71,14 @@ checks; head-to-head challenges whose results are only applied once *both* parti
 submit matching outcomes; and a feature-flagged tournament surface (list / join / leave,
 with capacity enforced under row-level locking).
 
-**Reputation with the incentives thought through** — A rank and honor system driven by
-booking outcomes. Tiers are computed from points rather than stored, and honor-ledger
-writes are reachable only through the challenge path, where a result applies only once
-*both* participants submit matching outcomes. Booking outcomes are weaker: either party
-can unilaterally mark a confirmed session completed or no-show, so the deterrent is
-game-theoretic — whoever claims a no-show takes a smaller penalty too. That is a
-mitigation, not a dispute system, and the design notes say so.
+**Reputation with the incentives thought through** — Two subsystems, deliberately kept
+apart. A *rank and honor ledger* accrues from booking outcomes, with tiers computed from
+points rather than stored; because either party can unilaterally mark a confirmed session
+completed or no-show, the deterrent there is game-theoretic — whoever claims a no-show
+takes a smaller penalty too. A separate *competitive Honor System* (local rankings,
+titles, win/loss streaks) is far more tightly gated: it is written only from the challenge
+path, and only once *both* participants submit matching results. Mitigation, not a dispute
+system — and the design notes say so.
 
 **Communicate** — Real-time per-match chat over WebSockets, with participant-checked
 rooms, REST history, optimistic send and message de-duplication across the
