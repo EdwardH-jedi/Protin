@@ -210,9 +210,11 @@ rankings, streaks and title holdings — which is precisely why there isn't one.
 **PostgreSQL 16** holds all durable state, accessed through async SQLAlchemy 2.0 over
 asyncpg. Schema changes go through Alembic; there are 15 migrations and no manual DDL.
 
-**Redis 7** is the runtime cache and rate-limit backend, and is health-checked on
-`/health`. Nothing durable lives there — losing Redis degrades the service, it does not
-lose data.
+**Redis 7** backs rate-limit state and is health-checked on `/health`. That is currently
+the extent of it — it is provisioned as the shared cache but nothing else uses it yet;
+the Places lookup cache in `services/places.py`, for instance, is process-local rather
+than Redis-backed, which does not survive a restart and is not shared across instances.
+Nothing durable lives in Redis — losing it degrades the service, it does not lose data.
 
 **Local media.** Profile photos are written to disk and served by `StaticFiles` under a
 configurable URL prefix. Cloud object storage would replace the writer without changing

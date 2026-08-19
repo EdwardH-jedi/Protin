@@ -80,8 +80,8 @@ check on clean infrastructure. See [TESTING.md](TESTING.md).
 ## Quality gates
 
 Three layers are configured at different moments, each cheaper and narrower than the
-next. **Two of the three are live today; the first and third are mis-wired — see the
-note at the end of this section.**
+next. **Only the Stop layer is live today** — the other two are mis-wired and do not
+fire; see the note at the end of this section.
 
 ### 1. On edit — `PostToolUse` *(currently inert)*
 

@@ -155,7 +155,7 @@ flowchart LR
   access, and Sentry.
 - **PostgreSQL** — durable state for users, profiles, matches, messages, bookings, events,
   challenges, tournaments, rankings, venues and safety records.
-- **Redis** — ephemeral state, rate-limit backend, and health-checked runtime dependency.
+- **Redis** — rate-limit state and a health-checked runtime dependency.
 - **WebSockets** — chat runs over an authenticated socket per match room, alongside the
   REST endpoints that serve message history.
 - **Worker** — a separate process that polls for due notifications and delivers them
@@ -175,7 +175,7 @@ typecheck, API pytest, mobile Jest, and an API Docker image build gated on the r
 
 | | Stack | Scope |
 |---|---|---|
-| **API** | pytest + pytest-asyncio, httpx `ASGITransport` | 620 tests exercising real HTTP routes against a per-module in-memory SQLite database. External services (Expo Push, Google, Apple) are mocked at the boundary, so the suite needs no network or containers. |
+| **API** | pytest + pytest-asyncio, httpx `ASGITransport` | 620 tests driving the real ASGI app over actual HTTP routes. Most modules stand up their own in-memory SQLite database; external services are mocked, some at the HTTP boundary and some above it. No network or containers required — the exact depths, and the gaps they leave, are in the testing doc. |
 | **Mobile** | Jest (`jest-expo`) + React Native Testing Library | 747 tests across 53 suites covering screens, hooks, stores and pure logic. |
 | **Static** | Ruff (lint + format), ESLint (`--max-warnings 0`), `tsc --noEmit` | Enforced on every push, not just on pull requests. |
 
