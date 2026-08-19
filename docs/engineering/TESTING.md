@@ -64,14 +64,20 @@ The remaining modules — `test_health`, `test_apple_auth`, `test_places`,
 **External services** are mocked so no test touches the network, but not all at the same
 depth, and the difference matters:
 
-- **Expo Push, Google Calendar and Google Places** are stubbed at the HTTP boundary, so
-  our own request construction, response parsing and error handling stay under test.
-- **Apple identity-token verification** is stubbed one level higher — route tests
-  monkeypatch `verify_identity_token` outright. That covers the routes' handling of a
-  verified or rejected token, but it means the function's own JWKS fetch, key rotation,
-  signature check and nonce comparison are **not** exercised by the suite. This is the
-  most significant coverage gap in the API tests and is called out rather than implied
-  away.
+- **Google Places** is stubbed at the HTTP boundary, so our own request construction,
+  response parsing and error handling stay under test.
+- **Google Calendar** is stubbed at the HTTP boundary for the OAuth token exchange only.
+  The event create/update calls and their error paths have no HTTP-boundary test.
+- **Expo Push** is stubbed one level higher: tests replace `_send_expo_push` itself, so
+  scheduling, due-event selection and the failure bookkeeping around delivery are
+  covered, but the Expo request body and response handling are not.
+- **Apple identity-token verification** is likewise stubbed above the boundary — route
+  tests monkeypatch `verify_identity_token` outright. The routes' handling of a verified
+  or rejected token is covered; the function's own JWKS fetch, key rotation, signature
+  check and nonce comparison are not.
+
+The last two are the suite's most significant coverage gaps and are named here rather
+than implied away. Both are cheap to close by moving the stub down to the HTTP client.
 
 **What this does not cover.** SQLite is not PostgreSQL. Anything relying on
 PostgreSQL-specific behaviour is unverified by the suite — most notably the

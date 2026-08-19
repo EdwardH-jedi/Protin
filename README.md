@@ -192,8 +192,10 @@ scaffolding built to keep that honest rather than the assistance itself.
   [`.claude/agents`](.claude/agents), with domain rules encoded as reusable skills
   (booking state machine, discovery feed, API contract sync).
 - **Deterministic gates** run automatically. A Stop hook lints, typechecks and
-  secret-scans the working diff before a turn is allowed to finish; a pre-commit hook
-  repeats the check before anything is committed.
+  secret-scans the working diff before a turn is allowed to finish. (A pre-commit and a
+  post-edit hook are also configured but are currently mis-wired and do not fire — found
+  while writing this up, and documented in the workflow notes rather than left as an
+  unearned claim.)
 - **Codex** reviews the resulting diff independently, writing a verdict report that blocks
   only on correctness, regression or security findings.
 - **CI** is the final arbiter — nothing merges on a green local run alone.

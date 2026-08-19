@@ -79,13 +79,15 @@ check on clean infrastructure. See [TESTING.md](TESTING.md).
 
 ## Quality gates
 
-Three layers run at different moments, each cheaper and narrower than the next.
+Three layers are configured at different moments, each cheaper and narrower than the
+next. **Two of the three are live today; the first and third are mis-wired — see the
+note at the end of this section.**
 
-### 1. On edit — `PostToolUse`
+### 1. On edit — `PostToolUse` *(currently inert)*
 
 `post-edit-lint.sh` lints the single file just edited. Fast feedback, no blocking.
 
-### 2. Before the turn ends — `Stop`
+### 2. Before the turn ends — `Stop` *(live)*
 
 `stop-quality-gate.sh` runs against the working diff:
 
@@ -101,7 +103,7 @@ Both hooks honour `stop_hook_active`, which is what prevents a blocked stop from
 recursing into an infinite loop. Both degrade gracefully when a tool is missing — a
 machine without `codex` installed skips the review rather than failing the turn.
 
-### 3. Before commit — `PreToolUse`
+### 3. Before commit — `PreToolUse` *(currently inert)*
 
 `pre-commit.sh` intercepts `git commit` and blocks on:
 
@@ -114,6 +116,24 @@ machine without `codex` installed skips the review rather than failing the turn.
 This is the strictest layer because it is the last one before history. It runs the whole
 project rather than the diff, so a change that breaks a file it did not touch is still
 caught.
+
+### Known defect: layers 1 and 3 do not currently fire
+
+`settings.json` invokes both hooks with `"$CLAUDE_TOOL_INPUT_COMMAND"` and
+`"$CLAUDE_TOOL_INPUT_FILE_PATH"`. Those variables are not set in the hook environment —
+Claude Code delivers hook input as JSON on **stdin**, which is how the two Stop hooks in
+the same directory correctly read it. Both scripts therefore receive an empty argument,
+take their `if [ -z ... ]` early-exit, and return 0 without running a single check.
+
+The scripts' own logic is sound — invoked with a real argument, `pre-commit.sh` runs its
+checks and emits a block decision as designed. Only the wiring is wrong. Fixing it also
+requires resolving `ruff` and `tsc` through `uv run` / `npx --no-install` rather than
+bare names, since neither is on a default `PATH`.
+
+Documenting this rather than quietly leaving the claim in place is the point of the
+section. A quality harness that is described as running when it is not is worse than no
+harness, because it converts a check into an assumption. In practice the Stop gate and
+CI have been carrying the load, which is why the defect survived unnoticed.
 
 ---
 
@@ -134,7 +154,8 @@ step before history.
 `jq` or `codex` is missing, so a partially configured machine still gets a usable loop.
 The pre-commit hook deliberately does not: it runs under `set -e` and fails the commit if
 its tooling is absent, on the grounds that "the linter was missing" is not a reason to let
-an unchecked commit through.
+an unchecked commit through. (That stricter posture is by design; it is also why the
+wiring fix above has to resolve the tools properly at the same time.)
 
 **The human stays the last step.** Diffs are read before they are committed, and the
 final decision is not automated. The gates narrow what reaches that review; they do not

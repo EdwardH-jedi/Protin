@@ -38,9 +38,11 @@ flowchart LR
     Worker --> ExpoPush
 ```
 
-The mobile app is the only product surface. `apps/web` is a small Vite site that hosts
-the public privacy, terms and support pages the app links to — it is not a second
-client and holds no application logic.
+The mobile app is the only product surface. `apps/web` is a small Vite marketing site —
+a single landing page that surfaces draft privacy, terms and contact copy in modals
+rather than as routed pages. It is not a second client, holds no application logic, and
+is not what the in-app legal links point at (those go to the separately deployed public
+site named in `EXPO_PUBLIC_PRIVACY_URL` and friends).
 
 ---
 
