@@ -43,10 +43,12 @@ Note the Docker build context: the repository **root**, not `apps/api`. The Dock
 
 ## API tests
 
-**Stack.** pytest with `asyncio_mode = "auto"`, driving the real ASGI app through
-httpx's `ASGITransport`. Tests exercise actual HTTP routes — method, path, status code,
-response body — rather than calling service functions directly. Route wiring, dependency
-resolution, auth and serialisation are therefore all covered.
+**Stack.** pytest with `asyncio_mode = "auto"`. Most modules drive the real ASGI app
+through httpx's `ASGITransport`, exercising actual HTTP routes — method, path, status
+code, response body — so route wiring, dependency resolution, auth and serialisation are
+covered rather than bypassed. A minority test a service or pure function directly where
+there is no route to go through: `test_places`, `test_matching_eval`,
+`test_content_moderation`, `test_seed_venues` and `test_startup_import`.
 
 **Database.** Nineteen of the twenty-six modules stand up their own module-scoped
 in-memory SQLite engine (`sqlite+aiosqlite:///:memory:`) and override the `get_db`

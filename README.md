@@ -175,7 +175,7 @@ typecheck, API pytest, mobile Jest, and an API Docker image build gated on the r
 
 | | Stack | Scope |
 |---|---|---|
-| **API** | pytest + pytest-asyncio, httpx `ASGITransport` | 620 tests driving the real ASGI app over actual HTTP routes. Most modules stand up their own in-memory SQLite database; external services are mocked, some at the HTTP boundary and some above it. No network or containers required — the exact depths, and the gaps they leave, are in the testing doc. |
+| **API** | pytest + pytest-asyncio, httpx `ASGITransport` | 620 tests. Most drive the real ASGI app over actual HTTP routes against a per-module in-memory SQLite database; a minority test services or pure functions directly. External services are mocked, some at the HTTP boundary and some above it. No network or containers required — the exact depths, and the gaps they leave, are in the testing doc. |
 | **Mobile** | Jest (`jest-expo`) + React Native Testing Library | 747 tests across 53 suites covering screens, hooks, stores and pure logic. |
 | **Static** | Ruff (lint + format), ESLint (`--max-warnings 0`), `tsc --noEmit` | Enforced on every push, not just on pull requests. |
 
