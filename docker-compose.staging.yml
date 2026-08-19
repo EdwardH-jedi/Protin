@@ -35,8 +35,10 @@ services:
   # ── DB migration (one-shot) ───────────────────────────────────────────────
   migrate:
     build:
-      context: apps/api
-      dockerfile: Dockerfile
+      # Build context is the repo ROOT: apps/api/Dockerfile COPYs
+      # repo-root-relative paths, matching fly.toml and CI.
+      context: .
+      dockerfile: apps/api/Dockerfile
     command: alembic upgrade head
     env_file:
       - .env.staging
@@ -48,8 +50,10 @@ services:
   # ── API server ────────────────────────────────────────────────────────────
   api:
     build:
-      context: apps/api
-      dockerfile: Dockerfile
+      # Build context is the repo ROOT: apps/api/Dockerfile COPYs
+      # repo-root-relative paths, matching fly.toml and CI.
+      context: .
+      dockerfile: apps/api/Dockerfile
     command: >
       uvicorn app.main:app
       --host 0.0.0.0
@@ -74,8 +78,10 @@ services:
   # ── Background worker ─────────────────────────────────────────────────────
   worker:
     build:
-      context: apps/api
-      dockerfile: Dockerfile
+      # Build context is the repo ROOT: apps/api/Dockerfile COPYs
+      # repo-root-relative paths, matching fly.toml and CI.
+      context: .
+      dockerfile: apps/api/Dockerfile
     command: python worker.py
     env_file:
       - .env.staging

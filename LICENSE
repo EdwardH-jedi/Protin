@@ -1,9 +1,28 @@
+Protin — Source Available, All Rights Reserved
+
 Copyright (c) 2026 Edward Hwang. All rights reserved.
 
-This software and its source code are proprietary and confidential.
-No permission is granted to use, copy, modify, merge, publish, distribute,
-sublicense, or sell copies of this software, in whole or in part, without
-prior written permission from the copyright holder.
+This repository is made publicly visible so that the source code can be read,
+studied and evaluated — for example by prospective employers, collaborators or
+reviewers assessing the author's work. Public visibility is intentional; the
+contents are not confidential.
 
-The source code is made publicly visible for portfolio and evaluation
-purposes only.
+Public visibility does not grant a licence. No permission is given to use, copy,
+modify, merge, publish, distribute, sublicense, sell, or create derivative works
+from this software or its source code, in whole or in part, whether for
+commercial or non-commercial purposes, without prior written permission from the
+copyright holder.
+
+This software is not open source and is not offered under any OSI-approved
+licence.
+
+For permission to use any part of this work, contact the copyright holder.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR OR
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN
+AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Third-party dependencies remain under their own respective licences.

@@ -20,6 +20,23 @@ from app.models import match, profile, user, chat  # noqa: F401
 from app.models import booking as _booking_model  # noqa: F401
 from app.models import google_calendar, notification, safety  # noqa: F401
 
+
+def _future_window(days: int = 2, hours: int = 1) -> tuple[str, str]:
+    """Return an ISO (starts_at, ends_at) pair safely in the future.
+
+    The booking service rejects a ``starts_at`` in the past, so any hard-coded
+    calendar date silently turns these tests into 422s the moment the wall
+    clock passes it. Deriving the window from ``now()`` keeps every booking
+    proposal valid indefinitely. Each caller passes a distinct ``days`` offset
+    so bookings created by different tests stay distinguishable.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    starts_at = (datetime.now(timezone.utc) + timedelta(days=days)).replace(microsecond=0)
+    ends_at = starts_at + timedelta(hours=hours)
+    return starts_at.isoformat(), ends_at.isoformat()
+
+
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 _engine = create_async_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
 _TestSession = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
@@ -165,21 +182,14 @@ async def test_notification_scheduled_on_booking_proposal(client: AsyncClient, m
     match_id = r.json()["match_id"]
 
     # Propose a booking — should schedule a notification for partner B.
-    # Use a dynamic future window: the booking service rejects a starts_at in
-    # the past, so a hard-coded date turns into a 422 the moment the wall clock
-    # passes it (a previously hard-coded 2026-06-01 did exactly that). now()+2d
-    # keeps the proposal valid indefinitely.
-    from datetime import datetime, timedelta, timezone
-
-    starts_at = (datetime.now(timezone.utc) + timedelta(days=2)).replace(microsecond=0)
-    ends_at = starts_at + timedelta(hours=1)
+    starts_at, ends_at = _future_window(1)
     book_r = await client.post(
         "/bookings",
         json={
             "match_id": match_id,
             "sport": "gym",
-            "starts_at": starts_at.isoformat(),
-            "ends_at": ends_at.isoformat(),
+            "starts_at": starts_at,
+            "ends_at": ends_at,
         },
         headers=_auth(token_a),
     )
@@ -428,13 +438,14 @@ async def _setup_match_and_booking(client: AsyncClient) -> tuple[str, str, str, 
     )
     match_id = r.json()["match_id"]
 
+    starts_at, ends_at = _future_window(2)
     book_r = await client.post(
         "/bookings",
         json={
             "match_id": match_id,
             "sport": "gym",
-            "starts_at": "2026-08-01T09:00:00Z",
-            "ends_at": "2026-08-01T10:00:00Z",
+            "starts_at": starts_at,
+            "ends_at": ends_at,
         },
         headers=_auth(token_a),
     )
@@ -548,13 +559,14 @@ async def test_process_marks_sent_on_success(client: AsyncClient, monkeypatch: p
     )
     match_id = r.json()["match_id"]
 
+    starts_at, ends_at = _future_window(3)
     await client.post(
         "/bookings",
         json={
             "match_id": match_id,
             "sport": "gym",
-            "starts_at": "2026-09-01T09:00:00Z",
-            "ends_at": "2026-09-01T10:00:00Z",
+            "starts_at": starts_at,
+            "ends_at": ends_at,
         },
         headers=_auth(token_a),
     )
@@ -597,13 +609,14 @@ async def test_process_marks_failed_on_delivery_error(client: AsyncClient, monke
     )
     match_id = r.json()["match_id"]
 
+    starts_at, ends_at = _future_window(4)
     await client.post(
         "/bookings",
         json={
             "match_id": match_id,
             "sport": "gym",
-            "starts_at": "2026-09-10T09:00:00Z",
-            "ends_at": "2026-09-10T10:00:00Z",
+            "starts_at": starts_at,
+            "ends_at": ends_at,
         },
         headers=_auth(token_a),
     )
@@ -649,13 +662,14 @@ async def test_process_skips_already_sent_events(client: AsyncClient, monkeypatc
     )
     match_id = r.json()["match_id"]
 
+    starts_at, ends_at = _future_window(5)
     await client.post(
         "/bookings",
         json={
             "match_id": match_id,
             "sport": "gym",
-            "starts_at": "2026-09-20T09:00:00Z",
-            "ends_at": "2026-09-20T10:00:00Z",
+            "starts_at": starts_at,
+            "ends_at": ends_at,
         },
         headers=_auth(token_a),
     )

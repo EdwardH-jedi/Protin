@@ -65,7 +65,7 @@ jest.mock('../stores/auth', () => ({
 
 const mockFetchProfile = jest.fn();
 let mockProfile: Record<string, unknown> | null = null;
-let mockSportProfiles: Array<{ sport: string; level: string }> = [];
+let mockSportProfiles: { sport: string; level: string }[] = [];
 
 jest.mock('../stores/profile', () => ({
   useProfileStore: () => ({
@@ -143,7 +143,7 @@ let mockLocalChampion:
       updatedAt: string;
     }
   | null = null;
-let mockMyTitles: Array<{
+let mockMyTitles: {
   id: string;
   sport: string;
   area: string;
@@ -152,7 +152,7 @@ let mockMyTitles: Array<{
   active: boolean;
   createdAt: string;
   updatedAt: string;
-}> = [];
+}[] = [];
 
 jest.mock('../hooks/useHonorSystem', () => ({
   useHonorSystem: () => ({

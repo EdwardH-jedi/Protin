@@ -1,328 +1,320 @@
 # Protin
 
-Protin connects clients with personal trainers for bookable sessions.
+**A mobile social fitness platform for finding training partners and organising sports sessions.**
+Protin matches people by sport, skill level and location, then carries them all the way through
+messaging, session scheduling, group games and a reputation system that rewards actually showing up.
 
-| Layer | Stack |
-|---|---|
-| Mobile | Expo 52, React Native 0.76, TypeScript, React Navigation |
-| API | FastAPI, SQLAlchemy (async), Alembic, Python 3.12 |
-| Data | PostgreSQL 16, Redis 7 |
-| Package manager (JS) | npm workspaces |
-| Package manager (Python) | uv |
+`React Native` · `Expo 54` · `TypeScript` · `FastAPI` · `PostgreSQL 16` · `Redis 7` · `Docker`
 
----
+[![CI](https://github.com/EdwardH-jedi/Protin/actions/workflows/ci.yml/badge.svg)](https://github.com/EdwardH-jedi/Protin/actions/workflows/ci.yml)
+![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
+![TypeScript 5.9](https://img.shields.io/badge/typescript-5.9-3178C6?logo=typescript&logoColor=white)
+![Expo 54](https://img.shields.io/badge/expo-54-000020?logo=expo&logoColor=white)
+![React Native 0.81](https://img.shields.io/badge/react%20native-0.81-61DAFB?logo=react&logoColor=black)
 
-## Repository layout
-
-```
-.
-├── apps/
-│   ├── api/                  FastAPI service
-│   │   ├── alembic/          database migrations
-│   │   ├── app/
-│   │   │   ├── core/         config, security
-│   │   │   └── db/           SQLAlchemy engine, Redis client
-│   │   └── tests/
-│   └── mobile/               Expo React Native app
-│       └── src/
-│           ├── components/   shared UI primitives
-│           ├── navigation/   React Navigation setup
-│           ├── screens/      screen shells by domain
-│           └── theme/        design tokens
-├── .env.example              root infrastructure variables (source of truth)
-├── docker-compose.yml        PostgreSQL + Redis
-└── package.json              npm workspace root + infra scripts
-```
+> Independently designed and built. The app is prepared for App Store submission under
+> the brand **SportsGang** — store metadata, privacy labels and a release gate checklist
+> live in [`docs/release`](docs/release) — but no build has been submitted or released.
+> `protin` remains the internal project and package namespace.
 
 ---
 
-## Prerequisites
+## Screens
 
-| Tool | Version | Install |
+| Discovery | Matches | Chat |
 |---|---|---|
-| Node.js | 20+ | [nodejs.org](https://nodejs.org) |
-| npm | 10+ | bundled with Node |
-| Python | 3.12+ | [python.org](https://python.org) |
-| uv | latest | `pip install uv` or `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| Docker Desktop | latest | [docker.com](https://docker.com) |
+| ![Partner discovery feed](docs/release/screenshots/ios/01-discovery-gym-partners.png) | ![Matches list](docs/release/screenshots/ios/02-matches-message-previews.png) | ![Chat with a confirmed session](docs/release/screenshots/ios/03-chat-confirmed-session.png) |
+
+| Events & sessions | Propose a session | Profile & account |
+|---|---|---|
+| ![Events and sessions](docs/release/screenshots/ios/04-events-sessions.png) | ![Session proposal form](docs/release/screenshots/ios/05-propose-session-form.png) | ![Profile, legal and account controls](docs/release/screenshots/ios/08-profile-legal-account.png) |
+
+<sub>iOS simulator captures from the release-review build.</sub>
 
 ---
 
-## Local setup
+## Why Protin exists
 
-### 1. Copy environment files
+Finding someone to train with is a coordination problem that no single app solves well.
+People discover partners in one place, argue about times in another, and track who
+actually turned up nowhere at all. Group sports make it worse: casual games need a
+roster, a venue and some assurance that the strangers involved will show.
 
-**bash / macOS / Linux**
+Protin puts that whole loop in one app — discovery, agreement, scheduling and
+accountability — and keeps it local, so the people it surfaces are ones you could
+realistically meet this week. The product is Sydney-first by design: the venue catalogue,
+suburb model and distance filters are all built around one city rather than pretending
+to global coverage on day one.
+
+It is deliberately **not** a dating app. Matching exists to produce a booked session,
+and the reputation system exists to make that session actually happen.
+
+---
+
+## Core capabilities
+
+**Discover & connect** — A sport-scoped partner feed filtered by fitness level, preferred
+training time, gender preference, age range and distance, with like / pass / save actions
+and mutual-match creation. Supported sports: gym, golf, tennis and running.
+
+**Plan & book** — 1:1 session proposals governed by an explicit booking state machine.
+Every transition is checked against both the current status and the acting party's role
+(proposer vs partner), so a partner can confirm or decline but only the proposer can
+withdraw. A confirmed booking can be exported to the user's Google Calendar.
+
+**Compete & participate** — Group events ("battles") with rosters, capacity and attendance
+checks; head-to-head challenges whose results are only applied once *both* participants
+submit matching outcomes; and a feature-flagged tournament surface (list / join / leave,
+with capacity enforced under row-level locking).
+
+**Reputation you can trust** — A rank and honor system driven by real booking outcomes
+rather than self-reporting. Tiers are computed from points rather than stored, results
+reach the honor ledger only through verified challenge paths, and a user who claims a
+no-show takes a smaller penalty themselves to deter false claims.
+
+**Communicate** — Real-time per-match chat over WebSockets, with participant-checked
+rooms, REST history, optimistic send and message de-duplication across the
+fetch / POST / socket paths. Inbound text passes content moderation.
+
+**Trust & safety** — Reporting and blocking across users and events, blocked users
+filtered out of the discovery feed, and full account deletion including Apple token
+revocation.
+
+**Venues & integrations** — Nearby-venue discovery backed by a seeded Sydney catalogue
+with an optional Google Places provider layered on top, Apple Sign-In, and Expo push
+notifications delivered by a background worker.
+
+---
+
+## Engineering highlights
+
+The parts of this repository worth looking at, and where to find them:
+
+| Area | What is there | Where |
+|---|---|---|
+| **Async API** | FastAPI with fully async SQLAlchemy 2.0 over asyncpg; 15 routers, 14 ORM model modules, 17 service modules | [`apps/api/app`](apps/api/app) |
+| **Booking state machine** | Transitions declared as a `(status, transition) → allowed_by` table and enforced centrally, so no route can invent an illegal state change | [`services/bookings.py`](apps/api/app/services/bookings.py) |
+| **Contract-typed integration** | A TypeScript package pins the API wire shapes and is imported by ~22 mobile modules, so a contract change surfaces as a build failure rather than a runtime error. Adoption is partial and the types are not OpenAPI-generated — both gaps are documented rather than glossed over | [`packages/shared-types`](packages/shared-types) |
+| **Security engineering** | Field-level Fernet encryption for stored OAuth tokens with a startup guard that refuses to boot unencrypted in staging/production; JWT auth; slowapi rate limiting; shared-secret gate on internal routes | [`core/encryption.py`](apps/api/app/core/encryption.py), [`core/security.py`](apps/api/app/core/security.py) |
+| **Real-time chat** | A WebSocket room per match with a connection manager; the token is decoded and match participation verified before the socket is admitted to any room, and a rejected connection is closed with a distinct code for auth vs authorisation failure | [`routers/chat.py`](apps/api/app/routers/chat.py), [`ChatScreen.tsx`](apps/mobile/src/screens/chat/ChatScreen.tsx) |
+| **Background processing** | A standalone worker process polling for due push notifications and delivering them via Expo | [`apps/api/worker.py`](apps/api/worker.py) |
+| **Schema evolution** | 15 Alembic migrations covering the full domain history | [`apps/api/alembic/versions`](apps/api/alembic/versions) |
+| **Mobile app** | Expo / React Native with React Navigation, Zustand stores, Apple Sign-In, expo-location, maps, image picker and Sentry | [`apps/mobile/src`](apps/mobile/src) |
+| **Test suite** | 620 API tests and 747 mobile tests, all run in CI | [`apps/api/tests`](apps/api/tests), [`apps/mobile/src/__tests__`](apps/mobile/src/__tests__) |
+| **Infrastructure** | Multi-stage Docker build, Compose stacks for local and staging, nginx reverse proxy, backup/restore and health-check scripts, Fly.io deployment configuration | [`infra`](infra), [`fly.toml`](fly.toml) |
+| **Security review** | A written security audit with severity ratings, tracked against the code that since addressed it — including which findings are closed, which are only partially addressed, and which remain open | [`docs/security/SECURITY_AUDIT.md`](docs/security/SECURITY_AUDIT.md) |
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Mobile["React Native / Expo app"]
+    API["FastAPI API"]
+    Worker["Notification worker"]
+    DB[("PostgreSQL 16")]
+    Redis[("Redis 7")]
+
+    Apple["Apple Sign-In"]
+    GCal["Google Calendar"]
+    Places["Google Places"]
+    Expo["Expo Push"]
+
+    Mobile -->|"REST + JWT"| API
+    Mobile -->|"WebSocket chat"| API
+    Mobile --> Apple
+    API --> Apple
+    API --> DB
+    API --> Redis
+    API --> GCal
+    API --> Places
+    Worker --> DB
+    Worker --> Expo
+```
+
+- **Mobile app** — all user-facing state and navigation. Talks to the API over REST with a
+  JWT held in `expo-secure-store`; holds no business rules of its own.
+- **API** — the single source of truth for domain rules: authentication, the booking state
+  machine, discovery filtering and scoring, challenge result verification, and rank/honor
+  accounting. Owns every external integration except Apple's on-device sign-in prompt.
+- **PostgreSQL** — durable state for users, profiles, matches, messages, bookings, events,
+  challenges, tournaments, rankings, venues and safety records.
+- **Redis** — ephemeral state, rate-limit backend, and health-checked runtime dependency.
+- **WebSockets** — chat runs over an authenticated socket per match room, alongside the
+  REST endpoints that serve message history.
+- **Worker** — a separate process that polls for due notifications and delivers them
+  through Expo Push, keeping fan-out off the request path.
+- **shared-types** — a TypeScript package consumed by the mobile app that pins the wire
+  contract. It is not generated from OpenAPI and a few newer hooks still declare shapes
+  inline; see [the architecture notes](docs/architecture/ARCHITECTURE.md#package-boundaries).
+
+Full detail: [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md).
+
+---
+
+## Testing & quality
+
+Every push runs six CI jobs: Ruff lint + format check, mobile ESLint, TypeScript
+typecheck, API pytest, mobile Jest, and an API Docker image build gated on the rest.
+
+| | Stack | Scope |
+|---|---|---|
+| **API** | pytest + pytest-asyncio, httpx `ASGITransport` | 620 tests exercising real HTTP routes against a per-module in-memory SQLite database. External services (Expo Push, Google, Apple) are mocked at the boundary, so the suite needs no network or containers. |
+| **Mobile** | Jest (`jest-expo`) + React Native Testing Library | 747 tests across 53 suites covering screens, hooks, stores and pure logic. |
+| **Static** | Ruff (lint + format), ESLint (`--max-warnings 0`), `tsc --noEmit` | Enforced on every push, not just on pull requests. |
+
+Details and local commands: [`docs/engineering/TESTING.md`](docs/engineering/TESTING.md).
+
+---
+
+## Engineering workflow
+
+Implementation on this project is AI-assisted, and the interesting part is the
+scaffolding built to keep that honest rather than the assistance itself.
+
+- **Claude Code** performs implementation against scoped, file-owned agent definitions in
+  [`.claude/agents`](.claude/agents), with domain rules encoded as reusable skills
+  (booking state machine, discovery feed, API contract sync).
+- **Deterministic gates** run automatically. A Stop hook lints, typechecks and
+  secret-scans the working diff before a turn is allowed to finish; a pre-commit hook
+  repeats the check before anything is committed.
+- **Codex** reviews the resulting diff independently, writing a verdict report that blocks
+  only on correctness, regression or security findings.
+- **CI** is the final arbiter — nothing merges on a green local run alone.
+- **Product direction, architecture, scope and final acceptance stay human-owned.**
+
+None of this makes generated code correct by itself. It makes incorrect code
+expensive to land, which is the property that actually matters.
+
+See [`docs/engineering/AI_WORKFLOW.md`](docs/engineering/AI_WORKFLOW.md).
+
+---
+
+## Project ownership
+
+Protin is an independent solo project. There was no team; every decision below was mine:
+
+- **Product direction** — positioning, sport scope, the Sydney-first constraint, and the
+  choice to make booking (not matching) the success metric.
+- **System architecture** — monorepo layout, the async API, the shared-type contract
+  boundary, and moving notification fan-out to a separate worker process.
+- **Data modelling** — the schema and its 15-migration history, including the booking
+  state machine and the rank/honor accounting rules.
+- **Mobile engineering** — screens, navigation, state management and API integration.
+- **Testing strategy** — the in-memory-SQLite API harness, the external-boundary mocking
+  policy, and the CI gate layout.
+- **Infrastructure** — Docker packaging, Compose stacks, nginx, backup/restore and
+  health-check tooling, and deployment configuration.
+- **Engineering workflow** — the AI-assisted loop described above and the automated gates
+  that constrain it.
+
+Implementation is AI-assisted (see the workflow section); the design, review and
+acceptance of that work are not.
+
+---
+
+## Repository structure
+
+```
+apps/
+  api/               FastAPI service — routers, services, models, migrations, worker
+  mobile/            Expo React Native app — screens, hooks, stores, navigation
+  web/               Vite landing / legal site (privacy, terms, support pages)
+packages/
+  shared-types/      TypeScript wire contract shared by the API and the app
+infra/               nginx config, deploy / backup / health-check scripts, systemd units
+docs/                architecture, engineering, deployment, security, legal, archive
+.claude/             AI engineering harness — agents, skills, quality-gate hooks
+.github/workflows/   CI pipeline
+```
+
+---
+
+## Getting started
+
+**Prerequisites:** Node.js 20+, Python 3.12+, [uv](https://docs.astral.sh/uv/), Docker Desktop.
+
 ```bash
+# 1. Environment files (defaults work for local development as-is)
 cp .env.example .env
 cp apps/api/.env.example apps/api/.env
 cp apps/mobile/.env.example apps/mobile/.env
-```
 
-**PowerShell**
-```powershell
-Copy-Item .env.example .env
-Copy-Item apps\api\.env.example apps\api\.env
-Copy-Item apps\mobile\.env.example apps\mobile\.env
-```
-
-The default values work out of the box for local development.
-See [Environment variables](#environment-variables) if you need to change ports.
-
----
-
-### 2. Start infrastructure
-
-```bash
+# 2. Infrastructure — PostgreSQL on :5432, Redis on :6379
 npm run infra:up
-```
+npm run infra:ps          # wait until both report "Up (healthy)"
 
-This starts PostgreSQL on `localhost:5432` and Redis on `localhost:6379`.
+# 3. Dependencies
+npm install
+cd apps/api && uv sync --dev
 
-**Wait for both services to be healthy before continuing:**
-
-```bash
-npm run infra:ps
-```
-
-Expected output — both `Status` columns should read `Up (healthy)`:
-
-```
-NAME               IMAGE                COMMAND                  STATUS
-protin-postgres-1  postgres:16-alpine   "docker-entrypoint.s…"  Up (healthy)
-protin-redis-1     redis:7-alpine       "docker-entrypoint.s…"  Up (healthy)
-```
-
-If services show `starting` rather than `healthy`, wait 10–15 seconds and run `npm run infra:ps` again.
-
----
-
-### 3. Install dependencies
-
-```bash
-npm install                       # JavaScript — mobile app + root tooling
-cd apps/api && uv sync --dev      # Python — API + test dependencies
-```
-
----
-
-### 4. Run database migrations
-
-From `apps/api`:
-
-```bash
+# 4. Migrations (from apps/api)
 uv run alembic upgrade head
+
+# 5. API (from apps/api)
+uv run uvicorn app.main:app --reload --port 8000
+# → http://localhost:8000/health   ·   docs at http://localhost:8000/docs
+
+# 6. Mobile app — in a second terminal, from the repository root
+cd ../..
+npm run mobile:start      # then press i (iOS), a (Android), or scan the QR code
 ```
 
-Expected output:
+Step 5 runs in the foreground, so start the app from a second terminal. Steps 4–5 run
+from `apps/api`; everything else runs from the repository root.
 
-```
-INFO  [alembic.runtime.migration] Context impl PostgreSQLImpl.
-INFO  [alembic.runtime.migration] Will assume transactional DDL.
-```
-
-Migrations are a no-op if the schema is already current.
-Re-run this command whenever new migration files are added.
+Hitting a problem? See [`docs/engineering/LOCAL_SETUP.md`](docs/engineering/LOCAL_SETUP.md)
+for environment variable reference and troubleshooting.
 
 ---
 
-### 5. Start the API
-
-From `apps/api`:
+## Development commands
 
 ```bash
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Infrastructure (each is its own command)
+npm run infra:up          # start PostgreSQL + Redis
+npm run infra:down        # stop, keeping volumes
+npm run infra:reset       # wipe volumes and restart
+npm run infra:logs        # tail service logs
+npm run infra:ps          # service status and health
+
+# Mobile — from the repository root
+npm run lint      -w @protin/mobile
+npm run typecheck -w @protin/mobile
+npm run test:ci   -w @protin/mobile
+npm run mobile:start      # also: mobile:ios, mobile:android, mobile:web
+
+# API — from apps/api
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest
+uv run alembic upgrade head
+
+# API container — note the context is the repo root, not apps/api
+docker build -f apps/api/Dockerfile .
 ```
-
-**Verify the API is running and connected to both services:**
-
-```bash
-curl http://localhost:8000/health
-```
-
-Expected response:
-
-```json
-{"status":"ok","environment":"local","checks":{"db":"ok","redis":"ok"}}
-```
-
-If either check shows `"error"`, see [Troubleshooting](#troubleshooting).
-
-Interactive API docs: `http://localhost:8000/docs`
 
 ---
 
-### 6. Start the mobile app
+## Documentation
 
-From the repository root:
-
-```bash
-npm run mobile:start
-```
-
-Then in the Expo terminal:
-
-| Key | Action |
+| Document | Contents |
 |---|---|
-| `a` | Open Android emulator |
-| `i` | Open iOS simulator |
-| `w` | Open in browser |
-| Scan QR | Open in Expo Go on a physical device |
-
-The app connects to `EXPO_PUBLIC_API_URL` from `apps/mobile/.env` (default: `http://localhost:8000`).
-
----
-
-## Development scripts
-
-All infra scripts run from the repository root via npm.
-
-### Infrastructure
-
-```bash
-npm run infra:up           # start PostgreSQL and Redis (detached)
-npm run infra:down         # stop services, keep data volumes
-npm run infra:reset        # wipe volumes and restart fresh (re-run migrations after)
-npm run infra:logs         # tail all service logs
-npm run infra:ps           # show service status and health
-```
-
-### Mobile
-
-```bash
-npm run mobile:start       # start Expo dev server
-npm run mobile:android     # open Android emulator
-npm run mobile:ios         # open iOS simulator
-npm run mobile:web         # open in browser
-```
-
-### API (run from `apps/api`)
-
-```bash
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000   # dev server
-uv run pytest                                                       # test suite
-uv run alembic upgrade head                                         # apply migrations
-uv run alembic downgrade -1                                         # roll back one migration
-```
+| [Architecture](docs/architecture/ARCHITECTURE.md) | System context, components, request flow, data stores, trade-offs |
+| [Testing](docs/engineering/TESTING.md) | Test stacks, CI gates, local commands, mocking policy |
+| [AI workflow](docs/engineering/AI_WORKFLOW.md) | Roles, quality gates, and the reasoning behind them |
+| [Local setup](docs/engineering/LOCAL_SETUP.md) | Environment variables, health checks, troubleshooting |
+| [Security audit](docs/security/SECURITY_AUDIT.md) | Reviewed findings, severities and remediation status |
+| [Deployment](docs/deployment/RELEASE_RUNBOOK.md) | Release runbook and App Store submission prep |
+| [Archive](docs/archive/README.md) | Superseded historical documents, retained for provenance |
 
 ---
 
-## Health verification
+## License
 
-Use these checks to confirm the full stack is operational before developing.
+Source available, all rights reserved — see [LICENSE](LICENSE).
+The code is public so it can be read and evaluated; reuse, redistribution and
+commercial use require permission.
 
-### Infrastructure
-
-```bash
-npm run infra:ps
-# Both STATUS values should be "Up (healthy)"
-
-# Check PostgreSQL directly
-docker compose exec postgres pg_isready -U protin
-# → /var/run/postgresql:5432 - accepting connections
-
-# Check Redis directly
-docker compose exec redis redis-cli ping
-# → PONG
-```
-
-### API
-
-```bash
-curl http://localhost:8000/health
-# → {"status":"ok","environment":"local","checks":{"db":"ok","redis":"ok"}}
-```
-
-Both checks inside `checks` must be `"ok"`. If either is `"error"`, the service
-is running but cannot reach that dependency — see [Troubleshooting](#troubleshooting).
-
----
-
-## Environment variables
-
-### `.env` (root) — Docker Compose + shared
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `POSTGRES_DB` | `protin` | database name |
-| `POSTGRES_USER` | `protin` | database user |
-| `POSTGRES_PASSWORD` | `protin` | database password |
-| `POSTGRES_PORT` | `5432` | host port for PostgreSQL |
-| `REDIS_PORT` | `6379` | host port for Redis |
-| `APP_ENV` | `local` | reported in `/health` response |
-| `API_HOST` | `0.0.0.0` | uvicorn bind address |
-| `API_PORT` | `8000` | uvicorn bind port |
-| `POSTGRES_URL` | `postgresql://protin:protin@localhost:5432/protin` | used by API and Alembic |
-| `REDIS_URL` | `redis://localhost:6379/0` | used by API |
-| `EXPO_PUBLIC_API_URL` | `http://localhost:8000` | API base URL baked into mobile JS bundle |
-
-### `apps/api/.env` — FastAPI runtime only
-
-Subset of the root variables: `APP_ENV`, `API_HOST`, `API_PORT`, `POSTGRES_URL`, `REDIS_URL`.
-
-### `apps/mobile/.env` — Expo runtime only
-
-`EXPO_PUBLIC_API_URL` only. The `EXPO_PUBLIC_` prefix is required by Expo to expose
-variables to the JavaScript bundle.
-
----
-
-## Troubleshooting
-
-### Port conflicts
-
-If ports `5432` or `6379` are already in use on your machine, edit `.env` before starting:
-
-```
-POSTGRES_PORT=5433
-REDIS_PORT=6380
-```
-
-Then update `POSTGRES_URL` to use the new port, restart infra (`npm run infra:reset`),
-and re-run migrations.
-
-### API health returns `"db": "error"`
-
-1. Confirm PostgreSQL is healthy: `npm run infra:ps`
-2. Confirm `POSTGRES_URL` in `apps/api/.env` matches the credentials in `.env`
-   (default for both: `protin` / `protin` / `protin`)
-3. If you reset volumes with `npm run infra:reset`, re-run migrations:
-   ```bash
-   cd apps/api && uv run alembic upgrade head
-   ```
-
-### API health returns `"redis": "error"`
-
-1. Confirm Redis is healthy: `npm run infra:ps`
-2. Confirm `REDIS_URL` in `apps/api/.env` matches the port in `.env`
-
-### Migrations fail: `Connection refused`
-
-PostgreSQL is not yet ready. Wait for `npm run infra:ps` to show `Up (healthy)`,
-then retry.
-
-### `uv` not found
-
-Install uv:
-```bash
-# bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# PowerShell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
----
-
-## Stopping and resetting
-
-```bash
-npm run infra:down          # stop services, data volumes are preserved
-npm run infra:reset         # wipe all data volumes and restart fresh
-```
-
-After `infra:reset`, re-run migrations before starting the API:
-
-```bash
-cd apps/api && uv run alembic upgrade head
-```
+© 2026 Edward Hwang

@@ -1,8 +1,16 @@
+> **Archived historical document.** This is a point-in-time readiness audit from April 2026
+> and is **not** current documentation. Findings recorded here have since been addressed
+> or superseded — notably OAuth tokens are now encrypted at rest and the mobile debug
+> logging it flags has been removed. For current documentation see
+> [`README.md`](../../README.md) and
+> [`docs/security/SECURITY_AUDIT.md`](../security/SECURITY_AUDIT.md).
+> Retained for project history only.
+
 # Protin — Alpha Readiness (Updated)
 
 Date: 2026-04-15
 Branch: `feature/wave-8-staging-readiness`
-Supersedes: `docs/alpha/ALPHA_READINESS.md` (2026-03-18)
+Supersedes: `docs/archive/2026-03-alpha-readiness.md` (2026-03-18)
 
 This is a re-audit of the Wave 7 readiness doc against shipped code in `apps/`
 after Waves 8–17 (harness, sport expansion, WebSocket chat, matching algorithm,
@@ -84,8 +92,8 @@ distribution. **PASS** across the board.
 | NEW-001 | Medium | Sport scope drift: tennis/running shipped in onboarding/discovery but `ProfileScreen.tsx` only labels gym/golf and CLAUDE.md restricts scope to gym+golf. Either gate behind a flag or finish the UI before alpha. |
 | NEW-002 | Low | `KNOWN_ISSUES.md` NB-004 ("Chat does not auto-refresh") is now incorrect — WebSocket is wired. Update or delete. |
 | NEW-003 | Low | `ALPHA_READINESS.md` "Wave 7 improvements summary" is frozen at Wave 7; Waves 8–17 changes (WebSocket, matching algorithm, CI, ESLint, nginx HTTP-only) are unrecorded. |
-| NEW-004 | Low (pre-prod) | `models/google_calendar.py` stores tokens in plaintext (per `PROJECT_STATUS.md`); acceptable for alpha but must be encrypted before production. |
-| NEW-005 | Low | `apps/mobile/src/lib/api.ts` debug logs noted in `PROJECT_STATUS.md`; verify removed before broader alpha distribution. |
+| NEW-004 | Low (pre-prod) | `models/google_calendar.py` stores tokens in plaintext (per `docs/archive/2026-04-project-status.md`); acceptable for alpha but must be encrypted before production. |
+| NEW-005 | Low | `apps/mobile/src/lib/api.ts` debug logs noted in `docs/archive/2026-04-project-status.md`; verify removed before broader alpha distribution. |
 
 ## 8. Go / no-go summary
 

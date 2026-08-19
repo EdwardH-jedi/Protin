@@ -110,5 +110,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Build context is the repo ROOT, not apps/api. apps/api/Dockerfile
+      # COPYs repo-root-relative paths (apps/api/pyproject.toml, ...) to match
+      # how fly.toml builds the image, and the root .dockerignore is written
+      # against the same context. Passing `apps/api` as the context fails at
+      # the first COPY.
       - name: Build API Docker image
-        run: docker build -f apps/api/Dockerfile apps/api
+        run: docker build -f apps/api/Dockerfile .
