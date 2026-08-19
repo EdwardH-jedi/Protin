@@ -124,13 +124,17 @@ reproducible: same input, same verdict, no judgement involved. They are the floo
 Model review sits on top to catch what a linter structurally cannot — a function that
 passes every check while doing the wrong thing.
 
-**Blocking is rationed.** The gates block on lint failure, typecheck failure, secret
+**Blocking is rationed.** The Stop gates block on lint failure, typecheck failure, secret
 exposure and a `BLOCK` verdict, and nothing else. A gate that blocks on everything gets
-bypassed, and a bypassed gate is worth less than no gate.
+bypassed, and a bypassed gate is worth less than no gate. The pre-commit gate is stricter
+by design — it additionally refuses a commit on `main`/`master` — because it is the last
+step before history.
 
-**Graceful degradation over hard dependency.** Every hook skips cleanly when its tool is
-absent. A workflow that only functions on one perfectly configured machine is not a
-workflow.
+**Degradation, where it is safe.** The two Stop hooks skip cleanly when `ruff`, `npx`,
+`jq` or `codex` is missing, so a partially configured machine still gets a usable loop.
+The pre-commit hook deliberately does not: it runs under `set -e` and fails the commit if
+its tooling is absent, on the grounds that "the linter was missing" is not a reason to let
+an unchecked commit through.
 
 **The human stays the last step.** Diffs are read before they are committed, and the
 final decision is not automated. The gates narrow what reaches that review; they do not

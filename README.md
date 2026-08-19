@@ -71,18 +71,25 @@ checks; head-to-head challenges whose results are only applied once *both* parti
 submit matching outcomes; and a feature-flagged tournament surface (list / join / leave,
 with capacity enforced under row-level locking).
 
-**Reputation you can trust** — A rank and honor system driven by real booking outcomes
-rather than self-reporting. Tiers are computed from points rather than stored, results
-reach the honor ledger only through verified challenge paths, and a user who claims a
-no-show takes a smaller penalty themselves to deter false claims.
+**Reputation with the incentives thought through** — A rank and honor system driven by
+booking outcomes. Tiers are computed from points rather than stored, and honor-ledger
+writes are reachable only through the challenge path, where a result applies only once
+*both* participants submit matching outcomes. Booking outcomes are weaker: either party
+can unilaterally mark a confirmed session completed or no-show, so the deterrent is
+game-theoretic — whoever claims a no-show takes a smaller penalty too. That is a
+mitigation, not a dispute system, and the design notes say so.
 
 **Communicate** — Real-time per-match chat over WebSockets, with participant-checked
 rooms, REST history, optimistic send and message de-duplication across the
 fetch / POST / socket paths. Inbound text passes content moderation.
 
 **Trust & safety** — Reporting and blocking across users and events, blocked users
-filtered out of the discovery feed, and full account deletion including Apple token
-revocation.
+filtered out of the discovery feed in both directions, and in-app account deletion that
+hard-deletes every row referencing the user in dependency order. For Sign in with Apple
+users it also attempts token revocation first, best-effort: revocation is skipped when
+Apple credentials are unconfigured and a failure is logged rather than aborting, so an
+Apple outage can never trap a user in their account. Uploaded photo *files* are not yet
+purged from disk on deletion — a known gap, tracked rather than glossed over.
 
 **Venues & integrations** — Nearby-venue discovery backed by a seeded Sydney catalogue
 with an optional Google Places provider layered on top, Apple Sign-In, and Expo push
@@ -141,7 +148,10 @@ flowchart LR
   JWT held in `expo-secure-store`; holds no business rules of its own.
 - **API** — the single source of truth for domain rules: authentication, the booking state
   machine, discovery filtering and scoring, challenge result verification, and rank/honor
-  accounting. Owns every external integration except Apple's on-device sign-in prompt.
+  accounting. It owns the server-side integrations (Apple token verification and
+  revocation, Google Calendar, Google Places). The app owns the ones that are inherently
+  on-device: the Apple sign-in prompt, Expo push-token registration, device calendar
+  access, and Sentry.
 - **PostgreSQL** — durable state for users, profiles, matches, messages, bookings, events,
   challenges, tournaments, rankings, venues and safety records.
 - **Redis** — ephemeral state, rate-limit backend, and health-checked runtime dependency.

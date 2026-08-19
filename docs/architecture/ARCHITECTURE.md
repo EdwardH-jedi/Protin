@@ -122,12 +122,17 @@ POST /bookings/{id}/confirm
         ├─ _get_booking_or_404
         ├─ _assert_booking_participant     caller is proposer or partner
         ├─ _check_transition               (status, target) legal? actor permitted?
-        ├─ commit new status
-        ├─ rank_service.record_booking_transition   rank/honor deltas
-        └─ notifications.schedule(...)              row written, not sent
+        ├─ mutate booking.status                    not committed yet
+        ├─ rank_service.record_booking_transition   rank/honor rows, same session
+        ├─ notifications.schedule(...)              rows written, nothing sent
+        └─ db.commit()                              all three land atomically
    │
    └─ 200  BookingResponse
 ```
+
+The single commit at the end is the point: the status change, the reputation ledger rows
+and the queued notifications either all land or none do. Committing the status first
+would allow a booking to be confirmed with no matching rank entry if the next step threw.
 
 Push delivery happens later, out of band, when the worker next polls.
 
@@ -227,12 +232,18 @@ These are *optional* integrations: leaving one unset switches that feature off, 
 records a delivery failure, without breaking an unrelated flow. That is what lets CI, and
 an App Store reviewer's environment, run the product without production credentials.
 
-A separate class of setting behaves the opposite way on purpose. `SECRET_KEY`,
-`FIELD_ENCRYPTION_KEY` and `INTERNAL_API_TOKEN` are **required** when `APP_ENV` is
-`staging` or `production`, and the app raises at startup rather than booting without
-them. Refusing to start is the correct failure mode there — a service running with a
-committed default signing key, unencrypted OAuth tokens, or an open internal endpoint is
-worse than a service that is down.
+A separate class of setting behaves the opposite way on purpose. `FIELD_ENCRYPTION_KEY`
+and `INTERNAL_API_TOKEN` are **required** when `APP_ENV` is `staging` or `production`:
+the app raises at startup rather than boot without them. Refusing to start is the correct
+failure mode there — a service persisting unencrypted OAuth tokens, or exposing an
+unauthenticated notification fan-out, is worse than a service that is down.
+
+`SECRET_KEY` has the same intent but a weaker guard, and it is worth being precise about
+the difference: the startup check rejects only the exact literal
+`change-me-in-production`. An empty value, a short value, or a different placeholder
+still boots and signs JWTs. Tightening that check to a real emptiness/length validation
+is finding **C1** in the [security audit](../security/SECURITY_AUDIT.md) and remains
+open.
 
 ---
 

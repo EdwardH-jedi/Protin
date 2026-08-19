@@ -67,7 +67,7 @@ the other two:
 
 | Variable | Behaviour when unset |
 |---|---|
-| `SECRET_KEY` | Locally: a warning, and every JWT is invalidated on restart. In `staging` / `production`: startup fails **if the value is the literal `change-me-in-production`**. Note the guard is an exact-match check only — an empty or weak key is still accepted, which is tracked as an open finding in the [security audit](../security/SECURITY_AUDIT.md). Always set a real random value. |
+| `SECRET_KEY` | Locally: a startup warning only. (The warning text says tokens are invalidated on restart; that is not accurate for the default, which is a fixed literal — it is true whenever you *do* set a fresh key.) In `staging` / `production`: startup fails **only if the value is the exact literal `change-me-in-production`**. The guard is an exact-match check, so an empty or weak key still boots — an open finding in the [security audit](../security/SECURITY_AUDIT.md). Always set a real random value. |
 | `FIELD_ENCRYPTION_KEY` | Locally: OAuth tokens are stored with a `plain:` sentinel prefix. In `staging` / `production`: startup fails — staging database dumps are retained as backups and would otherwise contain readable tokens. |
 | `INTERNAL_API_TOKEN` | Locally: `/internal/*` is reachable without a shared secret. In `staging` / `production`: startup fails rather than expose an unauthenticated notification fan-out trigger. |
 
