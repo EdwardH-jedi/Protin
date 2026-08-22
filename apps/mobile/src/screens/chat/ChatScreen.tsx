@@ -300,12 +300,23 @@ export function ChatScreen({ route, navigation }: ChatScreenProps) {
   useEffect(() => {
     if (!token) return;
     const wsBase = BASE_URL.replace(/^http/, 'ws');
-    const ws = new WebSocket(`${wsBase}/matches/${matchId}/ws?token=${token}`);
+    const ws = new WebSocket(`${wsBase}/matches/${matchId}/ws`);
     wsRef.current = ws;
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'auth', token }));
+    };
 
     ws.onmessage = (event) => {
       try {
-        const incoming = JSON.parse(event.data as string) as Message;
+        const parsed: unknown = JSON.parse(event.data as string);
+        if (
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          'type' in parsed &&
+          parsed.type === 'auth_ok'
+        ) return;
+        const incoming = parsed as Message;
         // Use the shared dedupe helper so this path matches sendMessage and
         // fetchMessages — a single source of truth means a race between the
         // POST response and a WS echo of the same id can never duplicate.

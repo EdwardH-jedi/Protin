@@ -70,6 +70,12 @@ if [[ "$DO_BUILD" == "true" ]]; then
     $COMPOSE build api worker migrate
 fi
 
+echo "==> Validating protected-environment secrets"
+if ! $COMPOSE run --rm --no-deps api python -m app.core.protected_config; then
+    echo "ERROR: protected-environment secret validation failed."
+    exit 1
+fi
+
 # Start infrastructure
 echo "==> Starting postgres and redis"
 $COMPOSE up -d postgres redis

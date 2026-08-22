@@ -79,7 +79,7 @@ async def verify_identity_token(
     identity_token: str,
     *,
     audience: str,
-    nonce: str | None = None,
+    nonce: str,
     http_client: httpx.AsyncClient | None = None,
 ) -> dict[str, Any]:
     """Verify an Apple identity token and return its decoded claims.
@@ -92,11 +92,10 @@ async def verify_identity_token(
         Expected ``aud`` claim — the app's bundle identifier (iOS) or
         Services ID (web). Required for signature validation.
     nonce:
-        Optional **raw** nonce previously passed to Apple on the client side
-        (e.g. via ``AppleAuthentication.signInAsync({ nonce })``). When
-        supplied, we compare ``SHA256(nonce)`` in hex against the token's
-        ``nonce`` claim — Apple hashes the client-supplied nonce before
-        embedding it in the identity token.
+        Required **raw** nonce previously passed to Apple on the client side
+        (e.g. via ``AppleAuthentication.signInAsync({ nonce })``). We compare
+        ``SHA256(nonce)`` in hex against the token's ``nonce`` claim — Apple
+        hashes the client-supplied nonce before embedding it in the token.
     http_client:
         Optional shared httpx client (used by tests to stub JWKS fetches).
 
@@ -112,9 +111,11 @@ async def verify_identity_token(
         raise AppleIdentityTokenError(f"Malformed identity token: {e}") from e
 
     kid = header.get("kid")
-    alg = header.get("alg", "RS256")
+    alg = header.get("alg")
     if not kid:
         raise AppleIdentityTokenError("Identity token header missing 'kid'")
+    if alg != "RS256":
+        raise AppleIdentityTokenError("Identity token must use RS256")
 
     keys = await _key_cache.get(http_client)
     jwk = keys.get(kid)
@@ -125,6 +126,12 @@ async def verify_identity_token(
         jwk = keys.get(kid)
     if jwk is None:
         raise AppleIdentityTokenError(f"No Apple public key matches kid={kid}")
+    if jwk.get("kty") != "RSA":
+        raise AppleIdentityTokenError("Apple public key must be RSA")
+    if jwk.get("use") not in (None, "sig"):
+        raise AppleIdentityTokenError("Apple public key is not a signing key")
+    if jwk.get("alg") not in (None, "RS256"):
+        raise AppleIdentityTokenError("Apple public key algorithm is not RS256")
 
     public_key = RSAAlgorithm.from_jwk(jwk)
 
@@ -132,17 +139,16 @@ async def verify_identity_token(
         claims = jwt.decode(
             identity_token,
             public_key,  # type: ignore[arg-type]
-            algorithms=[alg],
+            algorithms=["RS256"],
             audience=audience,
             issuer=APPLE_ISSUER,
         )
     except jwt.PyJWTError as e:
         raise AppleIdentityTokenError(f"Identity token verification failed: {e}") from e
 
-    if nonce is not None:
-        expected_nonce = hashlib.sha256(nonce.encode("utf-8")).hexdigest()
-        if claims.get("nonce") != expected_nonce:
-            raise AppleIdentityTokenError("Nonce mismatch")
+    expected_nonce = hashlib.sha256(nonce.encode("utf-8")).hexdigest()
+    if claims.get("nonce") != expected_nonce:
+        raise AppleIdentityTokenError("Nonce mismatch")
 
     if "sub" not in claims:
         raise AppleIdentityTokenError("Identity token missing 'sub' claim")

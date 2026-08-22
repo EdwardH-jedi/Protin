@@ -12,23 +12,21 @@ import jwt
 from passlib.context import CryptContext
 
 from app.core.config import get_settings as _get_settings
+from app.core.protected_config import PROTECTED_ENVS, validate_strong_secret
 
 _DEFAULT_SECRET_KEY = "change-me-in-production"
-_PROTECTED_ENVS = {"staging", "production"}
 
 _settings = _get_settings()
 SECRET_KEY: str = _settings.secret_key
 
 _log = logging.getLogger(__name__)
 
-if SECRET_KEY == _DEFAULT_SECRET_KEY:
-    if _settings.app_env in _PROTECTED_ENVS:
-        raise RuntimeError(
-            f"SECRET_KEY must be set in {_settings.app_env}; the default 'change-me-in-production' is not permitted."
-        )
+if _settings.app_env in PROTECTED_ENVS:
+    validate_strong_secret("SECRET_KEY", SECRET_KEY)
+elif SECRET_KEY == _DEFAULT_SECRET_KEY:
     _log.warning(
         "SECRET_KEY is set to the default value. "
-        "All JWT tokens will be invalidated on restart. "
+        "Local tokens are forgeable by anyone who knows the repository default. "
         "Set SECRET_KEY in your environment."
     )
 

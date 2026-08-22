@@ -27,6 +27,7 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 _engine = create_async_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
 _TestSession = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
+_APPLE_NONCE = "test-apple-nonce-value-000000000000"
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -287,6 +288,15 @@ async def test_delete_me_requires_auth(client: AsyncClient) -> None:
 # ---------------------------------------------------------------------------
 
 
+async def test_apple_sign_in_requires_nonce(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.core import config as config_module
+
+    monkeypatch.setattr(config_module.get_settings(), "apple_client_id", "com.protin.app")
+    response = await client.post("/auth/apple", json={"identity_token": "stub.jwt.value"})
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"][-1] == "nonce"
+
+
 async def test_apple_sign_in_creates_user_on_first_call(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
     from app.core import config as config_module
     from app.routers import auth as auth_router
@@ -310,7 +320,7 @@ async def test_apple_sign_in_creates_user_on_first_call(client: AsyncClient, mon
 
     r = await client.post(
         "/auth/apple",
-        json={"identity_token": "stub.jwt.value"},
+        json={"identity_token": "stub.jwt.value", "nonce": _APPLE_NONCE},
     )
     assert r.status_code == 200, r.text
     body = r.json()
@@ -318,7 +328,7 @@ async def test_apple_sign_in_creates_user_on_first_call(client: AsyncClient, mon
     assert body["token_type"] == "bearer"
 
     # Second call with same sub returns a token for the same user.
-    r2 = await client.post("/auth/apple", json={"identity_token": "stub.jwt.value"})
+    r2 = await client.post("/auth/apple", json={"identity_token": "stub.jwt.value", "nonce": _APPLE_NONCE})
     assert r2.status_code == 200
 
     # Sanity: only one row created
@@ -348,7 +358,7 @@ async def test_apple_sign_in_rejects_invalid_token(client: AsyncClient, monkeypa
 
     r = await client.post(
         "/auth/apple",
-        json={"identity_token": "forged.jwt.value"},
+        json={"identity_token": "forged.jwt.value", "nonce": _APPLE_NONCE},
     )
     assert r.status_code == 401
     assert "bad signature" in r.json()["detail"].lower()
@@ -360,7 +370,7 @@ async def test_apple_sign_in_503_when_not_configured(client: AsyncClient, monkey
     settings = config_module.get_settings()
     monkeypatch.setattr(settings, "apple_client_id", "")
 
-    r = await client.post("/auth/apple", json={"identity_token": "anything"})
+    r = await client.post("/auth/apple", json={"identity_token": "anything", "nonce": _APPLE_NONCE})
     assert r.status_code == 503
 
 
@@ -396,7 +406,7 @@ async def test_apple_sign_in_links_existing_user_by_verified_email(
 
     monkeypatch.setattr(auth_router, "verify_identity_token", fake_verify)
 
-    r = await client.post("/auth/apple", json={"identity_token": "stub.jwt.value"})
+    r = await client.post("/auth/apple", json={"identity_token": "stub.jwt.value", "nonce": _APPLE_NONCE})
     assert r.status_code == 200, r.text
 
     async with _TestSession() as session:
@@ -444,6 +454,7 @@ async def test_apple_sign_in_does_not_link_via_client_supplied_email(
         "/auth/apple",
         json={
             "identity_token": "stub.jwt.value",
+            "nonce": _APPLE_NONCE,
             "email": "victim@example.com",  # forged
         },
     )
@@ -475,7 +486,7 @@ async def test_apple_sign_in_propagates_nonce_mismatch_as_401(
 
     r = await client.post(
         "/auth/apple",
-        json={"identity_token": "stub.jwt.value", "nonce": "client-nonce"},
+        json={"identity_token": "stub.jwt.value", "nonce": _APPLE_NONCE},
     )
     assert r.status_code == 401
     assert "nonce" in r.json()["detail"].lower()
@@ -513,7 +524,7 @@ async def test_apple_sign_in_first_time_without_verified_email_is_rejected(
     # Even with a client-supplied email in the body, the server must refuse.
     r = await client.post(
         "/auth/apple",
-        json={"identity_token": "stub.jwt.value", "email": "anything@example.com"},
+        json={"identity_token": "stub.jwt.value", "nonce": _APPLE_NONCE, "email": "anything@example.com"},
     )
     assert r.status_code == 400, r.text
     assert "email" in r.json()["detail"].lower()
@@ -646,7 +657,7 @@ async def test_apple_sign_in_stores_refresh_token_when_code_provided(
 
     r = await client.post(
         "/auth/apple",
-        json={"identity_token": "stub.jwt.value", "authorization_code": "auth-code-xyz"},
+        json={"identity_token": "stub.jwt.value", "nonce": _APPLE_NONCE, "authorization_code": "auth-code-xyz"},
     )
     assert r.status_code == 200, r.text
 
@@ -687,7 +698,7 @@ async def test_apple_sign_in_succeeds_when_token_exchange_fails(
 
     r = await client.post(
         "/auth/apple",
-        json={"identity_token": "stub.jwt.value", "authorization_code": "auth-code-xyz"},
+        json={"identity_token": "stub.jwt.value", "nonce": _APPLE_NONCE, "authorization_code": "auth-code-xyz"},
     )
     assert r.status_code == 200, r.text
 

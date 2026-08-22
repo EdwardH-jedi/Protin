@@ -135,8 +135,10 @@ def validate_encryption_config() -> None:
     the process aborts before accepting requests.
     """
     settings = get_settings()
-    if settings.app_env in _PROTECTED_ENVS and not settings.field_encryption_key.strip():
-        raise RuntimeError(
-            f"FIELD_ENCRYPTION_KEY must be set in {settings.app_env}. "
-            'Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
-        )
+    if settings.app_env in _PROTECTED_ENVS:
+        from app.core.protected_config import validate_fernet_key
+
+        try:
+            validate_fernet_key(settings.field_encryption_key)
+        except RuntimeError as exc:
+            raise RuntimeError(f"{exc} in {settings.app_env}") from exc

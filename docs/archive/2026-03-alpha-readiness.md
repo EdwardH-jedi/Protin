@@ -1,3 +1,11 @@
+> **Archived historical document.** This is a point-in-time readiness audit from March 2026
+> and is **not** current documentation. Findings recorded here have since been addressed
+> or superseded — notably OAuth tokens are now encrypted at rest and the mobile debug
+> logging it flags has been removed. For current documentation see
+> [`README.md`](../../README.md) and
+> [`docs/security/SECURITY_AUDIT.md`](../security/SECURITY_AUDIT.md).
+> Retained for project history only.
+
 # Protin — Alpha Readiness
 
 Date: 2026-03-18
@@ -6,7 +14,7 @@ Wave: 7 (post-hardening)
 > **SUPERSEDED (2026-04-15)** — This document is frozen at Wave 7 and does
 > not reflect Waves 8–17 (harness, sport expansion, WebSocket chat, matching
 > algorithm, push-notification tests, CI pipeline, ESLint, nginx HTTP-only
-> default). See `docs/alpha/ALPHA_READINESS_UPDATED.md` for the current audit.
+> default). See `docs/archive/2026-04-alpha-readiness.md` for the current audit.
 > Kept for historical context only.
 
 ---

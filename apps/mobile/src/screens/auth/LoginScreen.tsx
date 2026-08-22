@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 
 import { Screen } from '../../components/Screen';
 import { useAuthStore } from '../../stores/auth';
@@ -21,14 +22,9 @@ import type { RootStackParamList } from '../../navigation/types';
 type Props = NativeStackScreenProps<RootStackParamList, 'LoginScreen'>;
 
 function generateNonce(): string {
-  // 32 chars of url-safe entropy. The backend verifies by computing
+  // 32 cryptographically random bytes encoded as hex. The backend verifies by computing
   // SHA256(nonce) and comparing against the identityToken's nonce claim.
-  const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let nonce = '';
-  for (let i = 0; i < 32; i++) {
-    nonce += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
-  return nonce;
+  return Array.from(Crypto.getRandomBytes(32), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 export function LoginScreen({ navigation }: Props) {

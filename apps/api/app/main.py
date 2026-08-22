@@ -31,11 +31,9 @@ _log = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _log.info("Protin API v%s starting — env=%s", VERSION, settings.app_env)
-    from app.core.encryption import validate_encryption_config
-    from app.routers.notifications import validate_internal_api_token_config
+    from app.core.protected_config import validate_protected_environment
 
-    validate_encryption_config()
-    validate_internal_api_token_config()
+    validate_protected_environment(settings)
     _log.info("App is ready.")
     yield
     await engine.dispose()

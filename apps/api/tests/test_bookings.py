@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock
+from uuid import UUID
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.db.base import Base
@@ -99,6 +102,18 @@ _BOOKING_PAYLOAD = {
     "ends_at": "2030-04-01T10:00:00Z",
     "location": "Bondi gym",
 }
+
+
+def _ended_booking_payload() -> dict[str, str]:
+    """A recently ended booking that still passes the one-hour creation window."""
+    ends_at = datetime.now(tz=timezone.utc) - timedelta(minutes=5)
+    starts_at = ends_at - timedelta(minutes=30)
+    return {
+        "sport": "gym",
+        "starts_at": starts_at.isoformat(),
+        "ends_at": ends_at.isoformat(),
+        "location": "Bondi gym",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +217,30 @@ async def test_proposer_cannot_confirm_own_booking(client: AsyncClient) -> None:
 
     r = await client.post(f"/bookings/{booking_id}/confirm", headers=_auth(token_a))
     assert r.status_code == 403
+
+
+async def test_database_rejects_self_booking(client: AsyncClient) -> None:
+    from app.models.booking import Booking
+
+    token_a, uid_a = await _register(client, "book_self_db_a@example.com")
+    token_b, uid_b = await _register(client, "book_self_db_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+    ends_at = datetime.now(tz=timezone.utc) + timedelta(hours=2)
+    async with _TestSession() as session:
+        session.add(
+            Booking(
+                match_id=UUID(match_id),
+                proposer_id=UUID(uid_a),
+                partner_id=UUID(uid_a),
+                sport="gym",
+                starts_at=ends_at - timedelta(hours=1),
+                ends_at=ends_at,
+                status="proposed",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            await session.commit()
+        await session.rollback()
 
 
 async def test_partner_can_decline_booking(client: AsyncClient) -> None:
@@ -341,7 +380,7 @@ async def test_complete_transition(client: AsyncClient) -> None:
 
     create_r = await client.post(
         "/bookings",
-        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        json={**_ended_booking_payload(), "match_id": match_id},
         headers=_auth(token_a),
     )
     assert create_r.status_code == 201
@@ -356,6 +395,23 @@ async def test_complete_transition(client: AsyncClient) -> None:
     complete_r = await client.post(f"/bookings/{booking_id}/complete", headers=_auth(token_a))
     assert complete_r.status_code == 200
     assert complete_r.json()["status"] == "completed"
+
+
+async def test_future_booking_cannot_be_completed(client: AsyncClient) -> None:
+    token_a, uid_a = await _register(client, "book_future_complete_a@example.com")
+    token_b, uid_b = await _register(client, "book_future_complete_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+    created = await client.post(
+        "/bookings",
+        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        headers=_auth(token_a),
+    )
+    booking_id = created.json()["id"]
+    assert (await client.post(f"/bookings/{booking_id}/confirm", headers=_auth(token_b))).status_code == 200
+
+    completion = await client.post(f"/bookings/{booking_id}/complete", headers=_auth(token_a))
+    assert completion.status_code == 422
+    assert "scheduled end" in completion.json()["detail"]
 
 
 async def test_no_show_transition(client: AsyncClient) -> None:
@@ -393,7 +449,7 @@ async def test_no_show_transition(client: AsyncClient) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def _proposed_booking(client: AsyncClient, suffix: str) -> tuple[str, str, str, str, str]:
+async def _proposed_booking(client: AsyncClient, suffix: str, *, ended: bool = False) -> tuple[str, str, str, str, str]:
     """Register two users, open a match, and create a proposed booking.
 
     Returns (token_proposer, uid_proposer, token_partner, uid_partner, booking_id).
@@ -403,7 +459,7 @@ async def _proposed_booking(client: AsyncClient, suffix: str) -> tuple[str, str,
     match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
     create_r = await client.post(
         "/bookings",
-        json={**_BOOKING_PAYLOAD, "match_id": match_id},
+        json={**(_ended_booking_payload() if ended else _BOOKING_PAYLOAD), "match_id": match_id},
         headers=_auth(token_a),
     )
     assert create_r.status_code == 201
@@ -439,7 +495,7 @@ async def test_cancelled_is_terminal(client: AsyncClient) -> None:
 
 async def test_completed_is_terminal(client: AsyncClient) -> None:
     """Once completed, no transitions are accepted."""
-    token_a, _, token_b, _, booking_id = await _proposed_booking(client, "completed_terminal")
+    token_a, _, token_b, _, booking_id = await _proposed_booking(client, "completed_terminal", ended=True)
 
     # proposed -> confirmed -> completed
     await client.post(f"/bookings/{booking_id}/confirm", headers=_auth(token_b))

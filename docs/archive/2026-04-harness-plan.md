@@ -1,3 +1,11 @@
+> **Archived historical document.** This file reflects the repository state as of
+> April 2026 and is **not** current project documentation. Its "missing" list is
+> obsolete — `.claude/` (agents, skills, hooks, settings), the GitHub Actions CI
+> pipeline, mobile lint/typecheck/test scripts and the mobile test suite all
+> exist today. For the current workflow see
+> [`docs/engineering/AI_WORKFLOW.md`](../engineering/AI_WORKFLOW.md).
+> Retained for project history only.
+
 # Protin 하네스 설계 & 로드맵
 
 > 기준: `feature/wave-8-staging-readiness` | 2026-04-08

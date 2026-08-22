@@ -62,22 +62,26 @@ jest.mock('../stores/auth', () => ({
 
 interface MockWS {
   url: string;
+  onopen: (() => void) | null;
   onmessage: ((e: { data: string }) => void) | null;
   onclose: (() => void) | null;
   onerror: (() => void) | null;
   readyState: number;
   close: jest.Mock;
+  send: jest.Mock;
 }
 
 let mockWsInstances: MockWS[] = [];
 
 class MockWebSocket implements MockWS {
   url: string;
+  onopen: (() => void) | null = null;
   onmessage: ((e: { data: string }) => void) | null = null;
   onclose: (() => void) | null = null;
   onerror: (() => void) | null = null;
   readyState = 1; // OPEN
   close = jest.fn(() => { this.readyState = 3; });
+  send = jest.fn();
 
   constructor(url: string) {
     this.url = url;
@@ -824,8 +828,11 @@ describe('ChatScreen', () => {
     mockApiGet.mockResolvedValue(emptyMessageResponse);
     renderChatScreen();
     await waitFor(() => expect(mockWsInstances.length).toBe(1));
-    expect(mockWsInstances[0].url).toBe(
-      'ws://localhost:8000/matches/match-1/ws?token=test-jwt-token'
+    expect(mockWsInstances[0].url).toBe('ws://localhost:8000/matches/match-1/ws');
+    expect(mockWsInstances[0].url).not.toContain('token');
+    act(() => mockWsInstances[0].onopen?.());
+    expect(mockWsInstances[0].send).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'auth', token: 'test-jwt-token' })
     );
   });
 

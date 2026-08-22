@@ -1,3 +1,4 @@
+import asyncio
 from uuid import UUID
 
 import jwt
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.match import Match
+from app.models.user import User
 from app.routers.auth import get_current_user
 from app.schemas.chat import MessageListResponse, MessageResponse, SendMessageRequest
 from app.services import chat as chat_service
@@ -24,8 +26,9 @@ class _ConnectionManager:
     def __init__(self) -> None:
         self._rooms: dict[str, list[WebSocket]] = {}
 
-    async def connect(self, room: str, ws: WebSocket) -> None:
-        await ws.accept()
+    async def connect(self, room: str, ws: WebSocket, *, accept: bool = True) -> None:
+        if accept:
+            await ws.accept()
         self._rooms.setdefault(room, []).append(ws)
 
     def disconnect(self, room: str, ws: WebSocket) -> None:
@@ -86,33 +89,52 @@ async def send_message(
 async def ws_chat(
     match_id: UUID,
     websocket: WebSocket,
-    token: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Real-time message stream for a match room.
 
-    Auth: pass ``?token=<jwt>`` as a query parameter.
-    The endpoint validates the token and confirms the caller is a match participant
-    before accepting the connection.  Once connected, the server pushes new
+    The socket is accepted in a pending state. The first application message must
+    be ``{"type": "auth", "token": "<jwt>"}`` within five seconds. The endpoint
+    validates the token, active account, and match participation before joining
+    the room. Once authenticated, the server pushes new
     messages as JSON objects whenever the partner sends via the HTTP POST endpoint.
     Clients may send any text frame to keep the connection alive; those frames are
     discarded.
     """
+    await websocket.accept()
+    try:
+        auth_message = await asyncio.wait_for(websocket.receive_json(), timeout=5.0)
+    except (TimeoutError, WebSocketDisconnect, ValueError):
+        await websocket.close(code=1008)
+        return
+
+    if not isinstance(auth_message, dict) or auth_message.get("type") != "auth":
+        await websocket.close(code=1008)
+        return
+    token = auth_message.get("token")
+    if not isinstance(token, str) or not token:
+        await websocket.close(code=1008)
+        return
+
     try:
         user_id = decode_access_token(token)
-    except (jwt.PyJWTError, ValueError):
-        await websocket.accept()
+    except (jwt.PyJWTError, KeyError, ValueError):
         await websocket.close(code=1008)
+        return
+
+    user = (await db.execute(select(User).where(User.id == user_id, User.is_active.is_(True)))).scalar_one_or_none()
+    if user is None:
+        await websocket.close(code=4003)
         return
 
     m = (await db.execute(select(Match).where(Match.id == match_id))).scalar_one_or_none()
     if m is None or (m.user1_id != user_id and m.user2_id != user_id):
-        await websocket.accept()
         await websocket.close(code=4003)
         return
 
     room = str(match_id)
-    await _manager.connect(room, websocket)
+    await _manager.connect(room, websocket, accept=False)
+    await websocket.send_json({"type": "auth_ok"})
     try:
         while True:
             await websocket.receive_text()  # discard keep-alive pings from client
