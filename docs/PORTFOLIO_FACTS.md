@@ -20,7 +20,7 @@ Last verified: 2026-08-22
 | Project name | Protin (App Store brand: **SportsGang**) |
 | Repository | [EdwardH-jedi/Protin](https://github.com/EdwardH-jedi/Protin) — public, source-available, all rights reserved |
 | Project type | Full-stack mobile application (monorepo: React Native client + FastAPI backend) |
-| Status | Active. v1 implementation present; expanded security CI awaiting a remote run; **not released** |
+| Status | Active. v1 implementation present; expanded security CI green; **not released** |
 | Team size | Solo — independently designed and built |
 
 ---
@@ -71,7 +71,7 @@ Only implemented work is listed.
   nginx config, backup/restore and health-check scripts, and Fly.io deployment config.
 - **An eight-job CI definition** covering API, mobile, web, PostgreSQL migrations and
   concurrency, Compose exposure and Docker packaging. Locally, **1,407 automated tests
-  pass**; three PostgreSQL-only tests await a database-backed CI run.
+  pass**; three additional PostgreSQL-only tests pass in CI.
 - **A shared TypeScript type package** pinning the API wire contract for the client.
 
 ---
@@ -185,7 +185,7 @@ Each is present in source. All are covered by tests except where noted in the ta
 | Backend tests | **660 passing, 3 PostgreSQL-only skipped locally** (pytest, 29 modules) |
 | Mobile tests | **747 passing** across 53 suites (Jest) |
 | Total automated tests | **1,407 passing locally**; three PostgreSQL-only tests are additional |
-| CI | **Eight jobs configured, not yet observed green after rehabilitation.** The older six-job [run 32234216724](https://github.com/EdwardH-jedi/Protin/actions/runs/32234216724) validates only base commit `2aced25`. |
+| CI | **Eight jobs green** on commit `956c002` — [run 32553409076](https://github.com/EdwardH-jedi/Protin/actions/runs/32553409076) |
 | CI jobs | `lint`, `typecheck`, `lint-mobile`, `web-quality`, `test-mobile`, `test`, `postgres-integration`, `docker-build` |
 | Lint policy | ESLint runs at `--max-warnings 0`; warnings fail the build |
 | Docker | API image builds successfully in CI from a multi-stage Dockerfile |
@@ -246,8 +246,7 @@ Each is evidenced by implementation or by recorded review history.
 - **Computed reputation tier, never stored** — avoids a third source of truth that can
   drift from the ledger.
 - **SQLite for the default test suite, PostgreSQL for the concurrency gate** — fast local
-  coverage plus CI-only row-lock/migration evidence; the latter still needs its first
-  observed green run.
+  coverage plus verified CI row-lock/migration evidence.
 - **Feature flag over a half-finished surface** — tournaments are hidden in v1 builds
   rather than shipped incomplete.
 - **Shared type package rather than duplicated interfaces** — a contract change breaks the
@@ -273,10 +272,10 @@ Run 2026-08-22 on the rehabilitation worktree based on `2aced25`.
 | Typecheck | `npm run typecheck -w @protin/mobile` | PASS — exit 0 |
 | Web | `npm run typecheck -w @protin/web && npm run build -w @protin/web` | PASS — no TS2786; Vite production build |
 | Alembic | `uv run alembic heads`; `uv run alembic upgrade head --sql` | PASS — one `0016` head; offline SQL generated |
-| PostgreSQL integration | `POSTGRES_TEST_URL=... uv run pytest -q tests/integration` | NOT VERIFIED locally — PostgreSQL and Docker unavailable |
+| PostgreSQL integration | `POSTGRES_TEST_URL=... uv run pytest -q tests/integration` | PASS in CI — 3 passed against PostgreSQL 16 after migration to `0016` |
 | Staging Compose | `bash infra/scripts/check-staging-compose.sh` | PASS — only nginx publishes host ports |
-| Docker build | `docker build -f apps/api/Dockerfile .` | NOT VERIFIED locally (no Docker daemon) |
-| CI | GitHub Actions `ci.yml` | CONFIGURED, NOT YET OBSERVED — eight jobs include web and PostgreSQL |
+| Docker build | `docker build -f apps/api/Dockerfile .` | PASS in CI; Docker unavailable locally |
+| CI | GitHub Actions `ci.yml` | PASS — all eight jobs green in run `32553409076` |
 
 ---
 
@@ -310,9 +309,8 @@ Mandatory reading before making any claim about this project.
 10. **Tournaments are incomplete** and feature-flagged off.
 11. **No code coverage measurement**, no refresh tokens, no dispute resolution for
     contested booking outcomes.
-12. **PostgreSQL concurrency evidence is pending.** Tests and CI service configuration
-    exist, but the local machine cannot execute them and the expanded workflow has not yet
-    run remotely.
+12. **CI tooling warnings remain.** The green run reports Node 20 action deprecation and
+    transient uv cache service failures; jobs still pass, but the warnings need upkeep.
 13. **Two of four configured quality-gate hooks do not fire** (pre-commit and post-edit);
     only the Stop gate and CI actually run.
 14. **Implementation is AI-assisted.** Do not present the code as entirely hand-written.
@@ -331,9 +329,8 @@ Verbatim-usable. Every one is supported by the evidence above.
 - "Designed and implemented a 28-table relational schema with 16 Alembic migrations,
   accessed asynchronously via SQLAlchemy 2 over asyncpg."
 - "Wrote 1,407 locally passing automated tests — 660 backend (pytest) and 747 mobile
-  (Jest) — and configured CI gates for web build, PostgreSQL migrations/concurrency,
-  Compose exposure and Docker packaging." Do not say the expanded workflow is green until
-  a GitHub Actions run proves it.
+  (Jest) — with a green eight-job CI pipeline covering web build, PostgreSQL
+  migrations/concurrency, Compose exposure and Docker packaging."
 - "Implemented a booking state machine with transitions and per-role permissions declared
   as data and enforced centrally, so no route can produce an illegal state change."
 - "Built real-time chat over WebSockets with per-match rooms, participant authorisation

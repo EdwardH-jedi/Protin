@@ -5,7 +5,7 @@
 >
 > | Finding | Status | Evidence |
 > |---|---|---|
-> | **C1** — default `SECRET_KEY` boots with a warning | **Closed in rehabilitation worktree** | `core/protected_config.py` centrally rejects missing, public-placeholder, short and repetitive secrets in staging/production; lifespan and deployment preflight invoke it. Focused tests cover fail-closed and valid cases. Remote CI is still pending. |
+> | **C1** — default `SECRET_KEY` boots with a warning | **Closed** | `core/protected_config.py` centrally rejects missing, public-placeholder, short and repetitive secrets in staging/production; lifespan and deployment preflight invoke it. Focused tests and eight-job CI run `32553409076` pass. |
 > | **H1** — `/internal/process-notifications` unauthenticated | **Closed** | `routers/notifications.py` adds a `require_internal_token` header dependency, plus `validate_internal_api_token_config()` at startup which refuses to boot a protected environment without `INTERNAL_API_TOKEN`. |
 > | **H2** — permissive CORS default | **Partially addressed** | `main.py` sets `allow_credentials=bool(cors_origins)`, so the wildcard fallback can no longer serve credentialed cross-origin requests. The recommended startup validation requiring a non-empty origin list outside `local` is **not** implemented. |
 > | **H3** — no rate limiting on auth routes | **Closed** | slowapi is wired in `main.py`; `routers/auth.py` applies `3/minute` and `5/minute` limits to registration and login. |
@@ -18,7 +18,7 @@
 > trusted-proxy rate-limit identity, safe image ingestion, participant/ledger database
 > constraints, and PostgreSQL concurrency tests. The historical findings below are kept
 > verbatim and must not be read as a current whole-repository audit. PostgreSQL tests are
-> configured but not locally executed, and the expanded remote CI run is still pending.
+> not locally executable, but passed against PostgreSQL 16 in CI run `32553409076`.
 >
 > Retaining an audit alongside its remediation record is intentional — the finding, the
 > fix and what is still outstanding are all more useful than a document that only shows

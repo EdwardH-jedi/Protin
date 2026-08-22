@@ -188,16 +188,16 @@ Full detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Current Status
 
-**Active — v1 implementation present, security rehabilitation awaiting remote CI evidence,
-not released.** Locally, 1,407 automated tests pass; three PostgreSQL-only concurrency
-tests are skipped because no local PostgreSQL or Docker daemon is available. The expanded
-CI workflow has not yet been observed on GitHub. No App Store or TestFlight build has been submitted,
+**Active — v1 implementation present, security rehabilitation verified in CI, not
+released.** Locally, 1,407 automated tests pass; three PostgreSQL-only concurrency tests
+skip because no local PostgreSQL or Docker daemon is available, and pass against
+PostgreSQL 16 in CI. No App Store or TestFlight build has been submitted,
 and the API is not verifiably deployed: the Fly.io configuration exists but the service
 did not respond when checked. The only currently live deployment is the Netlify
 marketing/legal site the app links to.
 
-Remaining work includes a green run of the expanded PostgreSQL/web CI gates, submission
-mechanics, and the gaps in [Known Limitations](#known-limitations).
+Remaining work includes submission mechanics and the gaps in
+[Known Limitations](#known-limitations).
 
 Full breakdown, including what is partially implemented and the validation evidence
 behind these claims: [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md).
@@ -208,8 +208,8 @@ behind these claims: [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md).
 
 The workflow defines eight jobs: API Ruff and pytest, mobile ESLint/typecheck/Jest, web
 typecheck/build, PostgreSQL 16 migration/concurrency tests, and an API Docker image build
-that also validates the rendered staging Compose exposure. This expanded workflow is
-configured locally but has not yet been observed green remotely.
+that also validates the rendered staging Compose exposure. All eight jobs passed on
+commit `956c002` in [run 32553409076](https://github.com/EdwardH-jedi/Protin/actions/runs/32553409076).
 
 | | Stack | Scope |
 |---|---|---|
@@ -363,8 +363,8 @@ Stated up front, because they are the questions worth asking:
 - **Google Calendar is export-only**, and cancelling a booking does not remove the
   calendar event.
 - **Tournaments are incomplete** and hidden behind a feature flag.
-- **PostgreSQL concurrency tests are configured but not locally executed.** This machine
-  has neither PostgreSQL nor a Docker daemon; a green remote CI run is still required.
+- **PostgreSQL and Docker cannot run on this local machine.** Those gates are instead
+  verified by GitHub Actions against PostgreSQL 16 and the Docker runner.
 - **The npm audit is not clean.** The current tree reports 30 advisories, including two
   critical transitive packages (`shell-quote` and `tar`); remediation needs a separately
   tested dependency-upgrade pass.

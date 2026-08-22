@@ -157,9 +157,11 @@ Three things worth noting about the gate design:
 - **The Docker build is the final gate.** It verifies the deployable image and rendered
   staging exposure after the web and PostgreSQL gates have passed.
 
-The eight-job definition is present in the repository. It has **not yet been observed
-green remotely** after this rehabilitation, so documentation must not describe it as a
-completed CI run until GitHub Actions supplies that evidence.
+All eight jobs passed on commit `956c002` in
+[run 32553409076](https://github.com/EdwardH-jedi/Protin/actions/runs/32553409076).
+The PostgreSQL job applied all 16 migrations, verified one head and passed all three
+concurrency/atomic-consumption tests; Docker packaging and rendered Compose exposure also
+passed.
 
 No coverage threshold is enforced, and no coverage percentage is reported. Adding a
 number without a policy behind it would be decoration.

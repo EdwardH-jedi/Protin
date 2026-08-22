@@ -30,9 +30,9 @@ remains the internal project and package namespace.
 
 ## 2. Current stage
 
-The v1 implementation is present and the security rehabilitation passes local non-Docker
-checks, but the expanded PostgreSQL/web workflow has **not yet been observed green in
-remote CI**. The project is not released; no App Store or TestFlight build has been
+The v1 implementation is present and the security rehabilitation passes both local checks
+and the expanded PostgreSQL/web/Docker workflow. All eight jobs passed on commit
+`956c002`. The project is not released; no App Store or TestFlight build has been
 submitted, and the API is not verifiably deployed anywhere (see [§7](#7-deployment)).
 
 The work remaining before a release is submission mechanics and the gaps listed in
@@ -102,8 +102,8 @@ The work remaining before a release is submission mechanics and the gaps listed 
 - `infra/` — nginx config, deploy / backup / restore / health-check scripts, systemd
   timer units.
 - `fly.toml` for Fly.io with separate `app` and `worker` processes.
-- GitHub Actions CI: eight configured jobs, including web build and PostgreSQL 16
-  migration/concurrency validation. This expanded workflow is not yet remotely verified.
+- GitHub Actions CI: eight jobs, including web build and PostgreSQL 16
+  migration/concurrency validation; all passed in run `32553409076`.
 
 ### Testing
 
@@ -158,10 +158,10 @@ tree also contains pre-existing documentation/configuration edits and was not cl
 | Typecheck | `npm run typecheck -w @protin/mobile` | **PASS** — `tsc --noEmit`, exit 0 |
 | Web | `npm run typecheck -w @protin/web && npm run build -w @protin/web` | **PASS** — no TS2786; Vite production build completed |
 | Alembic | `uv run alembic heads`; `uv run alembic upgrade head --sql` | **PASS** — one head (`0016`), full offline PostgreSQL SQL generated |
-| PostgreSQL integration | `POSTGRES_TEST_URL=... uv run pytest -q tests/integration` | **NOT VERIFIED locally** — no PostgreSQL server or Docker daemon; 3 tests skip in the default run |
+| PostgreSQL integration | `POSTGRES_TEST_URL=... uv run pytest -q tests/integration` | **PASS in CI** — PostgreSQL 16; 3/3 concurrency/atomic-consumption tests passed after all migrations |
 | Staging exposure | `bash infra/scripts/check-staging-compose.sh` | **PASS** — rendered PostgreSQL/Redis/API/worker/migrate have no host ports; nginx is the only ingress |
-| Docker build | `docker build -f apps/api/Dockerfile .` | **NOT VERIFIED locally** — no Docker daemon available |
-| CI | GitHub Actions `ci.yml` | **CONFIGURED, NOT YET OBSERVED** — eight jobs now include web and PostgreSQL; the older six-job run on `2aced25` does not validate these changes |
+| Docker build | `docker build -f apps/api/Dockerfile .` | **PASS in CI** — image build and staging exposure assertion passed |
+| CI | GitHub Actions `ci.yml`, [run 32553409076](https://github.com/EdwardH-jedi/Protin/actions/runs/32553409076) | **PASS** — all eight jobs green on `956c002` |
 
 ---
 
@@ -190,9 +190,9 @@ No live production API deployment should be inferred from the presence of `fly.t
    memory — it does not survive a restart or scale horizontally.
 5. **`decrypt_token` returns the raw stored value on Fernet failure**, which can forward
    an unexpected value to Google APIs. Open as finding **M4** in the security audit.
-6. **Expanded CI is unverified remotely.** PostgreSQL concurrency and fresh-migration
-   tests exist and are wired to GitHub Actions, but cannot be called verified until that
-   workflow runs green.
+6. **GitHub Actions emits runner/tooling warnings.** The green run reports Node 20 action
+   deprecation and transient uv cache restore/save failures; neither failed a job, but
+   action versions/cache reliability need maintenance.
 7. **The npm dependency tree has unresolved advisories.** `npm audit --json` on
    2026-08-22 reports 30 findings (2 low, 10 moderate, 16 high, 2 critical); the critical
    transitive packages are `shell-quote` and `tar`. Fix suggestions include dependency
@@ -234,13 +234,14 @@ No live production API deployment should be inferred from the presence of `fly.t
 | Dimension | State |
 |---|---|
 | README accuracy | Verified against implementation over multiple independent review rounds; over-claims removed. |
-| Tests | 660 backend + 747 mobile pass locally; 3 PostgreSQL-only tests await CI execution. |
+| Tests | 660 backend + 747 mobile pass locally; 3 PostgreSQL-only tests pass in CI. |
 | Lint / format | Ruff, ESLint (`--max-warnings 0`) and `tsc` all clean. |
 | Build | API Docker image builds in CI; not verifiable locally. |
 | Secrets | No committed secrets found. Tracked `.env*` files are examples with placeholder values only. |
 | Architecture documentation | [`ARCHITECTURE.md`](ARCHITECTURE.md) describes the implemented system, with limitations and planned work separated. |
 | Portfolio claims | Constrained to [`PORTFOLIO_FACTS.md`](PORTFOLIO_FACTS.md), which lists both safe claims and claims that must not be used. |
 
-**Assessment: REQUIRES ANOTHER PASS.** The local evidence is materially stronger, but a
-green remote PostgreSQL migration/concurrency run is still an acceptance gate. The API
-also remains unverifiably deployed and account deletion still leaves photo files behind.
+**Assessment: READY WITH CLEAR LIMITATIONS.** The expanded CI evidence now covers web,
+fresh PostgreSQL migrations/concurrency, Docker packaging and staging exposure. The API
+remains unverifiably deployed, account deletion still leaves photo files behind, and the
+npm audit backlog must not be hidden.
