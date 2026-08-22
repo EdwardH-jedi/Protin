@@ -21,11 +21,10 @@ _PROTECTED_ENVS = {"staging", "production"}
 
 def validate_internal_api_token_config() -> None:
     settings = get_settings()
-    if settings.app_env in _PROTECTED_ENVS and not settings.internal_api_token.strip():
-        raise RuntimeError(
-            f"INTERNAL_API_TOKEN must be set in {settings.app_env}. "
-            "Internal endpoints under /internal must not boot without a shared secret."
-        )
+    if settings.app_env in _PROTECTED_ENVS:
+        from app.core.protected_config import validate_strong_secret
+
+        validate_strong_secret("INTERNAL_API_TOKEN", settings.internal_api_token)
 
 
 def require_internal_token(x_internal_token: str | None = Header(default=None)) -> None:

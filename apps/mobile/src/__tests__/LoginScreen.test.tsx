@@ -73,6 +73,10 @@ jest.mock('expo-apple-authentication', () => {
   };
 });
 
+jest.mock('expo-crypto', () => ({
+  getRandomBytes: (count: number) => new Uint8Array(Array.from({ length: count }, (_, index) => index)),
+}));
+
 // ─── Mock Screen component ────────────────────────────────────────────────────
 
 jest.mock('../components/Screen', () => {
@@ -307,7 +311,7 @@ describe('LoginScreen', () => {
       expect(payload.identityToken).toBe('apple.jwt.token');
       expect(payload.authorizationCode).toBe('apple.auth.code');
       expect(typeof payload.nonce).toBe('string');
-      expect(payload.nonce.length).toBeGreaterThan(0);
+      expect(payload.nonce).toHaveLength(64);
       expect(payload.email).toBe('user@privaterelay.appleid.com');
       expect(payload.name).toBe('Alex Kim');
       await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('Main'));

@@ -8,6 +8,8 @@ with ``application/x-www-form-urlencoded`` bodies (Apple rejects JSON).
 
 from __future__ import annotations
 
+import hashlib
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from urllib.parse import parse_qs
 
@@ -15,7 +17,7 @@ import httpx
 import jwt
 import pytest
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 from app.services.apple_auth import (
     APPLE_ISSUER,
@@ -25,6 +27,7 @@ from app.services.apple_auth import (
     build_client_secret,
     exchange_authorization_code,
     revoke_refresh_token,
+    verify_identity_token,
 )
 
 
@@ -57,6 +60,135 @@ def _settings(private_pem: str) -> SimpleNamespace:
         apple_key_id="KEY1234567",
         apple_private_key=private_pem,
     )
+
+
+def _rsa_key_and_jwk(kid: str = "apple-key-1") -> tuple[object, dict]:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    jwk = jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key(), as_dict=True)
+    jwk.update({"kid": kid, "alg": "RS256", "use": "sig"})
+    return private_key, jwk
+
+
+def _identity_token(private_key: object, *, kid: str, nonce: str, **overrides) -> str:
+    now = datetime.now(tz=timezone.utc)
+    claims = {
+        "iss": APPLE_ISSUER,
+        "aud": "com.edh1223.protin",
+        "sub": "apple-subject-1",
+        "exp": now + timedelta(minutes=5),
+        "iat": now,
+        "nonce": hashlib.sha256(nonce.encode()).hexdigest(),
+    }
+    claims.update(overrides)
+    return jwt.encode(claims, private_key, algorithm="RS256", headers={"kid": kid})
+
+
+def _jwks_client(payloads: list[dict]) -> tuple[httpx.AsyncClient, list[int]]:
+    calls: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        index = min(len(calls), len(payloads) - 1)
+        calls.append(index)
+        return httpx.Response(200, json=payloads[index])
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler)), calls
+
+
+async def test_verify_identity_token_validates_real_rs256_boundary() -> None:
+    from app.services import apple_auth
+
+    nonce = "secure-nonce-value-00000000000000"
+    private_key, jwk = _rsa_key_and_jwk()
+    token = _identity_token(private_key, kid="apple-key-1", nonce=nonce)
+    apple_auth._key_cache.invalidate()
+    client, _ = _jwks_client([{"keys": [jwk]}])
+    async with client:
+        claims = await verify_identity_token(
+            token,
+            audience="com.edh1223.protin",
+            nonce=nonce,
+            http_client=client,
+        )
+    assert claims["sub"] == "apple-subject-1"
+
+
+@pytest.mark.parametrize(
+    ("claim_override", "audience", "nonce"),
+    [
+        ({"iss": "https://attacker.invalid"}, "com.edh1223.protin", "secure-nonce-value-00000000000000"),
+        ({}, "wrong.audience", "secure-nonce-value-00000000000000"),
+        (
+            {"exp": datetime.now(tz=timezone.utc) - timedelta(seconds=1)},
+            "com.edh1223.protin",
+            "secure-nonce-value-00000000000000",
+        ),
+        ({}, "com.edh1223.protin", "different-nonce-value-000000000000"),
+    ],
+)
+async def test_verify_identity_token_rejects_invalid_claims(claim_override, audience, nonce) -> None:
+    from app.services import apple_auth
+
+    signed_nonce = "secure-nonce-value-00000000000000"
+    private_key, jwk = _rsa_key_and_jwk()
+    token = _identity_token(private_key, kid="apple-key-1", nonce=signed_nonce, **claim_override)
+    apple_auth._key_cache.invalidate()
+    client, _ = _jwks_client([{"keys": [jwk]}])
+    async with client:
+        with pytest.raises(apple_auth.AppleIdentityTokenError):
+            await verify_identity_token(token, audience=audience, nonce=nonce, http_client=client)
+
+
+async def test_verify_identity_token_rejects_wrong_algorithm_before_jwks() -> None:
+    from app.services.apple_auth import AppleIdentityTokenError
+
+    token = jwt.encode(
+        {"sub": "x"},
+        "a-secret-long-enough-for-test-only-123456",
+        algorithm="HS256",
+        headers={"kid": "apple-key-1"},
+    )
+    with pytest.raises(AppleIdentityTokenError, match="RS256"):
+        await verify_identity_token(token, audience="com.edh1223.protin", nonce="n" * 32)
+
+
+async def test_verify_identity_token_refreshes_jwks_for_rotated_key() -> None:
+    from app.services import apple_auth
+
+    nonce = "secure-nonce-value-00000000000000"
+    _, old_jwk = _rsa_key_and_jwk("old-key")
+    new_private, new_jwk = _rsa_key_and_jwk("new-key")
+    token = _identity_token(new_private, kid="new-key", nonce=nonce)
+    apple_auth._key_cache.invalidate()
+    client, calls = _jwks_client([{"keys": [old_jwk]}, {"keys": [old_jwk, new_jwk]}])
+    async with client:
+        claims = await verify_identity_token(
+            token,
+            audience="com.edh1223.protin",
+            nonce=nonce,
+            http_client=client,
+        )
+    assert claims["sub"] == "apple-subject-1"
+    assert len(calls) == 2
+
+
+async def test_verify_identity_token_rejects_unknown_key_id() -> None:
+    from app.services import apple_auth
+
+    nonce = "secure-nonce-value-00000000000000"
+    signing_key, _ = _rsa_key_and_jwk("unknown-key")
+    _, published_jwk = _rsa_key_and_jwk("published-key")
+    token = _identity_token(signing_key, kid="unknown-key", nonce=nonce)
+    apple_auth._key_cache.invalidate()
+    client, calls = _jwks_client([{"keys": [published_jwk]}])
+    async with client:
+        with pytest.raises(apple_auth.AppleIdentityTokenError, match="No Apple public key"):
+            await verify_identity_token(
+                token,
+                audience="com.edh1223.protin",
+                nonce=nonce,
+                http_client=client,
+            )
+    assert len(calls) == 2
 
 
 def test_build_client_secret_has_expected_claims_and_verifies() -> None:

@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock
+from uuid import UUID
 
+import jwt
 import pytest
+from fastapi import WebSocketDisconnect
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -301,6 +305,93 @@ async def test_connection_manager_tolerates_send_failure() -> None:
     await manager.broadcast("room-z", {"body": "resilient"})
 
     good_ws.send_json.assert_called_once_with({"body": "resilient"})
+
+
+class _FakeWebSocket:
+    def __init__(self, auth_message: object) -> None:
+        self.auth_message = auth_message
+        self.accepted = False
+        self.close_code: int | None = None
+        self.sent: list[dict] = []
+
+    async def accept(self) -> None:
+        self.accepted = True
+
+    async def close(self, code: int) -> None:
+        self.close_code = code
+
+    async def receive_json(self) -> object:
+        return self.auth_message
+
+    async def send_json(self, payload: dict) -> None:
+        self.sent.append(payload)
+
+    async def receive_text(self) -> str:
+        raise WebSocketDisconnect()
+
+
+async def test_websocket_requires_first_auth_message(client: AsyncClient) -> None:
+    from app.routers.chat import ws_chat
+
+    ws = _FakeWebSocket({"type": "ping"})
+    async with _TestSession() as session:
+        await ws_chat(UUID("00000000-0000-0000-0000-000000000001"), ws, session)  # type: ignore[arg-type]
+    assert ws.accepted is True
+    assert ws.close_code == 1008
+
+
+async def test_websocket_authenticates_active_participant_and_rejects_others(client: AsyncClient) -> None:
+    from app.routers.chat import ws_chat
+
+    token_a, uid_a = await _register(client, "ws_auth_a@example.com")
+    token_b, uid_b = await _register(client, "ws_auth_b@example.com")
+    token_c, uid_c = await _register(client, "ws_auth_c@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+
+    allowed = _FakeWebSocket({"type": "auth", "token": token_a})
+    denied = _FakeWebSocket({"type": "auth", "token": token_c})
+    invalid = _FakeWebSocket({"type": "auth", "token": "not-a-jwt"})
+    async with _TestSession() as session:
+        await ws_chat(UUID(match_id), allowed, session)  # type: ignore[arg-type]
+    async with _TestSession() as session:
+        await ws_chat(UUID(match_id), denied, session)  # type: ignore[arg-type]
+    async with _TestSession() as session:
+        await ws_chat(UUID(match_id), invalid, session)  # type: ignore[arg-type]
+
+    assert allowed.sent == [{"type": "auth_ok"}]
+    assert allowed.close_code is None
+    assert denied.close_code == 4003
+    assert invalid.close_code == 1008
+
+
+async def test_websocket_rejects_expired_token_and_inactive_user(client: AsyncClient) -> None:
+    from sqlalchemy import update
+
+    from app.core import security
+    from app.models.user import User
+    from app.routers.chat import ws_chat
+
+    token_a, uid_a = await _register(client, "ws_inactive_a@example.com")
+    token_b, uid_b = await _register(client, "ws_inactive_b@example.com")
+    match_id = await _mutual_like_and_get_match_id(client, token_a, uid_a, token_b, uid_b)
+    expired = jwt.encode(
+        {"sub": uid_a, "exp": datetime.now(tz=timezone.utc) - timedelta(seconds=1)},
+        security.SECRET_KEY,
+        algorithm=security.JWT_ALGORITHM,
+    )
+
+    expired_ws = _FakeWebSocket({"type": "auth", "token": expired})
+    async with _TestSession() as session:
+        await ws_chat(UUID(match_id), expired_ws, session)  # type: ignore[arg-type]
+        await session.execute(update(User).where(User.id == UUID(uid_a)).values(is_active=False))
+        await session.commit()
+
+    inactive_ws = _FakeWebSocket({"type": "auth", "token": token_a})
+    async with _TestSession() as session:
+        await ws_chat(UUID(match_id), inactive_ws, session)  # type: ignore[arg-type]
+
+    assert expired_ws.close_code == 1008
+    assert inactive_ws.close_code == 4003
 
 
 # ---------------------------------------------------------------------------

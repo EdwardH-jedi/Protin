@@ -22,8 +22,9 @@ class TokenResponse(BaseModel):
 class AppleSignInRequest(BaseModel):
     # Raw identity JWT returned by Apple (ASAuthorizationAppleIDCredential.identityToken)
     identity_token: str
-    # Raw nonce passed to Apple on the client; if provided, server re-checks it
-    nonce: str | None = None
+    # Required raw nonce passed to Apple by the native client. The server hashes
+    # it and compares it with the signed identity-token claim.
+    nonce: str = Field(min_length=32, max_length=128)
     # Apple only returns email/name on the FIRST sign-in. Client must forward
     # them as-is so we can persist them before they are lost forever.
     email: EmailStr | None = None
