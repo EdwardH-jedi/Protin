@@ -8,6 +8,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import pytest
+import pytest_asyncio
 from fastapi import HTTPException
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -21,10 +22,21 @@ from app.services.bookings import transition_booking
 from app.services.google_calendar import _consume_oauth_state
 
 POSTGRES_TEST_URL = os.getenv("POSTGRES_TEST_URL")
-pytestmark = pytest.mark.skipif(not POSTGRES_TEST_URL, reason="POSTGRES_TEST_URL is required")
+pytestmark = [
+    pytest.mark.skipif(not POSTGRES_TEST_URL, reason="POSTGRES_TEST_URL is required"),
+    # The module-level asyncpg pool must be created, used and disposed on one
+    # event loop. pytest-asyncio otherwise gives each test a function loop.
+    pytest.mark.asyncio(loop_scope="module"),
+]
 
 _engine = create_async_engine(POSTGRES_TEST_URL or "postgresql+asyncpg://invalid/invalid", pool_pre_ping=True)
 _Session = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
+
+
+@pytest_asyncio.fixture(scope="module", loop_scope="module", autouse=True)
+async def _dispose_engine():
+    yield
+    await _engine.dispose()
 
 
 async def _seed_booking(*, status: str, ended: bool) -> tuple[object, object, object]:
