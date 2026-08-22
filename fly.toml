@@ -9,8 +9,13 @@ primary_region = 'syd'
 [build]
   dockerfile = 'apps/api/Dockerfile'
 
+[env]
+  # Fly Proxy reaches Machines over Fly's private IPv6 network. Only those
+  # peers may supply Fly-Client-IP for per-client rate limiting.
+  TRUSTED_PROXY_CIDRS = 'fdaa::/16'
+
 [processes]
-  app = 'uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info'
+  app = 'uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info --no-access-log'
   worker = 'python worker.py'
 
 [http_service]

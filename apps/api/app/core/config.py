@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     postgres_url: str = "postgresql://protin:protin@localhost:5432/protin"
     redis_url: str = "redis://localhost:6379/0"
 
+    # Comma-separated networks whose direct peers may supply client-IP headers.
+    # Never use a wildcard: forwarded headers are attacker-controlled unless the
+    # immediate network peer is a trusted reverse proxy.
+    trusted_proxy_cidrs: str = "127.0.0.1/32,::1/128"
+
     # Google Calendar OAuth 2.0
     # Register at https://console.cloud.google.com/ → APIs & Services → Credentials
     google_client_id: str = ""
@@ -48,7 +53,8 @@ class Settings(BaseSettings):
 
     # Field-level encryption key for OAuth tokens stored in the database.
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-    # Must be set in production; optional in local/staging (tokens stored as plaintext with a sentinel prefix).
+    # Required and validated as a Fernet key in staging/production; optional
+    # only in local development (where the legacy plaintext sentinel remains).
     field_encryption_key: str = ""
 
     # Comma-separated allowed CORS origins. Empty = wildcard (local dev only).
@@ -60,6 +66,10 @@ class Settings(BaseSettings):
     # Cloud object storage (S3/GCS) is a future replacement.
     media_root: str = "media"
     media_url_prefix: str = "/media"
+    media_max_file_bytes: int = 5 * 1024 * 1024
+    media_max_total_bytes: int = 16 * 1024 * 1024
+    media_max_dimension: int = 6000
+    media_max_pixels: int = 20_000_000
 
     # Google Places API (New) — venue discovery provider.
     #

@@ -161,17 +161,34 @@ async def replace_profile_photos(
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
 
-    await db.execute(delete(ProfilePhoto).where(ProfilePhoto.profile_id == profile.id))
+    try:
+        prepared = media_storage.prepare_user_photos(current_user.id, files)
+    except media_storage.MediaTooLargeError as exc:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)) from exc
+    except media_storage.MediaValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
 
-    media_storage.clear_user_photos(current_user.id)
-    urls = media_storage.save_user_photos(current_user.id, files)
-
-    new_photos = [ProfilePhoto(profile_id=profile.id, photo_url=url, position=index) for index, url in enumerate(urls)]
-    db.add_all(new_photos)
-
-    profile.avatar_url = urls[0]
-
-    await db.commit()
+    backup = None
+    promoted = False
+    try:
+        await db.execute(delete(ProfilePhoto).where(ProfilePhoto.profile_id == profile.id))
+        urls = prepared.urls
+        new_photos = [
+            ProfilePhoto(profile_id=profile.id, photo_url=url, position=index) for index, url in enumerate(urls)
+        ]
+        db.add_all(new_photos)
+        profile.avatar_url = urls[0]
+        backup = media_storage.promote_user_photos(prepared)
+        promoted = True
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        if promoted:
+            media_storage.rollback_promoted_photos(prepared, backup)
+        else:
+            media_storage.discard_prepared_photos(prepared)
+        raise
+    media_storage.finalize_promoted_photos(backup)
     for photo in new_photos:
         await db.refresh(photo)
     await db.refresh(profile)

@@ -1,11 +1,9 @@
 """Shared slowapi Limiter backed by Redis.
 
-Auth endpoints are the current consumers. Keyed on client IP
-(``get_remote_address``). In production the nginx reverse proxy must set
-``X-Forwarded-For`` and slowapi must see the real IP — starlette's
-``request.client.host`` already reflects the proxied peer when
-``forwarded_allow_ips`` is configured on uvicorn. If that is not set, the
-limiter falls back to the direct peer, which is still a reasonable floor.
+Auth endpoints are keyed on the effective client IP. Forwarded headers are
+accepted only when the immediate peer belongs to an explicitly configured
+trusted proxy network. The forwarding chain is evaluated from right to left,
+so a client-supplied leftmost value cannot spoof its rate-limit identity.
 
 Note on the `config_filename` argument below
 --------------------------------------------
@@ -34,15 +32,63 @@ internals untouched.
 
 from __future__ import annotations
 
+import ipaddress
 import os
 import warnings
 
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+from starlette.requests import Request
 
 from app.core.config import get_settings
 
 _settings = get_settings()
+
+
+def _trusted_proxy_networks() -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
+    networks = []
+    for raw in get_settings().trusted_proxy_cidrs.split(","):
+        value = raw.strip()
+        if value:
+            networks.append(ipaddress.ip_network(value, strict=False))
+    return tuple(networks)
+
+
+def _parse_ip(value: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    try:
+        return ipaddress.ip_address(value.strip())
+    except ValueError:
+        return None
+
+
+def _is_trusted_proxy(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    return any(address in network for network in _trusted_proxy_networks() if address.version == network.version)
+
+
+def get_rate_limit_client_ip(request: Request) -> str:
+    """Return a spoof-resistant client identity for SlowAPI."""
+    peer_text = request.client.host if request.client else "unknown"
+    peer = _parse_ip(peer_text)
+    if peer is None or not _is_trusted_proxy(peer):
+        return peer_text
+
+    fly_client = request.headers.get("fly-client-ip")
+    if fly_client:
+        parsed_fly_client = _parse_ip(fly_client)
+        return str(parsed_fly_client) if parsed_fly_client is not None else peer_text
+
+    forwarded = request.headers.get("x-forwarded-for")
+    if not forwarded:
+        return peer_text
+
+    chain = [_parse_ip(part) for part in forwarded.split(",")]
+    if any(address is None for address in chain):
+        return peer_text
+    addresses = [address for address in chain if address is not None]
+    addresses.append(peer)
+    while len(addresses) > 1 and _is_trusted_proxy(addresses[-1]):
+        addresses.pop()
+    return str(addresses[-1])
+
 
 # slowapi recognises redis:// URLs natively. If redis is unreachable at
 # check time slowapi will raise; we want auth to fail closed under abuse,
@@ -57,7 +103,7 @@ with warnings.catch_warnings():
         category=UserWarning,
     )
     limiter = Limiter(
-        key_func=get_remote_address,
+        key_func=get_rate_limit_client_ip,
         storage_uri=_settings.redis_url,
         # Strategy "fixed-window" is the default and cheapest. Reasonable
         # for login/register where we want burst protection, not precise

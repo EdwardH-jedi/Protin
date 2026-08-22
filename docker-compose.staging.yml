@@ -22,15 +22,15 @@ services:
   # ── Database ─────────────────────────────────────────────────────────────
   # Inherit postgres from base; override to not expose the port publicly.
   postgres:
-    ports: []          # remove the host-port binding from base compose
+    ports: !reset []   # Compose merge reset: never publish the database in staging
     env_file:
-      - .env.staging
+      - ${STAGING_ENV_FILE:-.env.staging}
 
   # ── Redis ─────────────────────────────────────────────────────────────────
   redis:
-    ports: []          # not exposed externally; accessible inside compose network
+    ports: !reset []   # Compose merge reset: private container network only
     env_file:
-      - .env.staging
+      - ${STAGING_ENV_FILE:-.env.staging}
 
   # ── DB migration (one-shot) ───────────────────────────────────────────────
   migrate:
@@ -41,7 +41,7 @@ services:
       dockerfile: apps/api/Dockerfile
     command: alembic upgrade head
     env_file:
-      - .env.staging
+      - ${STAGING_ENV_FILE:-.env.staging}
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,9 +59,9 @@ services:
       --host 0.0.0.0
       --port 8000
       --log-level ${LOG_LEVEL:-info}
-      --access-log
+      --no-access-log
     env_file:
-      - .env.staging
+      - ${STAGING_ENV_FILE:-.env.staging}
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,7 +84,7 @@ services:
       dockerfile: apps/api/Dockerfile
     command: python worker.py
     env_file:
-      - .env.staging
+      - ${STAGING_ENV_FILE:-.env.staging}
     depends_on:
       postgres:
         condition: service_healthy

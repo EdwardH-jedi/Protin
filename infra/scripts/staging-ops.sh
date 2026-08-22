@@ -159,7 +159,7 @@ cmd_drift() {
 
     mapfile -t missing < <(comm -23 <(printf '%s\n' "${example_keys[@]}") <(printf '%s\n' "${actual_keys[@]}"))
     mapfile -t extra < <(comm -13 <(printf '%s\n' "${example_keys[@]}") <(printf '%s\n' "${actual_keys[@]}"))
-    mapfile -t unresolved < <(grep -E '^[A-Z0-9_]+=.*<[^>]+>' "$REPO_ROOT/.env.staging" | cut -d= -f1 || true)
+    mapfile -t unresolved < <(grep -E '^[A-Z0-9_]+=(.*<[^>]+>|GENERATE_ME)$' "$REPO_ROOT/.env.staging" | cut -d= -f1 || true)
 
     info "Environment drift check at $(timestamp)"
 

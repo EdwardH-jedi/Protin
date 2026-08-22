@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -86,8 +88,16 @@ async def photo_client(tmp_path, monkeypatch) -> AsyncGenerator[tuple[AsyncClien
     app.dependency_overrides.clear()
 
 
-def _files(count: int) -> list[tuple[str, tuple[str, bytes, str]]]:
-    return [("files", (f"photo{i}.jpg", b"\xff\xd8\xff\xe0fake-jpeg-bytes", "image/jpeg")) for i in range(count)]
+def _image_bytes(image_format: str = "JPEG", size: tuple[int, int] = (32, 32)) -> bytes:
+    buffer = BytesIO()
+    Image.new("RGB", size, color=(20, 80, 140)).save(buffer, format=image_format)
+    return buffer.getvalue()
+
+
+def _files(count: int, image_format: str = "JPEG") -> list[tuple[str, tuple[str, bytes, str]]]:
+    suffix = "jpg" if image_format == "JPEG" else image_format.lower()
+    mime = "image/jpeg" if image_format == "JPEG" else f"image/{image_format.lower()}"
+    return [("files", (f"photo{i}.{suffix}", _image_bytes(image_format), mime)) for i in range(count)]
 
 
 async def test_replace_profile_photos_two_files(photo_client) -> None:
@@ -209,3 +219,66 @@ async def test_upsert_profile_response_includes_persisted_photos(photo_client) -
     assert r.status_code == 200, r.text
     body = r.json()
     assert [p["photo_url"] for p in body["photos"]] == uploaded_urls
+
+
+async def test_upload_rejects_fake_jpeg_and_corrupt_image(photo_client) -> None:
+    client, _, _ = photo_client
+    fake = [("files", (f"fake{i}.jpg", b"not-an-image", "image/jpeg")) for i in range(2)]
+    response = await client.put("/users/me/photos", files=fake)
+    assert response.status_code == 422
+    assert "valid image" in response.json()["detail"]
+
+
+async def test_upload_rejects_oversized_file(photo_client) -> None:
+    client, _, _ = photo_client
+    settings = media_storage.get_settings()
+    oversized = b"x" * (settings.media_max_file_bytes + 1)
+    files = [
+        ("files", ("oversized.jpg", oversized, "image/jpeg")),
+        ("files", ("valid.jpg", _image_bytes(), "image/jpeg")),
+    ]
+    response = await client.put("/users/me/photos", files=files)
+    assert response.status_code == 413
+
+
+async def test_upload_enforces_combined_user_quota(photo_client, monkeypatch) -> None:
+    client, _, _ = photo_client
+    one_image = _image_bytes()
+    monkeypatch.setattr(media_storage.get_settings(), "media_max_total_bytes", len(one_image) * 2 - 1)
+    files = [("files", (f"photo{i}.jpg", one_image, "image/jpeg")) for i in range(2)]
+    response = await client.put("/users/me/photos", files=files)
+    assert response.status_code == 413
+    assert "Combined profile photos" in response.json()["detail"]
+
+
+async def test_upload_rejects_excessive_dimensions(photo_client) -> None:
+    client, _, _ = photo_client
+    giant = _image_bytes("PNG", (6001, 1))
+    files = [("files", (f"giant{i}.png", giant, "image/png")) for i in range(2)]
+    response = await client.put("/users/me/photos", files=files)
+    assert response.status_code == 422
+    assert "dimensions" in response.json()["detail"]
+
+
+async def test_upload_accepts_valid_png(photo_client) -> None:
+    client, _, _ = photo_client
+    response = await client.put("/users/me/photos", files=_files(2, "PNG"))
+    assert response.status_code == 200
+    assert all(photo["photo_url"].endswith(".png") for photo in response.json()["photos"])
+
+
+async def test_database_failure_restores_previous_files(photo_client, monkeypatch) -> None:
+    client, user, _ = photo_client
+    initial = await client.put("/users/me/photos", files=_files(2))
+    assert initial.status_code == 200
+    user_dir = media_storage._user_dir(user.id)
+    original_names = sorted(path.name for path in user_dir.iterdir())
+
+    async def fail_commit(_session) -> None:
+        raise RuntimeError("simulated database failure")
+
+    monkeypatch.setattr(AsyncSession, "commit", fail_commit)
+    with pytest.raises(RuntimeError, match="simulated database failure"):
+        await client.put("/users/me/photos", files=_files(3, "PNG"))
+
+    assert sorted(path.name for path in user_dir.iterdir()) == original_names
