@@ -9,6 +9,7 @@ __pycache__/
 
 # --- Node ---
 node_modules/
+*.tsbuildinfo
 
 # --- SSL certificates (generated locally — never commit) ---
 infra/nginx/certs/*.crt
