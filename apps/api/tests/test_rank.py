@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock
 
@@ -108,13 +109,15 @@ async def _matched_pair(
 
 
 async def _create_booking(client: AsyncClient, token: str, match_id: str, sport: str = "tennis") -> str:
+    ends_at = datetime.now(tz=timezone.utc) - timedelta(minutes=5)
+    starts_at = ends_at - timedelta(minutes=30)
     r = await client.post(
         "/bookings",
         json={
             "match_id": match_id,
             "sport": sport,
-            "starts_at": "2030-04-01T09:00:00Z",
-            "ends_at": "2030-04-01T10:00:00Z",
+            "starts_at": starts_at.isoformat(),
+            "ends_at": ends_at.isoformat(),
         },
         headers=_auth(token),
     )
@@ -208,6 +211,34 @@ async def test_completed_booking_creates_positive_honor_event(client: AsyncClien
     assert body_b["honor"] == HONOR_BASELINE + HONOR_DELTA_SESSION_COMPLETED
     assert len(body_b["sports"]) == 1
     assert body_b["sports"][0]["sessions_completed"] == 1
+
+
+async def test_duplicate_completion_cannot_duplicate_rewards(client: AsyncClient) -> None:
+    from sqlalchemy import func, select
+
+    from app.models.rank import HonorEvent, RankEvent
+
+    token_a, uid_a, token_b, _uid_b, match_id = await _matched_pair(
+        client, "rank_retry_a@example.com", "rank_retry_b@example.com", sport="tennis"
+    )
+    booking_id = await _create_booking(client, token_a, match_id, sport="tennis")
+    await _confirm(client, token_b, booking_id)
+    assert (await client.post(f"/bookings/{booking_id}/complete", headers=_auth(token_a))).status_code == 200
+    assert (await client.post(f"/bookings/{booking_id}/complete", headers=_auth(token_a))).status_code == 422
+
+    async with _TestSession() as session:
+        honor_count = (
+            await session.execute(
+                select(func.count()).select_from(HonorEvent).where(HonorEvent.booking_id == UUID(booking_id))
+            )
+        ).scalar_one()
+        rank_count = (
+            await session.execute(
+                select(func.count()).select_from(RankEvent).where(RankEvent.booking_id == UUID(booking_id))
+            )
+        ).scalar_one()
+    assert honor_count == 2
+    assert rank_count == 2
 
 
 async def test_no_show_creates_negative_honor_for_other_and_actor(client: AsyncClient) -> None:
@@ -368,7 +399,6 @@ async def test_public_summary_returns_only_safe_fields(client: AsyncClient) -> N
 # ---------------------------------------------------------------------------
 
 
-from datetime import datetime, timedelta, timezone  # noqa: E402
 from uuid import UUID, uuid4  # noqa: E402
 
 
