@@ -1,17 +1,24 @@
-> **Status note — updated 2026-08-19.** This audit was written in April 2026 against the
+> **Status note — updated 2026-08-22.** This audit was written in April 2026 against the
 > Wave 8 staging-readiness branch. Several findings have since been remediated in code
 > and are recorded here so the document is not read as a list of open issues. The
 > findings themselves are left unedited below; this header is the current status.
 >
 > | Finding | Status | Evidence |
 > |---|---|---|
-> | **C1** — default `SECRET_KEY` boots with a warning | **Partially addressed** | `core/security.py` now raises `RuntimeError` in `staging` / `production`, but only for the exact literal `change-me-in-production`. An empty value, a weak value, or the `change-me-before-running` placeholder in `.env.example` still boot. The recommended length/emptiness validation is **not** implemented and this remains the highest-priority open item. |
+> | **C1** — default `SECRET_KEY` boots with a warning | **Closed in rehabilitation worktree** | `core/protected_config.py` centrally rejects missing, public-placeholder, short and repetitive secrets in staging/production; lifespan and deployment preflight invoke it. Focused tests cover fail-closed and valid cases. Remote CI is still pending. |
 > | **H1** — `/internal/process-notifications` unauthenticated | **Closed** | `routers/notifications.py` adds a `require_internal_token` header dependency, plus `validate_internal_api_token_config()` at startup which refuses to boot a protected environment without `INTERNAL_API_TOKEN`. |
 > | **H2** — permissive CORS default | **Partially addressed** | `main.py` sets `allow_credentials=bool(cors_origins)`, so the wildcard fallback can no longer serve credentialed cross-origin requests. The recommended startup validation requiring a non-empty origin list outside `local` is **not** implemented. |
 > | **H3** — no rate limiting on auth routes | **Closed** | slowapi is wired in `main.py`; `routers/auth.py` applies `3/minute` and `5/minute` limits to registration and login. |
 > | **M6** — encryption key enforced only in `production` | **Closed** | `core/encryption.py` uses `_PROTECTED_ENVS = {"staging", "production"}`, so staging fails startup without a key too. |
 > | **L2** — no password policy | **Partially addressed** | `schemas/auth.py` enforces `min_length=8` on registration. The audit's stronger recommendation (complexity or breach-list checks, and a policy on login) is not implemented. |
 > | **M1–M5, L1, L3–L5** | **Open** | Not yet addressed. `M4` (decrypt failure returning the raw stored value) is the most significant of these. |
+>
+> A separate 2026-08-22 rehabilitation also added one-time hashed Google OAuth state
+> with PKCE, URL-free WebSocket bearer authentication, Apple nonce/RS256 verification,
+> trusted-proxy rate-limit identity, safe image ingestion, participant/ledger database
+> constraints, and PostgreSQL concurrency tests. The historical findings below are kept
+> verbatim and must not be read as a current whole-repository audit. PostgreSQL tests are
+> configured but not locally executed, and the expanded remote CI run is still pending.
 >
 > Retaining an audit alongside its remediation record is intentional — the finding, the
 > fix and what is still outstanding are all more useful than a document that only shows

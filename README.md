@@ -34,7 +34,7 @@ rewards actually showing up.
 
 ---
 
-## Why Protin exists
+## Overview
 
 Finding someone to train with is a coordination problem that no single app solves well.
 People discover partners in one place, argue about times in another, and track who
@@ -52,12 +52,13 @@ and the reputation system exists to make that session actually happen.
 
 ---
 
-## Core capabilities
+## Key Features
 
 **Discover & connect** — A sport-scoped partner feed with like / pass / save actions and
 mutual-match creation. The feed *filters* on sport, active accounts, cards you have already
-acted on, and blocks in both directions; it then *ranks* what remains by compatibility —
-60% skill-level proximity, 40% preferred-time overlap. Gender, age and distance preferences
+acted on, and blocks in both directions; it then *ranks* a capped pool of the 200 newest
+remaining candidates by compatibility — 60% skill-level proximity, 40% preferred-time
+overlap. Gender, age and distance preferences
 are captured on the profile but are not yet applied to the feed. Supported sports: gym, golf,
 tennis and running.
 
@@ -98,7 +99,24 @@ notifications delivered by a background worker.
 
 ---
 
-## Engineering highlights
+## Tech Stack
+
+| Area | Technology |
+|---|---|
+| **Client** | React Native 0.81 · Expo 54 · React 19 · TypeScript 5.9 · React Navigation 6 · Zustand 5 |
+| **Backend** | Python 3.12 · FastAPI · Pydantic 2 · SQLAlchemy 2 (async) · Alembic · uvicorn |
+| **Data** | PostgreSQL 16 (asyncpg) · Redis 7 |
+| **Auth** | JWT (PyJWT) · bcrypt via passlib · Sign in with Apple |
+| **Infrastructure** | Docker (multi-stage) · Docker Compose · nginx · Fly.io config |
+| **Testing** | pytest · pytest-asyncio · httpx · Jest · jest-expo · React Native Testing Library |
+| **Tooling** | Ruff · ESLint · tsc · GitHub Actions · npm workspaces · uv |
+| **External** | Apple Sign-In · Google Calendar · Google Places · Expo Push · Sentry |
+
+Versions above are read from the committed manifests, not from memory.
+
+---
+
+## Engineering Highlights
 
 The parts of this repository worth looking at, and where to find them:
 
@@ -107,12 +125,12 @@ The parts of this repository worth looking at, and where to find them:
 | **Async API** | FastAPI with fully async SQLAlchemy 2.0 over asyncpg; 15 routers, 14 ORM model modules, 17 service modules | [`apps/api/app`](apps/api/app) |
 | **Booking state machine** | Transitions declared as a `(status, transition) → allowed_by` table and enforced centrally, so no route can invent an illegal state change | [`services/bookings.py`](apps/api/app/services/bookings.py) |
 | **Contract-typed integration** | A TypeScript package pins the API wire shapes and is imported by ~22 mobile modules, so a contract change surfaces as a build failure rather than a runtime error. Adoption is partial and the types are not OpenAPI-generated — both gaps are documented rather than glossed over | [`packages/shared-types`](packages/shared-types) |
-| **Security engineering** | Field-level Fernet encryption for stored OAuth tokens with a startup guard that refuses to boot unencrypted in staging/production; JWT auth; slowapi rate limiting; shared-secret gate on internal routes | [`core/encryption.py`](apps/api/app/core/encryption.py), [`core/security.py`](apps/api/app/core/security.py) |
-| **Real-time chat** | A WebSocket room per match with a connection manager; the token is decoded and match participation verified before the socket is admitted to any room, and a rejected connection is closed with a distinct code for auth vs authorisation failure | [`routers/chat.py`](apps/api/app/routers/chat.py), [`ChatScreen.tsx`](apps/mobile/src/screens/chat/ChatScreen.tsx) |
+| **Security engineering** | Central protected-environment startup validation for JWT, internal-service and Fernet secrets; encrypted OAuth tokens; trusted-proxy-aware rate limiting; one-time Google OAuth state with PKCE | [`core/protected_config.py`](apps/api/app/core/protected_config.py), [`core/rate_limit.py`](apps/api/app/core/rate_limit.py), [`services/google_calendar.py`](apps/api/app/services/google_calendar.py) |
+| **Real-time chat** | A WebSocket room per match; the client sends its JWT in the first application message rather than the URL, and the server verifies token, active account and match participation before joining the room | [`routers/chat.py`](apps/api/app/routers/chat.py), [`ChatScreen.tsx`](apps/mobile/src/screens/chat/ChatScreen.tsx) |
 | **Background processing** | A standalone worker process polling for due push notifications and delivering them via Expo | [`apps/api/worker.py`](apps/api/worker.py) |
-| **Schema evolution** | 15 Alembic migrations covering the full domain history | [`apps/api/alembic/versions`](apps/api/alembic/versions) |
+| **Schema evolution** | 16 Alembic migrations covering the full domain history | [`apps/api/alembic/versions`](apps/api/alembic/versions) |
 | **Mobile app** | Expo / React Native with React Navigation, Zustand stores, Apple Sign-In, expo-location, maps, image picker and Sentry | [`apps/mobile/src`](apps/mobile/src) |
-| **Test suite** | 620 API tests and 747 mobile tests, all run in CI | [`apps/api/tests`](apps/api/tests), [`apps/mobile/src/__tests__`](apps/mobile/src/__tests__) |
+| **Test suite** | 660 API tests pass locally (plus three PostgreSQL-only tests skipped without a database) and 747 mobile tests pass; CI is configured to run the PostgreSQL-only tests against PostgreSQL 16 | [`apps/api/tests`](apps/api/tests), [`apps/mobile/src/__tests__`](apps/mobile/src/__tests__) |
 | **Infrastructure** | Multi-stage Docker build, Compose stacks for local and staging, nginx reverse proxy, backup/restore and health-check scripts, Fly.io deployment configuration | [`infra`](infra), [`fly.toml`](fly.toml) |
 | **Security review** | A written security audit with severity ratings, tracked against the code that since addressed it — including which findings are closed, which are only partially addressed, and which remain open | [`docs/security/SECURITY_AUDIT.md`](docs/security/SECURITY_AUDIT.md) |
 
@@ -162,20 +180,40 @@ flowchart LR
   through Expo Push, keeping fan-out off the request path.
 - **shared-types** — a TypeScript package consumed by the mobile app that pins the wire
   contract. It is not generated from OpenAPI and a few newer hooks still declare shapes
-  inline; see [the architecture notes](docs/architecture/ARCHITECTURE.md#package-boundaries).
+  inline; see [the architecture notes](docs/ARCHITECTURE.md#package-boundaries-and-the-shared-type-contract).
 
-Full detail: [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md).
+Full detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
-## Testing & quality
+## Current Status
 
-Every push runs six CI jobs: Ruff lint + format check, mobile ESLint, TypeScript
-typecheck, API pytest, mobile Jest, and an API Docker image build gated on the rest.
+**Active — v1 implementation present, security rehabilitation awaiting remote CI evidence,
+not released.** Locally, 1,407 automated tests pass; three PostgreSQL-only concurrency
+tests are skipped because no local PostgreSQL or Docker daemon is available. The expanded
+CI workflow has not yet been observed on GitHub. No App Store or TestFlight build has been submitted,
+and the API is not verifiably deployed: the Fly.io configuration exists but the service
+did not respond when checked. The only currently live deployment is the Netlify
+marketing/legal site the app links to.
+
+Remaining work includes a green run of the expanded PostgreSQL/web CI gates, submission
+mechanics, and the gaps in [Known Limitations](#known-limitations).
+
+Full breakdown, including what is partially implemented and the validation evidence
+behind these claims: [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md).
+
+---
+
+## Testing & Quality
+
+The workflow defines eight jobs: API Ruff and pytest, mobile ESLint/typecheck/Jest, web
+typecheck/build, PostgreSQL 16 migration/concurrency tests, and an API Docker image build
+that also validates the rendered staging Compose exposure. This expanded workflow is
+configured locally but has not yet been observed green remotely.
 
 | | Stack | Scope |
 |---|---|---|
-| **API** | pytest + pytest-asyncio, httpx `ASGITransport` | 620 tests. Most drive the real ASGI app over actual HTTP routes against a per-module in-memory SQLite database; a minority test services or pure functions directly. External services are mocked, some at the HTTP boundary and some above it. No network or containers required — the exact depths, and the gaps they leave, are in the testing doc. |
+| **API** | pytest + pytest-asyncio, httpx `ASGITransport` | 660 tests pass locally and three PostgreSQL-only concurrency tests skip without `POSTGRES_TEST_URL`. Most tests drive the real ASGI app against in-memory SQLite; the CI-only group applies real migrations and locking against PostgreSQL 16. |
 | **Mobile** | Jest (`jest-expo`) + React Native Testing Library | 747 tests across 53 suites covering screens, hooks, stores and pure logic. |
 | **Static** | Ruff (lint + format), ESLint (`--max-warnings 0`), `tsc --noEmit` | Enforced on every push, not just on pull requests. |
 
@@ -183,7 +221,7 @@ Details and local commands: [`docs/engineering/TESTING.md`](docs/engineering/TES
 
 ---
 
-## Engineering workflow
+## Engineering Workflow
 
 Implementation on this project is AI-assisted, and the interesting part is the
 scaffolding built to keep that honest rather than the assistance itself.
@@ -208,47 +246,22 @@ See [`docs/engineering/AI_WORKFLOW.md`](docs/engineering/AI_WORKFLOW.md).
 
 ---
 
-## Project ownership
+## Project Ownership
 
-Protin is an independent solo project. There was no team; every decision below was mine:
+Protin is an independent solo project — no team. Product direction, system architecture,
+data modelling, mobile and backend engineering, testing strategy, infrastructure and the
+engineering workflow were all mine.
 
-- **Product direction** — positioning, sport scope, the Sydney-first constraint, and the
-  choice to make booking (not matching) the success metric.
-- **System architecture** — monorepo layout, the async API, the shared-type contract
-  boundary, and moving notification fan-out to a separate worker process.
-- **Data modelling** — the schema and its 15-migration history, including the booking
-  state machine and the rank/honor accounting rules.
-- **Mobile engineering** — screens, navigation, state management and API integration.
-- **Testing strategy** — the in-memory-SQLite API harness, the external-boundary mocking
-  policy, and the CI gate layout.
-- **Infrastructure** — Docker packaging, Compose stacks, nginx, backup/restore and
-  health-check tooling, and deployment configuration.
-- **Engineering workflow** — the AI-assisted loop described above and the automated gates
-  that constrain it.
-
-Implementation is AI-assisted (see the workflow section); the design, review and
+Implementation is AI-assisted (see the workflow section above); the design, review and
 acceptance of that work are not.
 
----
-
-## Repository structure
-
-```
-apps/
-  api/               FastAPI service — routers, services, models, migrations, worker
-  mobile/            Expo React Native app — screens, hooks, stores, navigation
-  web/               Vite landing / legal site (privacy, terms, support pages)
-packages/
-  shared-types/      TypeScript wire contract shared by the API and the app
-infra/               nginx config, deploy / backup / health-check scripts, systemd units
-docs/                architecture, engineering, deployment, security, legal, archive
-.claude/             AI engineering harness — agents, skills, quality-gate hooks
-.github/workflows/   CI pipeline
-```
+Full ownership breakdown by area:
+[`docs/PORTFOLIO_FACTS.md`](docs/PORTFOLIO_FACTS.md#5-technical-ownership).
 
 ---
 
-## Getting started
+
+## Running Locally
 
 **Prerequisites:** Node.js 20+, Python 3.12+, [uv](https://docs.astral.sh/uv/), Docker Desktop.
 
@@ -286,7 +299,7 @@ for environment variable reference and troubleshooting.
 
 ---
 
-## Development commands
+## Development Commands
 
 ```bash
 # Infrastructure (each is its own command)
@@ -314,11 +327,68 @@ docker build -f apps/api/Dockerfile .
 
 ---
 
+## Repository Structure
+
+```
+apps/
+  api/               FastAPI service — routers, services, models, migrations, worker
+  mobile/            Expo React Native app — screens, hooks, stores, navigation
+  web/               Vite marketing site — landing page with draft legal copy in modals
+packages/
+  shared-types/      TypeScript wire contract shared by the API and the app
+infra/               nginx config, deploy / backup / health-check scripts, systemd units
+docs/                architecture, engineering, deployment, security, legal, archive
+.claude/             AI engineering harness — agents, skills, quality-gate hooks
+.github/workflows/   CI pipeline
+```
+
+---
+
+## Known Limitations
+
+Stated up front, because they are the questions worth asking:
+
+- **Not deployed and not released.** Fly.io configuration exists but the API did not
+  respond when checked; no App Store or TestFlight build has been submitted. The project
+  has never had a real user, so there are no usage, scale or performance figures anywhere
+  in this repository.
+- **Discovery ignores stated preferences.** Gender, age-range and distance preferences are
+  captured on the profile but never read by the feed query.
+- **Account deletion leaves photo files on disk.** Database rows are removed; uploaded
+  images are not.
+- **JWT sessions last seven days and have no refresh or revocation model.** Shortening the
+  access-token lifetime safely requires a compatible mobile refresh-token flow.
+- **Chat is single-instance.** The WebSocket connection manager lives in process memory —
+  it does not survive a restart or scale horizontally.
+- **Google Calendar is export-only**, and cancelling a booking does not remove the
+  calendar event.
+- **Tournaments are incomplete** and hidden behind a feature flag.
+- **PostgreSQL concurrency tests are configured but not locally executed.** This machine
+  has neither PostgreSQL nor a Docker daemon; a green remote CI run is still required.
+- **The npm audit is not clean.** The current tree reports 30 advisories, including two
+  critical transitive packages (`shell-quote` and `tar`); remediation needs a separately
+  tested dependency-upgrade pass.
+
+The full list, with the code behind each, is in
+[`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) and
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#11-known-architectural-limitations).
+
+---
+
 ## Documentation
+
+**Canonical documents** — the authoritative source for anything about this project:
 
 | Document | Contents |
 |---|---|
-| [Architecture](docs/architecture/ARCHITECTURE.md) | System context, components, request flow, data stores, trade-offs |
+| [Project Status](docs/PROJECT_STATUS.md) | Current state: what is implemented, partial, missing; validation evidence; deployment truth; known issues |
+| [Architecture](docs/ARCHITECTURE.md) | System overview, components, request flow, data model, authentication, deployment, trade-offs, limitations |
+| [Portfolio Facts](docs/PORTFOLIO_FACTS.md) | Repository-verified facts safe to reuse in portfolio materials — including claims that must **not** be made |
+
+**Supporting documents:**
+
+| Document | Contents |
+|---|---|
 | [Testing](docs/engineering/TESTING.md) | Test stacks, CI gates, local commands, mocking policy |
 | [AI workflow](docs/engineering/AI_WORKFLOW.md) | Roles, quality gates, and the reasoning behind them |
 | [Local setup](docs/engineering/LOCAL_SETUP.md) | Environment variables, health checks, troubleshooting |

@@ -23,7 +23,10 @@ fly launch --no-deploy --copy-config --name protin-api --region syd
 fly postgres create --name protin-pg --region syd
 fly postgres attach protin-pg --app protin-api
 fly redis create --name protin-redis --region syd
-fly secrets set REDIS_URL="<url>" SECRET_KEY="<...>" FIELD_ENCRYPTION_KEY="<...>" \
+fly secrets set REDIS_URL="<url>" \
+  SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')" \
+  INTERNAL_API_TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(32))')" \
+  FIELD_ENCRYPTION_KEY="$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" \
   GOOGLE_CLIENT_ID="<...>" GOOGLE_CLIENT_SECRET="<...>" --app protin-api
 fly deploy --app protin-api
 fly ssh console -C 'alembic upgrade head' --app protin-api
@@ -44,6 +47,9 @@ git pull --ff-only
 
 # 2. Deploy the new image.
 fly deploy --app protin-api
+
+# Protected-environment startup validates SECRET_KEY, INTERNAL_API_TOKEN and
+# FIELD_ENCRYPTION_KEY before serving. Do not substitute example placeholders.
 
 # 3. ALWAYS run migrations after every deploy. This step is unconditional
 #    even when you do not think the release ships new revisions: skipping

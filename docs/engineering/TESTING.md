@@ -8,11 +8,12 @@ What is tested, how, and what the tests deliberately do not cover.
 
 | | Framework | Count | Runtime |
 |---|---|---|---|
-| API | pytest + pytest-asyncio | 620 tests, 26 modules | ~95s |
+| API | pytest + pytest-asyncio | 660 passing, 3 PostgreSQL-only skipped, 29 modules | ~95s |
 | Mobile | Jest (`jest-expo`) + React Native Testing Library | 747 tests, 53 suites | ~7s |
 
-Counts are from the runs recorded on this branch. Neither suite requires Docker,
-a database, or network access.
+Counts are from the 2026-08-22 local runs on this branch. The default API suite needs no
+container or network, but three concurrency tests require `POSTGRES_TEST_URL` and are
+skipped locally when PostgreSQL is unavailable. CI supplies PostgreSQL 16.
 
 ---
 
@@ -30,6 +31,17 @@ npm ci
 npm run lint      -w @protin/mobile
 npm run typecheck -w @protin/mobile
 npm run test:ci   -w @protin/mobile
+
+# Web — from the repository root
+npm run typecheck -w @protin/web
+npm run build     -w @protin/web
+
+# PostgreSQL-only migration and concurrency gate
+POSTGRES_URL=postgresql://... uv run alembic upgrade head
+POSTGRES_TEST_URL=postgresql+asyncpg://... uv run pytest -q tests/integration
+
+# Rendered staging-network assertion — from the repository root
+bash infra/scripts/check-staging-compose.sh
 
 # API container
 docker build -f apps/api/Dockerfile .
@@ -73,19 +85,21 @@ depth, and the difference matters:
 - **Expo Push** is stubbed one level higher: tests replace `_send_expo_push` itself, so
   scheduling, due-event selection and the failure bookkeeping around delivery are
   covered, but the Expo request body and response handling are not.
-- **Apple identity-token verification** is likewise stubbed above the boundary — route
-  tests monkeypatch `verify_identity_token` outright. The routes' handling of a verified
-  or rejected token is covered; the function's own JWKS fetch, key rotation, signature
-  check and nonce comparison are not.
+- **Apple route tests** stub the verifier, while `test_apple_auth.py` separately exercises
+  the verifier with a real RS256-signed token and mocked JWKS transport: issuer, audience,
+  expiry, required nonce, algorithm pinning, unknown key and cache rotation are covered.
 
-The last two are the suite's most significant coverage gaps and are named here rather
-than implied away. Both are cheap to close by moving the stub down to the HTTP client.
+Expo Push request/response handling remains the significant external-boundary gap.
 
-**What this does not cover.** SQLite is not PostgreSQL. Anything relying on
-PostgreSQL-specific behaviour is unverified by the suite — most notably the
-`with_for_update` row lock guarding tournament capacity, which SQLite silently ignores.
-Migrations are also not applied during tests (the schema comes from metadata), so a
-migration that diverges from the models would not be caught here.
+**WebSocket boundary.** `test_chat.py` exercises the route's first-message authentication,
+timeout/missing-auth rejection, invalid and expired JWTs, inactive accounts, participant
+admission and nonparticipant denial with a deterministic fake socket. The mobile test
+also asserts that the constructed URL contains no token and that auth is sent after open.
+
+SQLite is still the default unit/integration store. A separate PostgreSQL group applies
+all Alembic migrations and tests concurrent double-complete, confirm-vs-decline, and
+one-time OAuth-state consumption. Those tests are configured in CI but were **not verified
+locally** on 2026-08-22 because this machine has no PostgreSQL server or Docker daemon.
 
 ---
 
@@ -119,11 +133,9 @@ production sources.
 `.github/workflows/ci.yml` runs on every push to any branch and on pull requests to
 `main`, with in-progress PR runs cancelled when superseded.
 
-```
-lint (ruff check + ruff format --check) ──> test (pytest) ──┐
-lint-mobile (eslint --max-warnings 0) ───> test-mobile ─────┼──> docker-build
-typecheck (tsc --noEmit) ──────────────────────────────────┘
-```
+The workflow defines eight jobs. `docker-build` waits for API tests, PostgreSQL
+integration, mobile typecheck/tests, and web quality; the independent lint jobs remain
+required workflow results.
 
 | Job | Command |
 |---|---|
@@ -132,7 +144,9 @@ typecheck (tsc --noEmit) ──────────────────�
 | `lint-mobile` | `npm run lint -w @protin/mobile` |
 | `test` | `cd apps/api && uv run pytest` |
 | `test-mobile` | `npm run test:ci -w @protin/mobile` |
-| `docker-build` | `docker build -f apps/api/Dockerfile .` |
+| `web-quality` | `npm run build -w @protin/web` (TypeScript check + Vite production build) |
+| `postgres-integration` | PostgreSQL 16 service, `alembic upgrade head`, one-head assertion, `pytest -q tests/integration` |
+| `docker-build` | API image build plus `bash infra/scripts/check-staging-compose.sh` |
 
 Three things worth noting about the gate design:
 
@@ -140,9 +154,12 @@ Three things worth noting about the gate design:
   pass lint wastes a runner and buries the actionable signal under the noisier one.
 - **`--max-warnings 0`.** ESLint warnings fail the build, so there is no accumulating
   backlog of "known warnings" that stops being read.
-- **The Docker build is the final gate.** It only runs once every test and static check
-  has passed, and it verifies that the deployable artefact — the same Dockerfile
-  `fly.toml` uses — still builds.
+- **The Docker build is the final gate.** It verifies the deployable image and rendered
+  staging exposure after the web and PostgreSQL gates have passed.
+
+The eight-job definition is present in the repository. It has **not yet been observed
+green remotely** after this rehabilitation, so documentation must not describe it as a
+completed CI run until GitHub Actions supplies that evidence.
 
 No coverage threshold is enforced, and no coverage percentage is reported. Adding a
 number without a policy behind it would be decoration.

@@ -1,3 +1,11 @@
+> **Submission mechanics reference — parts are stale.** Some "still required" items have
+> since been done: `apps/mobile/assets/` now exists and contains `icon.png`, `splash.png`
+> and `notification-icon.png`, all referenced from `app.config.js`. Deployment statements
+> here (including the 2026-05-12 production seed run against Fly `protin-api`) record what
+> was true at the time of writing; the API was **not reachable** when last checked on
+> 2026-08-21. Verify against [`docs/PROJECT_STATUS.md`](../PROJECT_STATUS.md) before
+> relying on any status claim in this file.
+
 # SportsGang - App Store submission checklist
 
 > **Public brand vs. technical identifier note.** The App Store
@@ -45,7 +53,7 @@ Split between what the repo already supports today (no engineering work needed) 
 | Push notifications plumbing | `expo-notifications` plugin + iOS `UIBackgroundModes: ["remote-notification"]` |
 | iOS calendar integration | `NSCalendarsUsageDescription` set; `apps/mobile/src/lib/calendar.ts` |
 | HTTPS-only production API URL | `apps/mobile/app.config.js` throws at `eas build` time if `EXPO_PUBLIC_API_URL` is not `https://` under `APP_ENV=production` |
-| Staging / production field-encryption enforcement | `validate_encryption_config` refuses to start without `FIELD_ENCRYPTION_KEY` in staging + production (`apps/api/app/core/encryption.py`) |
+| Protected-environment secret enforcement | `validate_protected_environment` rejects missing, placeholder, short/repetitive JWT and internal tokens plus malformed Fernet keys before staging/production starts (`apps/api/app/core/protected_config.py`) |
 | Privacy policy + terms docs (source) | `docs/legal/PRIVACY_POLICY.md`, `docs/legal/TERMS_OF_SERVICE.md` |
 
 ### Still required before submission
@@ -54,7 +62,10 @@ Split between what the repo already supports today (no engineering work needed) 
 - `apps/api/scripts/seed_review_data.py` is committed and has been run against the production database on 2026-05-12 (Fly `protin-api`). The reviewer account, five demo discovery candidates (Chris, Kim, Luke, Taylor Kim, Sarah), three mutual matches, two seeded chats, and three bookings (one incoming proposal, one outgoing proposal, one confirmed upcoming session) are live. The script is idempotent and credential-gated on `REVIEWER_EMAIL` / `REVIEWER_PASSWORD` Fly secrets. See section 6 for the demo account contract.
 - `apps/mobile/eas.json` `submit.production.ios.ascAppId` and `appleTeamId` are pinned to the real values (`6767027447` and `37C8A2733Y` respectively) as of 2026-05-07. The earlier `REPLACE_WITH_*` placeholders are gone; `eas submit --platform ios --latest` is unblocked once a production build artifact exists.
 - Hosted URLs for the legal docs are **live** on Netlify at `https://sportgang.netlify.app/{privacy,terms,support}/`, and the matching `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_TERMS_URL`, and `EXPO_PUBLIC_SUPPORT_URL` values are pinned on the EAS `preview` and `production` environments (verify with `eas env:list --environment {preview,production}`). Same values also live in the env example files (`apps/mobile/.env.example`, `apps/mobile/.env.staging.example`, `.env.example`) for local Expo runs. **Privacy / Terms / Support real-device tap-through: PASS — 2026-05-05** (operator-confirmed on iPhone via Expo Go; recorded in `docs/deployment/RELEASE_GATE_CHECKLIST.md` §4.6 and `docs/deployment/APPLE_TESTFLIGHT_PREP.md` §4.8). The same tap-through must be re-run against the actual signed TestFlight build before submission — that re-run remains PENDING.
-- Fly secrets: `APPLE_CLIENT_ID=com.edh1223.protin`, `SECRET_KEY`, `FIELD_ENCRYPTION_KEY`. Without these the staging / production API refuses to boot and the `/auth/apple` endpoint returns 503.
+- Fly secrets: `APPLE_CLIENT_ID=com.edh1223.protin`, strong generated `SECRET_KEY`,
+  `INTERNAL_API_TOKEN`, and valid Fernet `FIELD_ENCRYPTION_KEY`. Protected environments
+  fail startup for missing, placeholder or weak values; `/auth/apple` returns 503 when
+  Apple configuration itself is absent.
 - Screenshots at both required iPhone sizes (section 9), 6 per size.
 - Apple Developer Program enrolment + ASC account (section Prerequisites).
 - TestFlight internal test with at least 2 human testers.
