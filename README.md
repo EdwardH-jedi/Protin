@@ -1,6 +1,6 @@
 # Protin
 
-Protin connects players for peer sports matches: discover opponents nearby, issue challenges, book courts, and track results through a ranking and honour system.
+Protin connects players for peer sports matches: find opponents by sport, issue challenges, book nearby courts, and track results through a ranking and honour system.
 
 | Layer | Stack |
 |---|---|
