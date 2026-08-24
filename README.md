@@ -1,6 +1,6 @@
 # Protin
 
-Protin connects clients with personal trainers for bookable sessions.
+Protin connects players for peer sports matches: discover opponents nearby, issue challenges, book courts, and track results through a ranking and honour system.
 
 | Layer | Stack |
 |---|---|
