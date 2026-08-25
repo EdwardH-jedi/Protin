@@ -10,7 +10,7 @@ Protin connects players for peer sports matches: find opponents by sport, issue 
 - **Bookings** — propose, confirm, decline, cancel, complete, or no-show a session via an explicit state machine
 - **Venues** — nearby court/venue search combining a seeded database with Google Places, deduplicated by name + distance
 - **Battles (group events)** — host or join open sport events with attendance confirmation
-- **Tournaments** — browse, join, and leave tournaments
+- **Tournaments** — join/leave tournaments, implemented behind a server-side feature flag (off outside local dev)
 - **Ranking & honour system** — rank progression from recorded results plus an honour/reputation layer
 - **Accounts & safety** — email/password and Sign in with Apple auth, profile photos, Google Calendar sync, Expo push notifications, reports, blocks, and content moderation
 

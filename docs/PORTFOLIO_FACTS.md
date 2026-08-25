@@ -58,7 +58,9 @@ defined in the shared-types package.
   distance, name+proximity dedup), lazy place-details lookup, rate limited
 - Battles (group events): create, join/leave, cancel/complete, host- and
   self-reported attendance
-- Tournaments: list, detail, join, leave
+- Tournaments: list, detail, join, leave — behind a server-side feature flag
+  (`TOURNAMENTS_ENABLED`, on by default only in local dev) and not yet wired into
+  the main mobile navigation
 - Rank & honour system: rank events from results, honour/reputation endpoints
 - Integrations: Google Calendar OAuth + booking sync, Expo push notifications with a
   background delivery worker
@@ -112,8 +114,8 @@ matches: a sport-scoped discovery feed with compatibility scoring produces mutua
 matches, matches carry chat threads and bookings, and bookings run through an explicit
 finite state machine so every transition and its side effects — like scheduled push
 notifications — are validated in one place. On top of that there are 1-v-1 challenges
-with results, group events with attendance tracking, tournaments, and a rank/honour
-system.
+with results, group events with attendance tracking, feature-flagged tournaments,
+and a rank/honour system.
 
 Two integrations I'd highlight: venue search merges a seeded database with Google
 Places, deduplicating by name and haversine distance and rate-limiting the external
