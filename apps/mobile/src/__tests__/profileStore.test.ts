@@ -7,6 +7,9 @@
  *  - uploadProfilePhotos() exposes absolute URLs in photoUris
  */
 
+import { useProfileStore } from '../stores/profile';
+import { api, BASE_URL } from '../lib/api';
+
 jest.mock('expo-constants', () => ({
   __esModule: true,
   default: {
@@ -15,9 +18,6 @@ jest.mock('expo-constants', () => ({
     manifest: null,
   },
 }));
-
-import { useProfileStore } from '../stores/profile';
-import { api, BASE_URL } from '../lib/api';
 
 function resetStore() {
   useProfileStore.setState({

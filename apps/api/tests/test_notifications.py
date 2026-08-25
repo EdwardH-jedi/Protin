@@ -428,13 +428,17 @@ async def _setup_match_and_booking(client: AsyncClient) -> tuple[str, str, str, 
     )
     match_id = r.json()["match_id"]
 
+    from datetime import datetime, timedelta, timezone
+
+    starts_at = (datetime.now(timezone.utc) + timedelta(days=2)).replace(microsecond=0)
+    ends_at = starts_at + timedelta(hours=1)
     book_r = await client.post(
         "/bookings",
         json={
             "match_id": match_id,
             "sport": "gym",
-            "starts_at": "2026-08-01T09:00:00Z",
-            "ends_at": "2026-08-01T10:00:00Z",
+            "starts_at": starts_at.isoformat().replace("+00:00", "Z"),
+            "ends_at": ends_at.isoformat().replace("+00:00", "Z"),
         },
         headers=_auth(token_a),
     )

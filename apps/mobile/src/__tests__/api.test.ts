@@ -16,6 +16,10 @@
 
 // ─── Mock expo-constants BEFORE importing api ────────────────────────────────
 
+// ─── Imports ──────────────────────────────────────────────────────────────────
+
+import { api, setToken, BASE_URL } from '../lib/api';
+
 jest.mock('expo-constants', () => ({
   __esModule: true,
   default: {
@@ -24,10 +28,6 @@ jest.mock('expo-constants', () => ({
     manifest: null,
   },
 }));
-
-// ─── Imports ──────────────────────────────────────────────────────────────────
-
-import { api, setToken, BASE_URL } from '../lib/api';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

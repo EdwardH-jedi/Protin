@@ -21,6 +21,9 @@ import React from 'react';
 import { Text, View } from 'react-native';
 import { act, render, renderHook, waitFor } from '@testing-library/react-native';
 
+import { api } from '../lib/api';
+import { useDiscovery } from '../hooks/useDiscovery';
+
 // ─── Mock the api module ──────────────────────────────────────────────────────
 
 jest.mock('../lib/api', () => ({
@@ -34,9 +37,6 @@ jest.mock('../lib/api', () => ({
   setToken: jest.fn(),
   BASE_URL: 'http://localhost:8000',
 }));
-
-import { api } from '../lib/api';
-import { useDiscovery } from '../hooks/useDiscovery';
 
 const mockGet = api.get as jest.Mock;
 const mockPost = api.post as jest.Mock;
