@@ -1,14 +1,55 @@
 # Protin
 
-Protin connects players for peer sports matches: find opponents by sport, issue challenges, book nearby courts, and track results through a ranking and honour system.
+Protin connects players for peer sports matches: find opponents by sport, issue challenges, book nearby courts, and track results through a ranking and honour system. It is a full-stack mobile product — an Expo/React Native app backed by an async FastAPI service — currently supporting gym, golf, tennis, and running in Sydney.
+
+## What it does
+
+- **Opponent discovery** — sport-scoped partner feed with compatibility scoring; mutual likes create a match
+- **Challenges** — issue, accept/decline, and record results for 1-v-1 sport challenges
+- **Matches & chat** — per-match message threads with WebSocket live delivery
+- **Bookings** — propose, confirm, decline, cancel, complete, or no-show a session via an explicit state machine
+- **Venues** — nearby court/venue search combining a seeded database with Google Places, deduplicated by name + distance
+- **Battles (group events)** — host or join open sport events with attendance confirmation
+- **Tournaments** — browse, join, and leave tournaments
+- **Ranking & honour system** — rank progression from recorded results plus an honour/reputation layer
+- **Accounts & safety** — email/password and Sign in with Apple auth, profile photos, Google Calendar sync, Expo push notifications, reports, blocks, and content moderation
+
+## Stack
 
 | Layer | Stack |
 |---|---|
-| Mobile | Expo 52, React Native 0.76, TypeScript, React Navigation |
-| API | FastAPI, SQLAlchemy (async), Alembic, Python 3.12 |
+| Mobile | Expo 54, React Native 0.81, React 19, TypeScript, React Navigation, Zustand |
+| API | FastAPI, SQLAlchemy 2 (async) + asyncpg, Alembic, Pydantic v2, Python 3.12 |
 | Data | PostgreSQL 16, Redis 7 |
-| Package manager (JS) | npm workspaces |
-| Package manager (Python) | uv |
+| Contracts | `@protin/shared-types` — TypeScript types shared between app and API consumers |
+| Infra | Docker (multi-stage API image), docker-compose, nginx, Fly.io config, GitHub Actions CI |
+| Package managers | npm workspaces (JS), uv (Python) |
+
+## Architecture
+
+```
+Expo mobile app ──HTTP + JWT──▶ FastAPI ──▶ PostgreSQL (async SQLAlchemy / Alembic)
+                                   │
+                                   └─────▶ Redis
+        notification worker ──────▶ Expo push service
+```
+
+## Engineering highlights
+
+- Fully async API stack: FastAPI + SQLAlchemy 2 async sessions + asyncpg, async Redis client
+- 15 incremental Alembic migrations covering the whole schema history
+- Booking lifecycle modelled as an explicit finite state machine on the service layer
+- Field-level Fernet encryption (AES-CBC + HMAC, `cryptography` library) for stored OAuth tokens, enforced at startup
+- Rate limiting on auth and external-API-backed endpoints (slowapi)
+- Multi-source venue search: seeded venue DB merged with Google Places, haversine dedup, lazy place-details loading
+- Typed mobile API client with JWT handling and snake_case↔camelCase conversion, backed by a shared types package
+- 26 API test files (620 tests, pytest, in-memory SQLite) and 53 mobile test suites (747 tests, Jest + React Native Testing Library)
+- CI: ruff lint/format, ESLint, TypeScript typecheck, both test suites, and a Docker image build on every push
+- Deployment configuration for a staging stack (docker-compose + nginx) and Fly.io (Sydney region, API + worker processes)
+
+## Current state
+
+Pre-release portfolio project: the feature set above is implemented and tested, and it runs locally (Docker for PostgreSQL/Redis, uvicorn and Expo dev servers for the API and app). Staging and release configuration exists — but it has no production users and is not deployed as a live service.
 
 ---
 
@@ -29,6 +70,10 @@ Protin connects players for peer sports matches: find opponents by sport, issue 
 │           ├── navigation/   React Navigation setup
 │           ├── screens/      screen shells by domain
 │           └── theme/        design tokens
+├── packages/
+│   └── shared-types/         TypeScript type contracts shared with the app
+├── infra/                    nginx config, deploy/backup/health-check scripts
+├── docs/                     release, staging, runbook, and portfolio docs
 ├── .env.example              root infrastructure variables (source of truth)
 ├── docker-compose.yml        PostgreSQL + Redis
 └── package.json              npm workspace root + infra scripts
