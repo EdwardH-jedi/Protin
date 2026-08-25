@@ -111,4 +111,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build API Docker image
-        run: docker build -f apps/api/Dockerfile apps/api
+        # The Dockerfile COPYs apps/api/... paths, so the build context must
+        # be the repository root (matching fly.toml).
+        run: docker build -f apps/api/Dockerfile .
