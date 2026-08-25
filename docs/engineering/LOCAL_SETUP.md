@@ -2,7 +2,7 @@
 
 Environment variables, health verification and troubleshooting for local development.
 The short path — six commands from clone to running app — is in the
-[README](../../README.md#getting-started).
+[README](../../README.md#running-locally).
 
 ---
 
@@ -61,15 +61,27 @@ breaking the app, which is what CI and the App Store reviewer environment rely o
 | `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` | Apple token revocation on account deletion is skipped |
 | `EXPO_PUSH_URL` | **Defaults to the live Expo endpoint**, so omitting it attempts real delivery. Set it explicitly to an empty value to disable sending — events are then still scheduled and stored, but each delivery attempt returns failure and is recorded as failed. |
 
-**Required outside `local`.** These three carry startup guards in a protected
-environment rather than degrading quietly. Note the `SECRET_KEY` guard is narrower than
-the other two:
+**Deployment and upload limits.** These have working defaults; override only when the
+deployment shape demands it:
 
-| Variable | Behaviour when unset |
+| Variable | Default | Purpose |
+|---|---|---|
+| `TRUSTED_PROXY_CIDRS` | `127.0.0.1/32,::1/128` | Networks whose direct peers may supply client-IP headers for rate limiting. Forwarded headers are honoured **only** when the immediate peer is inside one of these networks, and the chain is walked right-to-left so a client-supplied leftmost value cannot spoof its rate-limit identity. Never set a wildcard. |
+| `MEDIA_MAX_FILE_BYTES` | 5 MB | Per-file profile-photo upload ceiling |
+| `MEDIA_MAX_TOTAL_BYTES` | 16 MB | Total per-user media ceiling |
+| `MEDIA_MAX_DIMENSION` | 6000 | Max pixel dimension per side |
+| `MEDIA_MAX_PIXELS` | 20,000,000 | Max total pixels (decompression-bomb guard) |
+
+**Required outside `local`.** These three carry startup guards in a protected
+environment rather than degrading quietly. Validation is centralised in
+`app/core/protected_config.py` and runs from application startup and from the deployment
+preflight:
+
+| Variable | Behaviour when unset or weak |
 |---|---|
-| `SECRET_KEY` | Locally: a startup warning only. (The warning text says tokens are invalidated on restart; that is not accurate for the default, which is a fixed literal — it is true whenever you *do* set a fresh key.) In `staging` / `production`: startup fails **only if the value is the exact literal `change-me-in-production`**. The guard is an exact-match check, so an empty or weak key still boots — an open finding in the [security audit](../security/SECURITY_AUDIT.md). Always set a real random value. |
-| `FIELD_ENCRYPTION_KEY` | Locally: OAuth tokens are stored with a `plain:` sentinel prefix. In `staging` / `production`: startup fails — staging database dumps are retained as backups and would otherwise contain readable tokens. |
-| `INTERNAL_API_TOKEN` | Locally: `/internal/*` is reachable without a shared secret. In `staging` / `production`: startup fails rather than expose an unauthenticated notification fan-out trigger. |
+| `SECRET_KEY` | Locally: a startup warning only. In `staging` / `production`: startup **fails** unless the value is at least 32 characters, contains no placeholder marker (`change-me`, `example`, `placeholder`, `<...>`, …) and uses at least 8 distinct characters. This closed audit finding **C1**. |
+| `FIELD_ENCRYPTION_KEY` | Locally: OAuth tokens are stored with a `plain:` sentinel prefix. In `staging` / `production`: startup fails unless the value parses as a real Fernet key — staging database dumps are retained as backups and would otherwise contain readable tokens. |
+| `INTERNAL_API_TOKEN` | Locally: `/internal/*` is reachable without a shared secret. In `staging` / `production`: startup fails unless it meets the same strength rules as `SECRET_KEY`, rather than expose an unauthenticated notification fan-out trigger. |
 
 Generate the secrets with:
 

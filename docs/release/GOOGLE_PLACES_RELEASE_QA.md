@@ -1,3 +1,9 @@
+> **Point-in-time QA record — figures are stale.** The test count recorded below (72 for
+> `test_places.py` + `test_venues.py`) no longer matches the repository: those two modules
+> now hold **174** tests, all passing as of 2026-08-21. The QA findings remain useful as a
+> record of what was checked; treat every number as historical. Current validation
+> evidence is in [`docs/PROJECT_STATUS.md`](../PROJECT_STATUS.md).
+
 # Google Places — v1.1 Release / Privacy QA
 
 > **Scope:** engineering / release QA only. Nothing in this document is legal

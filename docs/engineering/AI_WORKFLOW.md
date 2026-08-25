@@ -171,6 +171,6 @@ replace it.
   will miss an obfuscated or unusually formatted one. It is a backstop, not a control.
 - The `shared-types` contract is upheld by review convention on the API side rather than
   generated from OpenAPI, so a mismatch is caught by a human or by a test, not by a
-  compiler. See [ARCHITECTURE.md](../architecture/ARCHITECTURE.md#package-boundaries).
+  compiler. See [ARCHITECTURE.md](../ARCHITECTURE.md#package-boundaries-and-the-shared-type-contract).
 - Agent file-ownership boundaries are declared in Markdown, not enforced by tooling.
   They work because the workflow respects them, not because it cannot violate them.

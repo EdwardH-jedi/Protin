@@ -1,3 +1,11 @@
+> **Archived historical document.** This is the April 2026 design plan for the Claude
+> Stop-hook quality gate, written before the gate was built. It is **not** current
+> documentation, and one claim in it is now known to be false: the `pre-commit.sh`
+> PreToolUse hook does **not** run at commit time — it is mis-wired and never fires.
+> For the implemented workflow and its verified gate status see
+> [`docs/engineering/AI_WORKFLOW.md`](../engineering/AI_WORKFLOW.md).
+> Retained for design provenance only.
+
 # Protin — Stop-hook Quality Gate Plan
 
 ## Purpose
@@ -66,7 +74,7 @@ they block safe merging.
 | `.claude/hooks/stop-quality-gate.sh` | lint + typecheck + secret scan |
 | `.claude/hooks/codex-review.sh` | Codex diff review |
 | `reviews/` | generated review reports (gitignored) |
-| `docs/PLAN.md` | this document |
+| `docs/archive/2026-04-stop-hook-plan.md` | this document (archived) |
 | `docs/TASK.md` | running task log |
 
 ## Notes

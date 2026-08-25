@@ -1,3 +1,10 @@
+> **Point-in-time release review — figures are stale.** This document records a QA pass
+> from an earlier branch state. Its test counts (244 mobile / 199 API) and its feature
+> inventory no longer match the repository: the current counts are **747 mobile / 620 API**,
+> and features it lists as absent (group events among them) are now implemented.
+> For current state and validation evidence see
+> [`docs/PROJECT_STATUS.md`](../PROJECT_STATUS.md). Retained for release-process history.
+
 # App Release Review
 
 ## Summary

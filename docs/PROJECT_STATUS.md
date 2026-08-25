@@ -1,6 +1,6 @@
 # Project Status
 
-Last verified: 2026-08-22
+Last verified: 2026-08-25
 Repository: EdwardH-jedi/Protin
 Default branch: main
 Status: Active
@@ -145,8 +145,11 @@ The work remaining before a release is submission mechanics and the gaps listed 
 
 ## 6. Validation
 
-Commands below ran 2026-08-22 on the rehabilitation worktree based on `2aced25`. The
-tree also contains pre-existing documentation/configuration edits and was not clean.
+Re-verified 2026-08-25 on `3752e63` with only documentation changes pending; the results
+below are unchanged from the 2026-08-22 run except where a fresher figure is noted. Local
+runs on 2026-08-25: backend **660 passed / 3 skipped** (101.44s), frontend **747 passed /
+53 suites**, Ruff check and format clean (133 files), ESLint and `tsc` exit 0. CI is green
+on `3752e63` ([run 32553624775](https://github.com/EdwardH-jedi/Protin/actions/runs/32553624775)).
 
 | Check | Command | Result |
 |---|---|---|
@@ -193,7 +196,11 @@ No live production API deployment should be inferred from the presence of `fly.t
 6. **GitHub Actions emits runner/tooling warnings.** The green run reports Node 20 action
    deprecation and transient uv cache restore/save failures; neither failed a job, but
    action versions/cache reliability need maintenance.
-7. **The npm dependency tree has unresolved advisories.** `npm audit --json` on
+7. **PR #3 conflicts with `main`.** The branch has diverged since the security
+   rehabilitation work landed, so the portfolio/documentation branch can no longer
+   fast-forward. Conflicts must be resolved before the branch can merge and before the
+   README's CI badge (which tracks `main`) turns green.
+8. **The npm dependency tree has unresolved advisories.** `npm audit --json` on
    2026-08-22 reports 30 findings (2 low, 10 moderate, 16 high, 2 critical); the critical
    transitive packages are `shell-quote` and `tar`. Fix suggestions include dependency
    changes outside this focused pass and need a separately tested upgrade.
@@ -217,13 +224,17 @@ No live production API deployment should be inferred from the presence of `fly.t
 
 ## 10. Next recommended work
 
-1. **Obtain a green expanded CI run**, including PostgreSQL 16 migrations/concurrency and
-   the web production build.
+1. **Resolve the PR #3 merge conflicts and land the branch**, so `main` carries the
+   security rehabilitation plus the documentation set and the CI badge goes green. This
+   is the blocking item — everything else below is easier once `main` is current.
+   (The expanded eight-job CI run this list previously asked for is now green on
+   `3752e63`.)
 2. **Purge photo files on account deletion** by calling `clear_user_photos` from the
    deletion path. Privacy-relevant and a genuine compliance gap.
 3. **Fix the `PreToolUse` / `PostToolUse` hook wiring** — read the JSON payload from
    stdin, and resolve `ruff` / `tsc` via `uv run` / `npx --no-install` at the same time.
-4. **Merge PR #3** so `main` and the CI badge go green.
+4. **Triage the npm advisories**, starting with the two critical transitive packages
+   (`shell-quote`, `tar`), as a separately tested upgrade.
 5. **Apply `identity_preferences` to the discovery feed**, closing the largest gap
    between what the product captures and what it uses.
 

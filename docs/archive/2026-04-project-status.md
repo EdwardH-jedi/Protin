@@ -1,9 +1,9 @@
 > **Archived historical document.** This file reflects the repository state as of
 > April 2026 and is **not** current project documentation. Much of it is now
 > inaccurate: the API, mobile app, migrations and test suites have all grown
-> substantially since. For current documentation see
-> [`README.md`](../../README.md),
-> [`docs/architecture/ARCHITECTURE.md`](../architecture/ARCHITECTURE.md) and
+> substantially since. **It has been superseded by
+> [`docs/PROJECT_STATUS.md`](../PROJECT_STATUS.md)**, which is the canonical
+> current-state document. See also [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) and
 > [`docs/engineering/TESTING.md`](../engineering/TESTING.md).
 > Retained for project history only.
 
