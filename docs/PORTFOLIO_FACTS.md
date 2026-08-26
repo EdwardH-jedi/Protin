@@ -1,12 +1,34 @@
 # Protin — Portfolio Facts
 
-Grounded reference for talking about this project. Every claim below is verifiable
-from this repository (code, tests, migrations, CI, and deploy configuration).
+Grounded reference for talking about this project. Repository claims below are
+verifiable from code, tests, migrations, CI, deploy configuration, and the recorded
+release history. The public App Store name for v1 is **SportsGang**; `Protin` remains
+the repository / technical project name.
 
 ## One-line description
 
 Peer sports matchmaking on mobile — find opponents by sport, issue challenges, book
 nearby courts, and track results through a ranking and honour system.
+
+## Release outcome
+
+- **Initial commit:** 18 March 2026.
+- **App Store submission:** SportsGang v1.0 submitted 10 May 2026 at 9:45 PM PDT.
+- **App Review:** one documented rejection / changes-needed cycle on 12 May 2026.
+- **Resolution:** the repository release history records the issue as Apple Guideline
+  2.1(a) / App Completeness: the reviewer account reached an empty production
+  Discover feed. I added an idempotent production review-data seed with a reviewer
+  account, demo discovery candidates, matches, chats, and bookings, then verified the
+  review path against the deployed HTTPS API.
+- **Approval:** Apple completed review on 13 May 2026, accepted SportsGang v1.0 for
+  iOS, marked it eligible for distribution, and separately confirmed that SportsGang
+  had been **approved for distribution**.
+- **App Store record:** `https://apps.apple.com/app/sportsgang/id6767027447`.
+- **First commit → App Store approval:** approximately **56 days / 8 weeks**.
+
+The App Store emails confirm approval and distribution eligibility. Download counts,
+active-user counts, and other post-launch product metrics are not tracked in this
+repository, so no adoption numbers are claimed here.
 
 ## Problem / purpose
 
@@ -81,27 +103,47 @@ defined in the shared-types package.
    live Google Places responses, deduplicating by normalised name plus ~100 m
    haversine proximity, with place details lazy-loaded per selection to keep external
    API usage (and rate limits) under control.
+4. **App Review recovery as a reproducible production workflow.** After the first
+   review cycle exposed an empty reviewer experience, `seed_review_data.py` made the
+   review dataset idempotent and future-facing instead of relying on manual database
+   edits. The seeded account, discovery feed, matches, chats, and bookings could be
+   regenerated before review and verified through the public API.
+
+## Release / deployment facts
+
+- Apple Developer Program and App Store Connect setup were completed for SportsGang.
+- A production Fly.io backend was exercised during the App Review recovery flow.
+- Reviewer data was verified end-to-end through the deployed public HTTPS API.
+- SportsGang v1.0 passed App Review and was approved for App Store distribution on
+  13 May 2026.
+- The approval email includes the App Store record URL for app ID `6767027447`.
+- No download, MAU, retention, or other adoption metrics are claimed because they are
+  not tracked in this repository.
 
 ## Current limitations
 
-- No production deployment or users; staging and release configuration exists
-  (docker-compose.staging, Fly.io, TestFlight/App Store prep docs) but nothing is
-  claimed as live
+- Public adoption metrics are not available in the repository, so download counts and
+  active-user counts should not be invented or inferred from App Store approval.
 - API tests run against in-memory SQLite, not PostgreSQL, so DB-engine-specific
-  behaviour and the Alembic chain are not exercised in CI
+  behaviour and the Alembic chain are not exercised in CI.
 - Media (profile photos) is stored on local disk; cloud object storage is a
-  production TODO
-- Opponent discovery filters by sport and profile compatibility, not by
-  geographic proximity (location is used for venue search only)
+  production TODO.
+- Opponent discovery filters by sport and profile compatibility, not by geographic
+  proximity (location is used for venue search only).
+- Tournaments are implemented behind a feature flag but are not wired into the main
+  mobile navigation.
 
 ## 30-second version
 
 "Protin is a peer sports matchmaking app I built end-to-end: an Expo/React Native
-app on top of an async FastAPI backend with PostgreSQL and Redis. You discover
-opponents by sport, challenge them, book a nearby court through a Google
-Places-backed venue search, and results feed a ranking and honour system. It's
-around 620 backend tests and 750 mobile tests, with CI running lint, typecheck,
-both suites, and a Docker build."
+TypeScript app on top of an async FastAPI backend with PostgreSQL and Redis. You can
+discover opponents by sport, challenge them, book nearby venues, chat, and track
+results through a ranking and honour system. I took the iOS release through Apple App
+Review as SportsGang v1.0; after one App Completeness review issue, I built a
+reproducible production review-data workflow, resubmitted, and the app was approved
+for distribution about eight weeks after the first commit. The repo has around 620
+backend tests and 750 mobile tests with CI covering lint, typecheck, both suites, and
+a Docker build."
 
 ## 2-minute technical version
 
@@ -117,13 +159,20 @@ notifications — are validated in one place. On top of that there are 1-v-1 cha
 with results, group events with attendance tracking, feature-flagged tournaments,
 and a rank/honour system.
 
-Two integrations I'd highlight: venue search merges a seeded database with Google
-Places, deduplicating by name and haversine distance and rate-limiting the external
-calls; and Google Calendar sync stores OAuth tokens through a field-level encryption
-type that the app refuses to boot without a key for outside dev.
+Two integrations I'd highlight are venue search, which merges a seeded database with
+Google Places while deduplicating by name and haversine distance, and Google Calendar
+sync, where OAuth tokens are stored through a field-level encryption type that the app
+refuses to boot without a key outside development.
 
-Quality-wise: about 620 pytest tests against the ASGI app with in-memory SQLite, 747
-Jest tests over the mobile screens and stores, and a GitHub Actions pipeline running
-ruff, ESLint, typechecks, both suites, and the Docker build. It's a pre-release
-portfolio project — deploy configuration for staging and Fly.io exists, but I don't
-claim production traffic."
+The release process became an engineering problem too. SportsGang v1.0 went through
+Apple App Review and hit one App Completeness issue because the reviewer account
+landed on an empty production discovery feed. I fixed that by building an idempotent
+production seed for the full reviewer journey — discovery candidates, matches, chat,
+and pending/confirmed bookings — and verified it against the deployed HTTPS API.
+Apple then accepted v1.0 and approved it for distribution on 13 May 2026, roughly 56
+days after the first commit.
+
+Quality-wise, the repository has about 620 pytest tests and roughly 750 Jest tests,
+plus GitHub Actions for linting, typechecking, both suites, and the Docker build.
+I don't claim download or active-user numbers because those metrics are not tracked in
+the repository."
